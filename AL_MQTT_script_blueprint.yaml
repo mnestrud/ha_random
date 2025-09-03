@@ -1,22 +1,56 @@
 blueprint:
-  name: "AL → MQTT: Publish set payload (configurable topic)"
+  name: "AL → MQTT: Publish set payload (configurable topic, state, transition, selective fields)"
   description: >
-    Publishes a Zigbee2MQTT `set` payload using brightness and color temperature
-    derived from an Adaptive Lighting switch. Configure the MQTT topic per instance.
+    Publishes a Zigbee2MQTT `set` payload using values from an Adaptive Lighting switch.
+    Configure topic/state/transition, and use toggles to include:
+    (1) brightness + level_config, (2) color_temp + color_options.
   domain: script
   input:
     mqtt_topic:
       name: MQTT Topic
-      description: "Target topic, e.g., zigbee2mqtt/<device>/set"
+      description: "Target topic, e.g., zigbee2mqtt/<device_or_group>/set"
       selector:
         text: {}
     al_switch:
       name: Adaptive Lighting Switch
-      description: "Switch that exposes brightness_pct and color_temp_kelvin"
+      description: "Switch exposing brightness_pct and color_temp_kelvin"
       default: switch.adaptive_lighting_al_dummy_overhead_control
       selector:
         entity:
           domain: switch
+    light_state:
+      name: State
+      description: "State to send on the group/device"
+      default: "ON"
+      selector:
+        select:
+          options:
+            - "ON"
+            - "OFF"
+            - "TOGGLE"
+    transition_s:
+      name: Transition (seconds)
+      description: "Fade time in seconds"
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.1
+          mode: slider
+          unit_of_measurement: s
+    include_brightness_level_config:
+      name: Include Brightness + level_config
+      description: "If on, include brightness (scaled from AL) and level_config.execute_if_off"
+      default: true
+      selector:
+        boolean: {}
+    include_color_temp_options:
+      name: Include color_temp + color_options
+      description: "If on, include color_temp (mired from AL K) and color_options.execute_if_off"
+      default: true
+      selector:
+        boolean: {}
 
 alias: "AL → MQTT: Publish set payload"
 mode: restart
@@ -28,18 +62,25 @@ sequence:
       retain: false
       topic: !input mqtt_topic
       payload: >-
-        {{
-          {
-            "state": "ON",
-            "transition": 1,
-            "level_config": {"execute_if_off": true},
-            "color_options": {"execute_if_off": true},
-            "brightness": (
-              (state_attr(!input al_switch, 'brightness_pct') | int * 255 / 100)
-              | round(0)
-            ),
-            "color_temp": (
-              1000000 / (state_attr(!input al_switch, 'color_temp_kelvin') | float)
-            ) | round(0)
-          } | tojson
-        }}
+        {%- set include_bl = !input include_brightness_level_config -%}
+        {%- set include_color = !input include_color_temp_options -%}
+        {%- set al = !input al_switch -%}
+        {%- set _brightness = ((state_attr(al, 'brightness_pct') | int * 255 / 100) | round(0)) -%}
+        {%- set _color_temp = (1000000 / (state_attr(al, 'color_temp_kelvin') | float)) | round(0) -%}
+        {%- set base = {
+              "state": !input light_state,
+              "transition": !input transition_s
+            } -%}
+        {%- if include_bl -%}
+        {%- set base = base | combine({
+              "level_config": {"execute_if_off": true},
+              "brightness": _brightness
+            }, recursive=True) -%}
+        {%- endif -%}
+        {%- if include_color -%}
+        {%- set base = base | combine({
+              "color_options": {"execute_if_off": true},
+              "color_temp": _color_temp
+            }, recursive=True) -%}
+        {%- endif -%}
+        {{ base | tojson }}
