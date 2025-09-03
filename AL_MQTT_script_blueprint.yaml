@@ -1,5 +1,5 @@
 blueprint:
-  name: "AL → MQTT: script for direct payload to lights and switches v0.2"
+  name: "AL to MQTT: script for direct payload to lights and switches v0.2"
   description: >
     Publishes a Zigbee2MQTT `set` payload using values from an Adaptive Lighting switch.
     Configure topic/state/transition, and optionally include:
@@ -55,7 +55,6 @@ blueprint:
 alias: "AL → MQTT: Publish set payload"
 mode: restart
 
-# ✅ Move !input values into plain variables first
 variables:
   v_topic: !input mqtt_topic
   v_al: !input al_switch
@@ -70,9 +69,7 @@ sequence:
       evaluate_payload: true
       qos: 1
       retain: false
-      # ✅ Ensure topic is a STRING (template) explicitly
       topic: "{{ v_topic }}"
-      # ✅ Build JSON strictly as a single template STRING
       payload: >-
         {
           "state": "{{ v_state }}",
@@ -92,4 +89,3 @@ sequence:
             ) | round(0) | int
           }}{% endif %}
         }
-
