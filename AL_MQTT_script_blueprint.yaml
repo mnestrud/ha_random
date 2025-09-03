@@ -1,5 +1,5 @@
 blueprint:
-  name: "AL → MQTT: Publish set payload (configurable topic, state, transition, selective fields)"
+  name: "AL → MQTT: script for direct payload to lights and switches"
   description: >
     Publishes a Zigbee2MQTT `set` payload using values from an Adaptive Lighting switch.
     Configure topic/state/transition, and use toggles to include:
@@ -84,3 +84,4 @@ sequence:
             }, recursive=True) -%}
         {%- endif -%}
         {{ base | tojson }}
+
