@@ -1,5 +1,5 @@
 blueprint:
-  name: "AL → MQTT: script for direct payload to lights and switches"
+  name: "AL → MQTT: script for direct payload to lights and switches v0.1"
   description: >
     Publishes a Zigbee2MQTT `set` payload using values from an Adaptive Lighting switch.
     Configure topic/state/transition, and optionally include:
@@ -76,3 +76,4 @@ sequence:
             (1000000 / (state_attr(!input al_switch, 'color_temp_kelvin') | float)) | round(0)
           }}{% endif %}
         }
+
