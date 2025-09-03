@@ -1,5 +1,5 @@
 blueprint:
-  name: "AL → MQTT: script for direct payload to lights and switches v0.1"
+  name: "AL → MQTT: script for direct payload to lights and switches v0.2"
   description: >
     Publishes a Zigbee2MQTT `set` payload using values from an Adaptive Lighting switch.
     Configure topic/state/transition, and optionally include:
@@ -54,26 +54,42 @@ blueprint:
 
 alias: "AL → MQTT: Publish set payload"
 mode: restart
+
+# ✅ Move !input values into plain variables first
+variables:
+  v_topic: !input mqtt_topic
+  v_al: !input al_switch
+  v_state: !input light_state
+  v_transition: !input transition_s
+  v_inc_bl: !input include_brightness_level_config
+  v_inc_color: !input include_color_temp_options
+
 sequence:
   - action: mqtt.publish
     data:
-      # Keep these as plain types (no templates), to avoid the validator complaint
       evaluate_payload: true
       qos: 1
       retain: false
-      topic: !input mqtt_topic
-      # Build JSON as a single *string* with conditional parts
+      # ✅ Ensure topic is a STRING (template) explicitly
+      topic: "{{ v_topic }}"
+      # ✅ Build JSON strictly as a single template STRING
       payload: >-
         {
-          "state": "{{ !input light_state }}",
-          "transition": {{ !input transition_s }}{% if !input include_brightness_level_config %},
-          "level_config": {"execute_if_off": true},
+          "state": "{{ v_state }}",
+          "transition": {{ v_transition }}{% if v_inc_bl %},
+          "level_config": { "execute_if_off": true },
           "brightness": {{
-            ((state_attr(!input al_switch, 'brightness_pct') | int * 255 / 100) | round(0))
-          }}{% endif %}{% if !input include_color_temp_options %},
-          "color_options": {"execute_if_off": true},
+            (
+              (
+                state_attr(v_al, 'brightness_pct') | int(0)
+              ) * 255 / 100
+            ) | round(0) | int
+          }}{% endif %}{% if v_inc_color %},
+          "color_options": { "execute_if_off": true },
           "color_temp": {{
-            (1000000 / (state_attr(!input al_switch, 'color_temp_kelvin') | float)) | round(0)
+            (
+              1000000 / (state_attr(v_al, 'color_temp_kelvin') | float(4000.0))
+            ) | round(0) | int
           }}{% endif %}
         }
 
