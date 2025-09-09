@@ -1,91 +1,91 @@
 blueprint:
-  name: "AL to MQTT: script for direct payload to lights and switches v0.2"
+  name: Adaptive Lighting → Inovelli Blue + Z2M Group (Script)
   description: >
-    Publishes a Zigbee2MQTT `set` payload using values from an Adaptive Lighting switch.
-    Configure topic/state/transition, and optionally include:
-    (1) brightness + level_config, (2) color_temp + color_options.
+    Create an AL script with three inputs:
+    1) Adaptive Lighting switch (fallback source for brightness/color),
+    2) Inovelli Zigbee2MQTT /set topic,
+    3) Zigbee2MQTT group /set topic.
   domain: script
   input:
-    mqtt_topic:
-      name: MQTT Topic
-      description: "Target topic, e.g., zigbee2mqtt/<device_or_group>/set"
-      selector:
-        text: {}
     al_switch:
-      name: Adaptive Lighting Switch
-      description: "Switch exposing brightness_pct and color_temp_kelvin"
-      default: switch.adaptive_lighting_al_dummy_overhead_control
+      name: Adaptive Lighting switch (fallback source)
+      description: Switch entity providing brightness_pct & color_temp_kelvin attributes
       selector:
         entity:
           domain: switch
-    light_state:
-      name: State
-      description: "State to send on the group/device"
-      default: "ON"
+    inovelli_set_topic:
+      name: Inovelli Zigbee2MQTT /set topic
+      description: e.g. "zigbee2mqtt/Primary Bedroom Overhead Light Switch/set"
       selector:
-        select:
-          options:
-            - "ON"
-            - "OFF"
-            - "TOGGLE"
-    transition_s:
-      name: Transition (seconds)
-      description: "Fade time in seconds"
-      default: 1
+        text:
+    group_set_topic:
+      name: Zigbee2MQTT group /set topic
+      description: e.g. "zigbee2mqtt/zgb_primary_bedroom/set"
       selector:
-        number:
-          min: 0
-          max: 10
-          step: 0.1
-          mode: slider
-          unit_of_measurement: s
-    include_brightness_level_config:
-      name: Include Brightness + level_config
-      description: "If on, include brightness (scaled from AL) and level_config.execute_if_off"
-      default: true
-      selector:
-        boolean: {}
-    include_color_temp_options:
-      name: Include color_temp + color_options
-      description: "If on, include color_temp (mired from AL K) and color_options.execute_if_off"
-      default: true
-      selector:
-        boolean: {}
+        text:
 
-alias: "AL → MQTT: Publish set payload"
-mode: restart
-
-variables:
-  v_topic: !input mqtt_topic
-  v_al: !input al_switch
-  v_state: !input light_state
-  v_transition: !input transition_s
-  v_inc_bl: !input include_brightness_level_config
-  v_inc_color: !input include_color_temp_options
-
+# ---------- Script body (logic unchanged except for the three inputs) ----------
+alias: AL Bedroom Overhead
+mode: single
+fields:
+  target_state:
+    description: "\"ON\" or \"OFF\" (required)"
+    example: "ON"
+  brightness_pct:
+    description: Optional brightness percent (0–100). Falls back to AL dummy switch.
+    example: 72
+  color_temp_kelvin:
+    description: Optional color temp in Kelvin. Falls back to AL dummy switch.
+    example: 2700
 sequence:
+  - variables:
+      # Blueprint inputs
+      al_sw: !input al_switch
+
+      pct: >-
+        {% set p = brightness_pct | default(None) %}
+        {% if p is number %}{{ p | int }}
+        {% else %}{{ state_attr(al_sw,'brightness_pct') | int(50) }}
+        {% endif %}
+      kelvin: >-
+        {% set k = color_temp_kelvin | default(None) %}
+        {% if k is number %}{{ k | float }}
+        {% else %}{{ state_attr(al_sw,'color_temp_kelvin') | float(2700) }}
+        {% endif %}
+      bri_raw: "{{ (pct * 254 / 100) | round(0) | int }}"
+      bri: "{{ [ [ bri_raw, 1 ] | max, 254 ] | min }}"
+      mired_raw: "{{ (1000000 / kelvin) | round(0) | int }}"
+      mired: "{{ [ [ mired_raw, 153 ] | max, 500 ] | min }}"
+      target_state_norm: "{{ target_state | upper }}"
   - action: mqtt.publish
     data:
-      evaluate_payload: true
-      qos: 1
+      topic: !input inovelli_set_topic
+      qos: 0
       retain: false
-      topic: "{{ v_topic }}"
-      payload: >-
-        {
-          "state": "{{ v_state }}",
-          "transition": {{ v_transition }}{% if v_inc_bl %},
-          "level_config": { "execute_if_off": true },
-          "brightness": {{
-            (
-              (
-                state_attr(v_al, 'brightness_pct') | int(0)
-              ) * 255 / 100
-            ) | round(0) | int
-          }}{% endif %}{% if v_inc_color %},
-          "color_options": { "execute_if_off": true },
-          "color_temp": {{
-            (
-              1000000 / (state_attr(v_al, 'color_temp_kelvin') | float(4000.0))
-            ) | round(0) | int
-          }}{% endif %}
-        }
+      payload: |-
+        {{
+          {
+            "level_config": {"execute_if_off": true},
+            "defaultLevelLocal": bri,
+            "defaultLevelRemote": bri,
+            "brightness": bri,
+            "state": target_state_norm
+          } | tojson
+        }}
+  - delay: "00:00:01"
+  - action: mqtt.publish
+    data:
+      topic: !input group_set_topic
+      qos: 0
+      retain: false
+      payload: |-
+        {{
+          {
+            "state": target_state_norm,
+            "level_config": {"execute_if_off": true},
+            "color_options": {"execute_if_off": true},
+            "brightness": bri,
+            "color_temp": mired
+          } | tojson
+        }}
+description: ""
