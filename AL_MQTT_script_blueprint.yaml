@@ -21,8 +21,20 @@ blueprint:
       default: ""
       selector:
         text:
+    inovelli_compare_entity:
+      name: Entity to compare (switch brightness)
+      description: Light entity representing the Inovelli-controlled load (used to compare current brightness)
+      selector:
+        entity:
+          domain: light
+    group_compare_entity:
+      name: Entity to compare (group brightness/color)
+      description: Light or group entity representing the Z2M group (used to compare current brightness & color_temp)
+      selector:
+        entity:
+          domain: light
 
-# ---------- Script body (logic unchanged; only delay condition updated) ----------
+# ---------- Script body (logic unchanged; adds compare checks before publishes) ----------
 alias: AL Bedroom Overhead
 mode: single
 fields:
@@ -41,7 +53,10 @@ sequence:
       al_sw: !input al_switch
       inovelli_topic: !input inovelli_set_topic
       group_topic: !input group_set_topic
+      inovelli_compare: !input inovelli_compare_entity
+      group_compare: !input group_compare_entity
 
+      # Desired targets from AL (or overrides)
       pct: >-
         {% set p = brightness_pct | default(None) %}
         {% if p is number %}{{ p | int }}
@@ -58,11 +73,25 @@ sequence:
       mired: "{{ [ [ mired_raw, 153 ] | max, 500 ] | min }}"
       target_state_norm: "{{ target_state | upper }}"
 
-  # Publish to Inovelli only if topic input is non-blank
+      # Current attributes for comparison
+      cur_bri_inovelli: >-
+        {% set v = state_attr(inovelli_compare, 'brightness') %}
+        {% if v is number %}{{ v | int }}{% else %}{{ None }}{% endif %}
+      cur_bri_group: >-
+        {% set v = state_attr(group_compare, 'brightness') %}
+        {% if v is number %}{{ v | int }}{% else %}{{ None }}{% endif %}
+      cur_mired_group: >-
+        {% set v = state_attr(group_compare, 'color_temp') %}
+        {% if v is number %}{{ v | int }}{% else %}{{ None }}{% endif %}
+
+  # Publish to Inovelli only if topic non-blank AND brightness differs (or unknown)
   - choose:
       - conditions:
           - condition: template
             value_template: "{{ (inovelli_topic | string | trim) | length > 0 }}"
+          - condition: template
+            value_template: >
+              {{ cur_bri_inovelli is not number or cur_bri_inovelli != bri }}
         sequence:
           - action: mqtt.publish
             data:
@@ -90,11 +119,15 @@ sequence:
         sequence:
           - delay: "00:00:01"
 
-  # Publish to Zigbee2MQTT group only if topic input is non-blank
+  # Publish to Zigbee2MQTT group only if topic non-blank AND (brightness OR color_temp) differs (or unknown)
   - choose:
       - conditions:
           - condition: template
             value_template: "{{ (group_topic | string | trim) | length > 0 }}"
+          - condition: template
+            value_template: >
+              {{ (cur_bri_group is not number or cur_bri_group != bri)
+                 or (cur_mired_group is not number or cur_mired_group != mired) }}
         sequence:
           - action: mqtt.publish
             data:
