@@ -23,18 +23,20 @@ blueprint:
         text:
     inovelli_compare_entity:
       name: Entity to compare (switch brightness)
-      description: Light entity representing the Inovelli-controlled load (used to compare current brightness)
+      description: Light entity representing the Inovelli-controlled load (used to compare current brightness). May be blank.
+      default: ""
       selector:
         entity:
           domain: light
     group_compare_entity:
       name: Entity to compare (group brightness/color)
-      description: Light or group entity representing the Z2M group (used to compare current brightness & color_temp)
+      description: Light or group entity representing the Z2M group (used to compare current brightness & color_temp). May be blank.
+      default: ""
       selector:
         entity:
           domain: light
 
-# ---------- Script body (logic unchanged; adds compare checks before publishes) ----------
+# ---------- Script body (logic unchanged; compare-entity inputs can be blank) ----------
 alias: AL Bedroom Overhead
 mode: single
 fields:
@@ -73,16 +75,30 @@ sequence:
       mired: "{{ [ [ mired_raw, 153 ] | max, 500 ] | min }}"
       target_state_norm: "{{ target_state | upper }}"
 
+      # Blank-check helpers
+      inovelli_compare_blank: "{{ (inovelli_compare | string | trim) == '' }}"
+      group_compare_blank: "{{ (group_compare | string | trim) == '' }}"
+
       # Current attributes for comparison
+      # If the compare input is blank, force 0 so it always differs from target (bri 1..254, mired 153..500)
       cur_bri_inovelli: >-
-        {% set v = state_attr(inovelli_compare, 'brightness') %}
-        {% if v is number %}{{ v | int }}{% else %}{{ None }}{% endif %}
+        {% if inovelli_compare_blank %}
+          0
+        {% else %}
+          {{ state_attr(inovelli_compare, 'brightness') | default(0) | int }}
+        {% endif %}
       cur_bri_group: >-
-        {% set v = state_attr(group_compare, 'brightness') %}
-        {% if v is number %}{{ v | int }}{% else %}{{ None }}{% endif %}
+        {% if group_compare_blank %}
+          0
+        {% else %}
+          {{ state_attr(group_compare, 'brightness') | default(0) | int }}
+        {% endif %}
       cur_mired_group: >-
-        {% set v = state_attr(group_compare, 'color_temp') %}
-        {% if v is number %}{{ v | int }}{% else %}{{ None }}{% endif %}
+        {% if group_compare_blank %}
+          0
+        {% else %}
+          {{ state_attr(group_compare, 'color_temp') | default(0) | int }}
+        {% endif %}
 
   # Publish to Inovelli only if topic non-blank AND brightness differs (or unknown)
   - choose:
