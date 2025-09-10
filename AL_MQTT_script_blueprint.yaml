@@ -1,30 +1,28 @@
 blueprint:
-  name: Adaptive Lighting → Inovelli Blue + Z2M Group (Script)
-  description: >
-    Create an AL script with three inputs:
-    1) Adaptive Lighting switch (fallback source for brightness/color),
-    2) Inovelli Zigbee2MQTT /set topic,
-    3) Zigbee2MQTT group /set topic.
+  name: Ataraxia Lighting Script
   domain: script
+  author: mnestrud
   input:
     al_switch:
-      name: Adaptive Lighting switch (fallback source)
-      description: Switch entity providing brightness_pct & color_temp_kelvin attributes
+      name: Adaptive Lighting switch
+      description: Adaptive Lighting Switch entity providing brightness_pct & color_temp_kelvin attributes
       selector:
         entity:
           domain: switch
     inovelli_set_topic:
-      name: Inovelli Zigbee2MQTT /set topic
-      description: e.g. "zigbee2mqtt/Primary Bedroom Overhead Light Switch/set"
+      name: Light Switch - Zigbee2MQTT /set topic (Innovelli Blue)
+      description: e.g. "zigbee2mqtt/Primary Bedroom Overhead Light Switch/set" - May be blank.
+      default: ""
       selector:
         text:
     group_set_topic:
-      name: Zigbee2MQTT group /set topic
-      description: e.g. "zigbee2mqtt/zgb_primary_bedroom/set"
+      name: Light Group or Individual Light - Zigbee2MQTT /set topic.  
+      description: e.g. "zigbee2mqtt/zgb_primary_bedroom/set" - May be blank.
+      default: ""
       selector:
         text:
 
-# ---------- Script body (logic unchanged except for the three inputs) ----------
+# ---------- Script body (logic unchanged; only delay condition updated) ----------
 alias: AL Bedroom Overhead
 mode: single
 fields:
@@ -41,6 +39,8 @@ sequence:
   - variables:
       # Blueprint inputs
       al_sw: !input al_switch
+      inovelli_topic: !input inovelli_set_topic
+      group_topic: !input group_set_topic
 
       pct: >-
         {% set p = brightness_pct | default(None) %}
@@ -57,35 +57,57 @@ sequence:
       mired_raw: "{{ (1000000 / kelvin) | round(0) | int }}"
       mired: "{{ [ [ mired_raw, 153 ] | max, 500 ] | min }}"
       target_state_norm: "{{ target_state | upper }}"
-  - action: mqtt.publish
-    data:
-      topic: !input inovelli_set_topic
-      qos: 0
-      retain: false
-      payload: |-
-        {{
-          {
-            "level_config": {"execute_if_off": true},
-            "defaultLevelLocal": bri,
-            "defaultLevelRemote": bri,
-            "brightness": bri,
-            "state": target_state_norm
-          } | tojson
-        }}
-  - delay: "00:00:01"
-  - action: mqtt.publish
-    data:
-      topic: !input group_set_topic
-      qos: 0
-      retain: false
-      payload: |-
-        {{
-          {
-            "state": target_state_norm,
-            "level_config": {"execute_if_off": true},
-            "color_options": {"execute_if_off": true},
-            "brightness": bri,
-            "color_temp": mired
-          } | tojson
-        }}
-description: ""
+
+  # Publish to Inovelli only if topic input is non-blank
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ (inovelli_topic | string) | length > 0 }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: "{{ inovelli_topic }}"
+              qos: 0
+              retain: false
+              payload: |-
+                {{
+                  {
+                    "level_config": {"execute_if_off": true},
+                    "defaultLevelLocal": bri,
+                    "defaultLevelRemote": bri,
+                    "brightness": bri,
+                    "state": target_state_norm
+                  } | tojson
+                }}
+
+  # Delay only if BOTH topics are non-blank
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ ((inovelli_topic | string) | length > 0) and
+                 ((group_topic | string) | length > 0) }}
+        sequence:
+          - delay: "00:00:01"
+
+  # Publish to Zigbee2MQTT group only if topic input is non-blank
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ (group_topic | string) | length > 0 }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: "{{ group_topic }}"
+              qos: 0
+              retain: false
+              payload: |-
+                {{
+                  {
+                    "state": target_state_norm,
+                    "level_config": {"execute_if_off": true},
+                    "color_options": {"execute_if_off": true},
+                    "brightness": bri,
+                    "color_temp": mired
+                  } | tojson
+                }}
