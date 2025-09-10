@@ -10,13 +10,13 @@ blueprint:
         entity:
           domain: switch
     inovelli_set_topic:
-      name: Light Switch - Zigbee2MQTT /set topic (Innovelli Blue)
+      name: Light Switch - Zigbee2MQTT /set topic (Inovelli Blue)
       description: e.g. "zigbee2mqtt/Primary Bedroom Overhead Light Switch/set" - May be blank.
       default: ""
       selector:
         text:
     group_set_topic:
-      name: Light Group or Individual Light - Zigbee2MQTT /set topic.  
+      name: Light Group or Individual Light - Zigbee2MQTT /set topic.
       description: e.g. "zigbee2mqtt/zgb_primary_bedroom/set" - May be blank.
       default: ""
       selector:
@@ -62,7 +62,7 @@ sequence:
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ (inovelli_topic | string) | length > 0 }}"
+            value_template: "{{ (inovelli_topic | string | trim) | length > 0 }}"
         sequence:
           - action: mqtt.publish
             data:
@@ -85,8 +85,8 @@ sequence:
       - conditions:
           - condition: template
             value_template: >-
-              {{ ((inovelli_topic | string) | length > 0) and
-                 ((group_topic | string) | length > 0) }}
+              {{ (inovelli_topic | string | trim) | length > 0 and
+                 (group_topic | string | trim) | length > 0 }}
         sequence:
           - delay: "00:00:01"
 
@@ -94,7 +94,7 @@ sequence:
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ (group_topic | string) | length > 0 }}"
+            value_template: "{{ (group_topic | string | trim) | length > 0 }}"
         sequence:
           - action: mqtt.publish
             data:
