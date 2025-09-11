@@ -1,14 +1,14 @@
 blueprint:
-  name: "Ataraxia Lighting – Master Tick Automation (v0.2)"
+  name: "Ataraxia Lighting – Master Tick Automation (v0.3)"
   description: >
-    Master timer tick that fans out to up to 15 areas. For each area, reads
+    Master timer tick that fans out to 11 areas. For each area, reads
     brightness_pct and color_temp_kelvin from that area's Adaptive Lighting
     dummy switch, determines ON/OFF from the area's light state, and calls the
     area's script. Includes a global stagger delay and an optional transition
     (defaults empty) passed to each script.
   domain: automation
   author: mnestrud
-  source_url: https://github.com/mnestrud/ha_random/blob/main/AL_Tick_Automation_Blueprint.yaml
+  source_url: https://raw.githubusercontent.com/mnestrud/ha_random/main/AL_Tick_Automation_Blueprint.yaml
 
   input:
     timer_entity:
@@ -41,321 +41,149 @@ blueprint:
       selector:
         text: {}
 
-    # ------- 15 area blocks (enable boolean, light, script, AL switch) -------
+    # ------- 11 area blocks -------
     a1_enable:
       name: "Area 1 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
+      selector: { entity: { domain: input_boolean } }
     a1_light:
       name: "Area 1 – Light entity"
-      selector:
-        entity:
-          domain: light
+      selector: { entity: { domain: light } }
     a1_script:
       name: "Area 1 – Script to call"
-      selector:
-        entity:
-          domain: script
+      selector: { entity: { domain: script } }
     a1_al_switch:
       name: "Area 1 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
+      selector: { entity: { domain: switch } }
 
     a2_enable:
       name: "Area 2 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
+      selector: { entity: { domain: input_boolean } }
     a2_light:
       name: "Area 2 – Light entity"
-      selector:
-        entity:
-          domain: light
+      selector: { entity: { domain: light } }
     a2_script:
       name: "Area 2 – Script to call"
-      selector:
-        entity:
-          domain: script
+      selector: { entity: { domain: script } }
     a2_al_switch:
       name: "Area 2 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
+      selector: { entity: { domain: switch } }
 
     a3_enable:
       name: "Area 3 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
+      selector: { entity: { domain: input_boolean } }
     a3_light:
       name: "Area 3 – Light entity"
-      selector:
-        entity:
-          domain: light
+      selector: { entity: { domain: light } }
     a3_script:
       name: "Area 3 – Script to call"
-      selector:
-        entity:
-          domain: script
+      selector: { entity: { domain: script } }
     a3_al_switch:
       name: "Area 3 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
+      selector: { entity: { domain: switch } }
 
     a4_enable:
       name: "Area 4 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
+      selector: { entity: { domain: input_boolean } }
     a4_light:
       name: "Area 4 – Light entity"
-      selector:
-        entity:
-          domain: light
+      selector: { entity: { domain: light } }
     a4_script:
       name: "Area 4 – Script to call"
-      selector:
-        entity:
-          domain: script
+      selector: { entity: { domain: script } }
     a4_al_switch:
       name: "Area 4 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
+      selector: { entity: { domain: switch } }
 
     a5_enable:
       name: "Area 5 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
+      selector: { entity: { domain: input_boolean } }
     a5_light:
       name: "Area 5 – Light entity"
-      selector:
-        entity:
-          domain: light
+      selector: { entity: { domain: light } }
     a5_script:
       name: "Area 5 – Script to call"
-      selector:
-        entity:
-          domain: script
+      selector: { entity: { domain: script } }
     a5_al_switch:
       name: "Area 5 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
+      selector: { entity: { domain: switch } }
 
     a6_enable:
       name: "Area 6 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
+      selector: { entity: { domain: input_boolean } }
     a6_light:
       name: "Area 6 – Light entity"
-      selector:
-        entity:
-          domain: light
+      selector: { entity: { domain: light } }
     a6_script:
       name: "Area 6 – Script to call"
-      selector:
-        entity:
-          domain: script
+      selector: { entity: { domain: script } }
     a6_al_switch:
       name: "Area 6 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
+      selector: { entity: { domain: switch } }
 
     a7_enable:
       name: "Area 7 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
+      selector: { entity: { domain: input_boolean } }
     a7_light:
       name: "Area 7 – Light entity"
-      selector:
-        entity:
-          domain: light
+      selector: { entity: { domain: light } }
     a7_script:
       name: "Area 7 – Script to call"
-      selector:
-        entity:
-          domain: script
+      selector: { entity: { domain: script } }
     a7_al_switch:
       name: "Area 7 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
+      selector: { entity: { domain: switch } }
 
     a8_enable:
       name: "Area 8 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
+      selector: { entity: { domain: input_boolean } }
     a8_light:
       name: "Area 8 – Light entity"
-      selector:
-        entity:
-          domain: light
+      selector: { entity: { domain: light } }
     a8_script:
       name: "Area 8 – Script to call"
-      selector:
-        entity:
-          domain: script
+      selector: { entity: { domain: script } }
     a8_al_switch:
       name: "Area 8 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
+      selector: { entity: { domain: switch } }
 
     a9_enable:
       name: "Area 9 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
+      selector: { entity: { domain: input_boolean } }
     a9_light:
       name: "Area 9 – Light entity"
-      selector:
-        entity:
-          domain: light
+      selector: { entity: { domain: light } }
     a9_script:
       name: "Area 9 – Script to call"
-      selector:
-        entity:
-          domain: script
+      selector: { entity: { domain: script } }
     a9_al_switch:
       name: "Area 9 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
+      selector: { entity: { domain: switch } }
 
     a10_enable:
       name: "Area 10 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
+      selector: { entity: { domain: input_boolean } }
     a10_light:
       name: "Area 10 – Light entity"
-      selector:
-        entity:
-          domain: light
+      selector: { entity: { domain: light } }
     a10_script:
       name: "Area 10 – Script to call"
-      selector:
-        entity:
-          domain: script
+      selector: { entity: { domain: script } }
     a10_al_switch:
       name: "Area 10 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
+      selector: { entity: { domain: switch } }
 
     a11_enable:
       name: "Area 11 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
+      selector: { entity: { domain: input_boolean } }
     a11_light:
       name: "Area 11 – Light entity"
-      selector:
-        entity:
-          domain: light
+      selector: { entity: { domain: light } }
     a11_script:
       name: "Area 11 – Script to call"
-      selector:
-        entity:
-          domain: script
+      selector: { entity: { domain: script } }
     a11_al_switch:
       name: "Area 11 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
-
-    a12_enable:
-      name: "Area 12 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
-    a12_light:
-      name: "Area 12 – Light entity"
-      selector:
-        entity:
-          domain: light
-    a12_script:
-      name: "Area 12 – Script to call"
-      selector:
-        entity:
-          domain: script
-    a12_al_switch:
-      name: "Area 12 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
-
-    a13_enable:
-      name: "Area 13 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
-    a13_light:
-      name: "Area 13 – Light entity"
-      selector:
-        entity:
-          domain: light
-    a13_script:
-      name: "Area 13 – Script to call"
-      selector:
-        entity:
-          domain: script
-    a13_al_switch:
-      name: "Area 13 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
-
-    a14_enable:
-      name: "Area 14 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
-    a14_light:
-      name: "Area 14 – Light entity"
-      selector:
-        entity:
-          domain: light
-    a14_script:
-      name: "Area 14 – Script to call"
-      selector:
-        entity:
-          domain: script
-    a14_al_switch:
-      name: "Area 14 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
-
-    a15_enable:
-      name: "Area 15 – Enable boolean"
-      selector:
-        entity:
-          domain: input_boolean
-    a15_light:
-      name: "Area 15 – Light entity"
-      selector:
-        entity:
-          domain: light
-    a15_script:
-      name: "Area 15 – Script to call"
-      selector:
-        entity:
-          domain: script
-    a15_al_switch:
-      name: "Area 15 – AL dummy switch"
-      selector:
-        entity:
-          domain: switch
+      selector: { entity: { domain: switch } }
 
 mode: single
 max_exceeded: silent
@@ -438,22 +266,6 @@ actions:
                   light: !input a11_light
                   script: !input a11_script
                   al_switch: !input a11_al_switch
-                - enable: !input a12_enable
-                  light: !input a12_light
-                  script: !input a12_script
-                  al_switch: !input a12_al_switch
-                - enable: !input a13_enable
-                  light: !input a13_light
-                  script: !input a13_script
-                  al_switch: !input a13_al_switch
-                - enable: !input a14_enable
-                  light: !input a14_light
-                  script: !input a14_script
-                  al_switch: !input a14_al_switch
-                - enable: !input a15_enable
-                  light: !input a15_light
-                  script: !input a15_script
-                  al_switch: !input a15_al_switch
 
           - repeat:
               for_each: "{{ areas }}"
