@@ -1,13 +1,9 @@
 blueprint:
-  name: "Ataraxia Lighting – Master Tick Automation (v0.4)"
+  name: "Ataraxia Lighting – Master Tick Automation (v0.5)"
   description: >
-    Master timer tick that fans out to up to 15 areas. Reads brightness_pct and
-    color_temp_kelvin from a GLOBAL Adaptive Lighting (AL) switch once per tick.
-    Any area can optionally specify its own AL switch override; if provided,
-    that area's values come from the override instead of the global.
-    Determines ON/OFF from each area's light state and calls the area's script.
-    Includes a global stagger delay and an optional transition (defaults empty).
-    Timer always re-arms at the end of each tick, even if the Z2M bridge is offline.
+    Timer-driven fan-out to up to 15 areas. Uses a global AL switch (optional per-area
+    overrides). Reads values once per tick, applies to active areas only. Always re-arms.
+    Includes availability checks and optional debug logging.
   domain: automation
   author: mnestrud
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/main/AL_Tick_Automation_Blueprint.yaml
@@ -15,23 +11,25 @@ blueprint:
   input:
     timer_entity:
       name: "Timer"
-      description: "Restarted each tick to pace the cadence"
+      description: "Heartbeat interval; restarted each tick."
       selector:
         entity: { domain: timer }
 
     z2m_bridge:
       name: "Zigbee2MQTT Bridge Online Sensor"
+      description: "Used to gate fan-out work."
       selector:
         entity: { domain: binary_sensor }
 
     global_al_switch:
       name: "Global Adaptive Lighting Values Control Switch"
-      description: "Used for all areas unless an area override is provided"
+      description: "Default brightness/K source for all areas."
       selector:
         entity: { domain: switch }
 
     per_area_delay:
       name: "Per-area stagger (seconds)"
+      description: "Delay between areas."
       default: 4
       selector:
         number:
@@ -42,10 +40,17 @@ blueprint:
 
     transition:
       name: "Transition (seconds) – optional"
-      description: "Leave empty to skip (scripts should treat empty as no transition)"
+      description: "Blank = no transition."
       default: ""
       selector:
         text: {}
+
+    verbose_logging:
+      name: "Debug logging (tick + per-area)"
+      description: "When on, write Logbook entries."
+      default: false
+      selector:
+        boolean: {}
 
     # ------- 15 area blocks (all optional) -------
     a1_enable:  { name: "Area 1 – AL Area Active - Toggle Switch", default: null, selector: { entity: { domain: input_boolean } } }
@@ -156,6 +161,7 @@ actions:
           - variables:
               _stagger: !input per_area_delay
               _transition: !input transition
+              _log: !input verbose_logging
 
               # Bind inputs so they always exist
               g_sw: !input global_al_switch
@@ -290,6 +296,18 @@ actions:
                   bri: "{{ _a15_bri }}"
                   kel: "{{ _a15_kel }}"
 
+          # Optional tick-level log
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ _log }}"
+                sequence:
+                  - action: logbook.log
+                    data:
+                      name: "Ataraxia AL"
+                      message: "Tick: bri={{ _g_bri }}, K={{ _g_kel }}, stagger={{ _stagger }}s"
+                      entity_id: !input timer_entity
+
           # ---------- Do work only when the bridge is online ----------
           - choose:
               - conditions:
@@ -300,16 +318,39 @@ actions:
                   - repeat:
                       for_each: "{{ areas }}"
                       sequence:
+                        # Required fields + enable ON
                         - condition: template
                           value_template: >
                             {{ repeat.item.enable is not none and
                                repeat.item.light  is not none and
                                repeat.item.script is not none and
                                is_state(repeat.item.enable, 'on') }}
+                        # Availability hardening
+                        - condition: template
+                          value_template: >
+                            {{ states(repeat.item.light) not in ['unavailable','unknown'] }}
 
                         - variables:
                             _is_on: "{{ is_state(repeat.item.light, 'on') }}"
                             _target_state: "{{ 'ON' if _is_on else 'OFF' }}"
+
+                        # Optional per-area log
+                        - choose:
+                            - conditions:
+                                - condition: template
+                                  value_template: "{{ _log }}"
+                              sequence:
+                                - action: logbook.log
+                                  data:
+                                    name: "Ataraxia AL"
+                                    message: >-
+                                      Area {{ repeat.index }}:
+                                      light={{ repeat.item.light }},
+                                      script={{ repeat.item.script }},
+                                      {{ _target_state }},
+                                      bri={{ repeat.item.bri }},
+                                      K={{ repeat.item.kel }}
+                                    entity_id: "{{ repeat.item.light }}"
 
                         - action: script.turn_on
                           target:
