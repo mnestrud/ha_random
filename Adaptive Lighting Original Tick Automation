@@ -1,0 +1,357 @@
+alias: Adaptive Lighting - Dummy Overhead Control New
+description: ""
+triggers:
+  - trigger: state
+    entity_id:
+      - timer.adaptive_lighting_timer_dummy_overhead
+    id: time_zero
+    enabled: true
+    from: active
+    to: idle
+  - trigger: homeassistant
+    event: start
+    id: START_TIMER
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id:
+              - time_zero
+        sequence:
+          - if:
+              - condition: state
+                entity_id: binary_sensor.zigbee2mqtt_bridge_connection_state
+                state: "on"
+            then:
+              - variables:
+                  al_brightness_pct: >-
+                    {{
+                    state_attr('switch.adaptive_lighting_al_dummy_overhead_control','brightness_pct')
+                    }}
+                  al_color_temp_kelvin: >-
+                    {{
+                    state_attr('switch.adaptive_lighting_al_dummy_overhead_control','color_temp_kelvin')
+                    }}
+              - sequence:
+                  - action: timer.start
+                    metadata: {}
+                    data: {}
+                    target:
+                      entity_id: timer.adaptive_lighting_timer_dummy_overhead
+                    alias: Reset Timer
+                  - alias: Adapt Living Room Lights *
+                    if:
+                      - condition: state
+                        entity_id: input_boolean.adaptive_lighting_switch_lr
+                        state: "on"
+                    then:
+                      - if:
+                          - condition: state
+                            entity_id: light.living_room_overhead_light_switch_1
+                            state: "on"
+                        then:
+                          - action: script.al_living_room_recessed
+                            data:
+                              target_state: "ON"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                        else:
+                          - action: script.al_living_room_recessed
+                            data:
+                              target_state: "OFF"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                  - delay:
+                      hours: 0
+                      minutes: 0
+                      seconds: 4
+                      milliseconds: 0
+                  - alias: Adapt Kitchen Lights *
+                    if:
+                      - condition: state
+                        entity_id: input_boolean.adaptive_lighting_switch_kitchen
+                        state: "on"
+                    then:
+                      - if:
+                          - condition: state
+                            entity_id: light.kitchen_overhead_light_switch
+                            state: "on"
+                        then:
+                          - action: script.al_kitchen_overhead_2
+                            data:
+                              target_state: "ON"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                        else:
+                          - action: script.al_kitchen_overhead_2
+                            data:
+                              target_state: "OFF"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                  - delay:
+                      hours: 0
+                      minutes: 0
+                      seconds: 4
+                      milliseconds: 0
+                  - alias: Adapt Kitchen Island Lights *
+                    if:
+                      - condition: state
+                        entity_id: input_boolean.adaptive_lighting_switch_kitchen_island
+                        state: "on"
+                    then:
+                      - if:
+                          - condition: state
+                            entity_id: light.kitchen_island_light_switch
+                            state: "on"
+                        then:
+                          - action: script.al_kitchen_island_pendants
+                            data:
+                              target_state: "ON"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                        else:
+                          - action: script.al_kitchen_island_pendants
+                            data:
+                              target_state: "OFF"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                  - delay:
+                      hours: 0
+                      minutes: 0
+                      seconds: 4
+                      milliseconds: 0
+                  - alias: Adapt Front Door Lights *
+                    if:
+                      - condition: state
+                        entity_id: input_boolean.adaptive_lighting_switch_front_door
+                        state: "on"
+                    then:
+                      - if:
+                          - condition: state
+                            entity_id: light.front_door_overhead_light_switch
+                            state: "on"
+                        then:
+                          - action: script.al_front_door_overhead
+                            data:
+                              target_state: "ON"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                        else:
+                          - action: script.al_front_door_overhead
+                            data:
+                              target_state: "OFF"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                  - delay:
+                      hours: 0
+                      minutes: 0
+                      seconds: 4
+                      milliseconds: 0
+                  - alias: Adapt Upstairs Bath Lights *
+                    if:
+                      - condition: state
+                        entity_id: input_boolean.adaptive_lighting_switch_upstairs_bath
+                        state: "on"
+                    then:
+                      - if:
+                          - condition: device
+                            type: is_on
+                            device_id: 4b3fa083ded122a7509f5e2e24f3346b
+                            entity_id: 1e61e87f4e4478489f6b14edb7dff7b0
+                            domain: light
+                        then:
+                          - action: script.al_upstairs_bath_wall_sconces
+                            data:
+                              target_state: "ON"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                        else:
+                          - action: script.al_upstairs_bath_wall_sconces
+                            data:
+                              target_state: "OFF"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                  - delay:
+                      hours: 0
+                      minutes: 0
+                      seconds: 4
+                      milliseconds: 0
+                  - alias: Adapt Bedroom Lights *
+                    if:
+                      - condition: state
+                        entity_id: input_boolean.adaptive_lighting_switch_bedroom
+                        state: "on"
+                    then:
+                      - if:
+                          - condition: state
+                            entity_id: light.primary_bedroom_overhead_light_switch
+                            state: "on"
+                        then:
+                          - action: script.al_primary_bedroom
+                            data:
+                              target_state: "ON"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                        else:
+                          - action: script.al_primary_bedroom
+                            data:
+                              target_state: "OFF"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                  - delay:
+                      hours: 0
+                      minutes: 0
+                      seconds: 4
+                      milliseconds: 0
+                  - alias: Adapt Michael Closet Lights *
+                    if:
+                      - condition: state
+                        entity_id: input_boolean.adaptive_lighting_switch_michael_closet
+                        state: "on"
+                    then:
+                      - if:
+                          - condition: device
+                            type: is_on
+                            device_id: 3359cbd5b581fc437262558d75e2930e
+                            entity_id: 4773c7c7edeff5188fda815c60870356
+                            domain: light
+                        then:
+                          - action: script.al_michael_closet_overhead
+                            data:
+                              target_state: "ON"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                        else:
+                          - action: script.al_michael_closet_overhead
+                            data:
+                              target_state: "OFF"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                  - delay:
+                      hours: 0
+                      minutes: 0
+                      seconds: 4
+                      milliseconds: 0
+                  - alias: Adapt Primary Bath Overhead Lights *
+                    if:
+                      - condition: state
+                        entity_id: >-
+                          input_boolean.adaptive_lighting_switch_primary_bath_overhead
+                        state: "on"
+                    then:
+                      - if:
+                          - condition: device
+                            type: is_on
+                            device_id: 5ccb47982c35af1e59b285909046cf40
+                            entity_id: 8d3396216196690a2a8a38f73969e019
+                            domain: light
+                        then:
+                          - action: script.al_bathroom_recessed
+                            data:
+                              target_state: "ON"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                        else:
+                          - action: script.al_bathroom_recessed
+                            data:
+                              target_state: "OFF"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                  - delay:
+                      hours: 0
+                      minutes: 0
+                      seconds: 4
+                      milliseconds: 0
+                  - alias: Adapt Primary Shower Lights
+                    if:
+                      - condition: state
+                        entity_id: input_boolean.adaptive_lighting_switch_shower
+                        state: "on"
+                    then:
+                      - if:
+                          - condition: device
+                            type: is_on
+                            device_id: 8e730d40d59a6fea913a6173f9076fc4
+                            entity_id: fd1831a4de49368ab65136a5c80f990f
+                            domain: light
+                        then:
+                          - action: script.al_suite_shower_recessed
+                            data:
+                              target_state: "ON"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                        else:
+                          - action: script.al_suite_shower_recessed
+                            data:
+                              target_state: "OFF"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                  - delay:
+                      hours: 0
+                      minutes: 0
+                      seconds: 4
+                      milliseconds: 0
+                  - alias: Adapt Primary Bath Vanity Lights
+                    if:
+                      - condition: state
+                        entity_id: >-
+                          input_boolean.adaptive_lighting_switch_primary_bath_vanity
+                        state: "on"
+                    then:
+                      - if:
+                          - condition: device
+                            type: is_on
+                            device_id: 8e730d40d59a6fea913a6173f9076fc4
+                            entity_id: fd1831a4de49368ab65136a5c80f990f
+                            domain: light
+                        then:
+                          - action: script.primary_bath_vanity_adaptive
+                            data:
+                              target_state: "ON"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                        else:
+                          - action: script.primary_bath_vanity_adaptive
+                            data:
+                              target_state: "OFF"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                  - delay:
+                      hours: 0
+                      minutes: 0
+                      seconds: 4
+                      milliseconds: 0
+                  - alias: Adapt Office Lights *
+                    if:
+                      - condition: state
+                        entity_id: input_boolean.adaptive_lighting_switch_office
+                        state: "on"
+                    then:
+                      - if:
+                          - condition: state
+                            entity_id: light.office_smart_switch
+                            state: "on"
+                        then:
+                          - action: script.al_office_overhead_2
+                            data:
+                              target_state: "ON"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+                        else:
+                          - action: script.al_office_overhead_2
+                            data:
+                              target_state: "OFF"
+                              brightness_pct: "{{ al_brightness_pct | int }}"
+                              color_temp_kelvin: "{{ al_color_temp_kelvin | float }}"
+      - conditions:
+          - condition: trigger
+            id:
+              - START_TIMER
+        sequence:
+          - action: timer.start
+            metadata: {}
+            data: {}
+            target:
+              entity_id: timer.adaptive_lighting_timer_dummy_overhead
+mode: single
