@@ -1,5 +1,5 @@
 blueprint:
-  name: Adaptive Lighting – Master Tick (Looped Fan-out)
+  name: Ataraxia Lighting – Master Tick Automation (v0.1)
   description: >
     Master timer tick that reads brightness/kelvin from an Adaptive Lighting
     switch and fans out to per-area scripts. Each area can be individually
