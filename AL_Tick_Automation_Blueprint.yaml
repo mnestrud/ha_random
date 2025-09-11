@@ -1,11 +1,13 @@
 blueprint:
   name: "Ataraxia Lighting – Master Tick Automation (v0.3)"
   description: >
-    Master timer tick that fans out to 11 areas. For each area, reads
-    brightness_pct and color_temp_kelvin from that area's Adaptive Lighting
-    dummy switch, determines ON/OFF from the area's light state, and calls the
-    area's script. Includes a global stagger delay and an optional transition
-    (defaults empty) passed to each script.
+    Master timer tick that fans out to 11 areas. Reads brightness_pct and
+    color_temp_kelvin from a GLOBAL Adaptive Lighting (AL) switch once per tick.
+    Optionally, any area can specify its own AL switch override; if present,
+    the area's values are read once from that override instead of the global.
+    For each area, the automation determines ON/OFF from the area's light state
+    and calls the area's script. Includes a global stagger delay and an optional
+    transition (defaults empty) passed to each script.
   domain: automation
   author: mnestrud
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/main/AL_Tick_Automation_Blueprint.yaml
@@ -24,6 +26,13 @@ blueprint:
         entity:
           domain: binary_sensor
 
+    global_al_switch:
+      name: "Global Adaptive Lighting dummy switch"
+      description: "Used for all areas unless an area override is provided"
+      selector:
+        entity:
+          domain: switch
+
     per_area_delay:
       name: "Per-area stagger (seconds)"
       default: 4
@@ -41,149 +50,248 @@ blueprint:
       selector:
         text: {}
 
-    # ------- 11 area blocks -------
+    # ------- 11 area blocks (enable, light, script, optional AL override) -------
     a1_enable:
       name: "Area 1 – Enable boolean"
-      selector: { entity: { domain: input_boolean } }
+      selector:
+        entity:
+          domain: input_boolean
     a1_light:
       name: "Area 1 – Light entity"
-      selector: { entity: { domain: light } }
+      selector:
+        entity:
+          domain: light
     a1_script:
       name: "Area 1 – Script to call"
-      selector: { entity: { domain: script } }
-    a1_al_switch:
-      name: "Area 1 – AL dummy switch"
-      selector: { entity: { domain: switch } }
+      selector:
+        entity:
+          domain: script
+    a1_al_switch_override:
+      name: "Area 1 – AL switch override (optional)"
+      default: ""
+      selector:
+        entity:
+          domain: switch
 
     a2_enable:
       name: "Area 2 – Enable boolean"
-      selector: { entity: { domain: input_boolean } }
+      selector:
+        entity:
+          domain: input_boolean
     a2_light:
       name: "Area 2 – Light entity"
-      selector: { entity: { domain: light } }
+      selector:
+        entity:
+          domain: light
     a2_script:
       name: "Area 2 – Script to call"
-      selector: { entity: { domain: script } }
-    a2_al_switch:
-      name: "Area 2 – AL dummy switch"
-      selector: { entity: { domain: switch } }
+      selector:
+        entity:
+          domain: script
+    a2_al_switch_override:
+      name: "Area 2 – AL switch override (optional)"
+      default: ""
+      selector:
+        entity:
+          domain: switch
 
     a3_enable:
       name: "Area 3 – Enable boolean"
-      selector: { entity: { domain: input_boolean } }
+      selector:
+        entity:
+          domain: input_boolean
     a3_light:
       name: "Area 3 – Light entity"
-      selector: { entity: { domain: light } }
+      selector:
+        entity:
+          domain: light
     a3_script:
       name: "Area 3 – Script to call"
-      selector: { entity: { domain: script } }
-    a3_al_switch:
-      name: "Area 3 – AL dummy switch"
-      selector: { entity: { domain: switch } }
+      selector:
+        entity:
+          domain: script
+    a3_al_switch_override:
+      name: "Area 3 – AL switch override (optional)"
+      default: ""
+      selector:
+        entity:
+          domain: switch
 
     a4_enable:
       name: "Area 4 – Enable boolean"
-      selector: { entity: { domain: input_boolean } }
+      selector:
+        entity:
+          domain: input_boolean
     a4_light:
       name: "Area 4 – Light entity"
-      selector: { entity: { domain: light } }
+      selector:
+        entity:
+          domain: light
     a4_script:
       name: "Area 4 – Script to call"
-      selector: { entity: { domain: script } }
-    a4_al_switch:
-      name: "Area 4 – AL dummy switch"
-      selector: { entity: { domain: switch } }
+      selector:
+        entity:
+          domain: script
+    a4_al_switch_override:
+      name: "Area 4 – AL switch override (optional)"
+      default: ""
+      selector:
+        entity:
+          domain: switch
 
     a5_enable:
       name: "Area 5 – Enable boolean"
-      selector: { entity: { domain: input_boolean } }
+      selector:
+        entity:
+          domain: input_boolean
     a5_light:
       name: "Area 5 – Light entity"
-      selector: { entity: { domain: light } }
+      selector:
+        entity:
+          domain: light
     a5_script:
       name: "Area 5 – Script to call"
-      selector: { entity: { domain: script } }
-    a5_al_switch:
-      name: "Area 5 – AL dummy switch"
-      selector: { entity: { domain: switch } }
+      selector:
+        entity:
+          domain: script
+    a5_al_switch_override:
+      name: "Area 5 – AL switch override (optional)"
+      default: ""
+      selector:
+        entity:
+          domain: switch
 
     a6_enable:
       name: "Area 6 – Enable boolean"
-      selector: { entity: { domain: input_boolean } }
+      selector:
+        entity:
+          domain: input_boolean
     a6_light:
       name: "Area 6 – Light entity"
-      selector: { entity: { domain: light } }
+      selector:
+        entity:
+          domain: light
     a6_script:
       name: "Area 6 – Script to call"
-      selector: { entity: { domain: script } }
-    a6_al_switch:
-      name: "Area 6 – AL dummy switch"
-      selector: { entity: { domain: switch } }
+      selector:
+        entity:
+          domain: script
+    a6_al_switch_override:
+      name: "Area 6 – AL switch override (optional)"
+      default: ""
+      selector:
+        entity:
+          domain: switch
 
     a7_enable:
       name: "Area 7 – Enable boolean"
-      selector: { entity: { domain: input_boolean } }
+      selector:
+        entity:
+          domain: input_boolean
     a7_light:
       name: "Area 7 – Light entity"
-      selector: { entity: { domain: light } }
+      selector:
+        entity:
+          domain: light
     a7_script:
       name: "Area 7 – Script to call"
-      selector: { entity: { domain: script } }
-    a7_al_switch:
-      name: "Area 7 – AL dummy switch"
-      selector: { entity: { domain: switch } }
+      selector:
+        entity:
+          domain: script
+    a7_al_switch_override:
+      name: "Area 7 – AL switch override (optional)"
+      default: ""
+      selector:
+        entity:
+          domain: switch
 
     a8_enable:
       name: "Area 8 – Enable boolean"
-      selector: { entity: { domain: input_boolean } }
+      selector:
+        entity:
+          domain: input_boolean
     a8_light:
       name: "Area 8 – Light entity"
-      selector: { entity: { domain: light } }
+      selector:
+        entity:
+          domain: light
     a8_script:
       name: "Area 8 – Script to call"
-      selector: { entity: { domain: script } }
-    a8_al_switch:
-      name: "Area 8 – AL dummy switch"
-      selector: { entity: { domain: switch } }
+      selector:
+        entity:
+          domain: script
+    a8_al_switch_override:
+      name: "Area 8 – AL switch override (optional)"
+      default: ""
+      selector:
+        entity:
+          domain: switch
 
     a9_enable:
       name: "Area 9 – Enable boolean"
-      selector: { entity: { domain: input_boolean } }
+      selector:
+        entity:
+          domain: input_boolean
     a9_light:
       name: "Area 9 – Light entity"
-      selector: { entity: { domain: light } }
+      selector:
+        entity:
+          domain: light
     a9_script:
       name: "Area 9 – Script to call"
-      selector: { entity: { domain: script } }
-    a9_al_switch:
-      name: "Area 9 – AL dummy switch"
-      selector: { entity: { domain: switch } }
+      selector:
+        entity:
+          domain: script
+    a9_al_switch_override:
+      name: "Area 9 – AL switch override (optional)"
+      default: ""
+      selector:
+        entity:
+          domain: switch
 
     a10_enable:
       name: "Area 10 – Enable boolean"
-      selector: { entity: { domain: input_boolean } }
+      selector:
+        entity:
+          domain: input_boolean
     a10_light:
       name: "Area 10 – Light entity"
-      selector: { entity: { domain: light } }
+      selector:
+        entity:
+          domain: light
     a10_script:
       name: "Area 10 – Script to call"
-      selector: { entity: { domain: script } }
-    a10_al_switch:
-      name: "Area 10 – AL dummy switch"
-      selector: { entity: { domain: switch } }
+      selector:
+        entity:
+          domain: script
+    a10_al_switch_override:
+      name: "Area 10 – AL switch override (optional)"
+      default: ""
+      selector:
+        entity:
+          domain: switch
 
     a11_enable:
       name: "Area 11 – Enable boolean"
-      selector: { entity: { domain: input_boolean } }
+      selector:
+        entity:
+          domain: input_boolean
     a11_light:
       name: "Area 11 – Light entity"
-      selector: { entity: { domain: light } }
+      selector:
+        entity:
+          domain: light
     a11_script:
       name: "Area 11 – Script to call"
-      selector: { entity: { domain: script } }
-    a11_al_switch:
-      name: "Area 11 – AL dummy switch"
-      selector: { entity: { domain: switch } }
+      selector:
+        entity:
+          domain: script
+    a11_al_switch_override:
+      name: "Area 11 – AL switch override (optional)"
+      default: ""
+      selector:
+        entity:
+          domain: switch
 
 mode: single
 max_exceeded: silent
@@ -218,54 +326,109 @@ actions:
             entity_id: !input z2m_bridge
             state: "on"
 
+          # ---------- Read global & overrides once per tick ----------
           - variables:
               _stagger: !input per_area_delay
               _transition: !input transition
+
+              # Global AL values (single read)
+              _g_bri: "{{ state_attr(inputs.global_al_switch, 'brightness_pct') | int(50) }}"
+              _g_kel: "{{ state_attr(inputs.global_al_switch, 'color_temp_kelvin') | float(2700) }}"
+
+              # Helper macro-ish filters
+              _ov1: "{{ inputs.a1_al_switch_override if (inputs.a1_al_switch_override is defined and inputs.a1_al_switch_override|length > 0) else None }}"
+              _ov2: "{{ inputs.a2_al_switch_override if (inputs.a2_al_switch_override is defined and inputs.a2_al_switch_override|length > 0) else None }}"
+              _ov3: "{{ inputs.a3_al_switch_override if (inputs.a3_al_switch_override is defined and inputs.a3_al_switch_override|length > 0) else None }}"
+              _ov4: "{{ inputs.a4_al_switch_override if (inputs.a4_al_switch_override is defined and inputs.a4_al_switch_override|length > 0) else None }}"
+              _ov5: "{{ inputs.a5_al_switch_override if (inputs.a5_al_switch_override is defined and inputs.a5_al_switch_override|length > 0) else None }}"
+              _ov6: "{{ inputs.a6_al_switch_override if (inputs.a6_al_switch_override is defined and inputs.a6_al_switch_override|length > 0) else None }}"
+              _ov7: "{{ inputs.a7_al_switch_override if (inputs.a7_al_switch_override is defined and inputs.a7_al_switch_override|length > 0) else None }}"
+              _ov8: "{{ inputs.a8_al_switch_override if (inputs.a8_al_switch_override is defined and inputs.a8_al_switch_override|length > 0) else None }}"
+              _ov9: "{{ inputs.a9_al_switch_override if (inputs.a9_al_switch_override is defined and inputs.a9_al_switch_override|length > 0) else None }}"
+              _ov10: "{{ inputs.a10_al_switch_override if (inputs.a10_al_switch_override is defined and inputs.a10_al_switch_override|length > 0) else None }}"
+              _ov11: "{{ inputs.a11_al_switch_override if (inputs.a11_al_switch_override is defined and inputs.a11_al_switch_override|length > 0) else None }}"
+
+              # Per-area resolved values (override -> use override; else -> use global)
+              _a1_bri: "{{ state_attr(_ov1, 'brightness_pct') | int(_g_bri) if _ov1 else _g_bri }}"
+              _a1_kel: "{{ state_attr(_ov1, 'color_temp_kelvin') | float(_g_kel) if _ov1 else _g_kel }}"
+              _a2_bri: "{{ state_attr(_ov2, 'brightness_pct') | int(_g_bri) if _ov2 else _g_bri }}"
+              _a2_kel: "{{ state_attr(_ov2, 'color_temp_kelvin') | float(_g_kel) if _ov2 else _g_kel }}"
+              _a3_bri: "{{ state_attr(_ov3, 'brightness_pct') | int(_g_bri) if _ov3 else _g_bri }}"
+              _a3_kel: "{{ state_attr(_ov3, 'color_temp_kelvin') | float(_g_kel) if _ov3 else _g_kel }}"
+              _a4_bri: "{{ state_attr(_ov4, 'brightness_pct') | int(_g_bri) if _ov4 else _g_bri }}"
+              _a4_kel: "{{ state_attr(_ov4, 'color_temp_kelvin') | float(_g_kel) if _ov4 else _g_kel }}"
+              _a5_bri: "{{ state_attr(_ov5, 'brightness_pct') | int(_g_bri) if _ov5 else _g_bri }}"
+              _a5_kel: "{{ state_attr(_ov5, 'color_temp_kelvin') | float(_g_kel) if _ov5 else _g_kel }}"
+              _a6_bri: "{{ state_attr(_ov6, 'brightness_pct') | int(_g_bri) if _ov6 else _g_bri }}"
+              _a6_kel: "{{ state_attr(_ov6, 'color_temp_kelvin') | float(_g_kel) if _ov6 else _g_kel }}"
+              _a7_bri: "{{ state_attr(_ov7, 'brightness_pct') | int(_g_bri) if _ov7 else _g_bri }}"
+              _a7_kel: "{{ state_attr(_ov7, 'color_temp_kelvin') | float(_g_kel) if _ov7 else _g_kel }}"
+              _a8_bri: "{{ state_attr(_ov8, 'brightness_pct') | int(_g_bri) if _ov8 else _g_bri }}"
+              _a8_kel: "{{ state_attr(_ov8, 'color_temp_kelvin') | float(_g_kel) if _ov8 else _g_kel }}"
+              _a9_bri: "{{ state_attr(_ov9, 'brightness_pct') | int(_g_bri) if _ov9 else _g_bri }}"
+              _a9_kel: "{{ state_attr(_ov9, 'color_temp_kelvin') | float(_g_kel) if _ov9 else _g_kel }}"
+              _a10_bri: "{{ state_attr(_ov10, 'brightness_pct') | int(_g_bri) if _ov10 else _g_bri }}"
+              _a10_kel: "{{ state_attr(_ov10, 'color_temp_kelvin') | float(_g_kel) if _ov10 else _g_kel }}"
+              _a11_bri: "{{ state_attr(_ov11, 'brightness_pct') | int(_g_bri) if _ov11 else _g_bri }}"
+              _a11_kel: "{{ state_attr(_ov11, 'color_temp_kelvin') | float(_g_kel) if _ov11 else _g_kel }}"
+
+              # Areas table for the loop
               areas:
                 - enable: !input a1_enable
                   light: !input a1_light
                   script: !input a1_script
-                  al_switch: !input a1_al_switch
+                  bri: "{{ _a1_bri }}"
+                  kel: "{{ _a1_kel }}"
                 - enable: !input a2_enable
                   light: !input a2_light
                   script: !input a2_script
-                  al_switch: !input a2_al_switch
+                  bri: "{{ _a2_bri }}"
+                  kel: "{{ _a2_kel }}"
                 - enable: !input a3_enable
                   light: !input a3_light
                   script: !input a3_script
-                  al_switch: !input a3_al_switch
+                  bri: "{{ _a3_bri }}"
+                  kel: "{{ _a3_kel }}"
                 - enable: !input a4_enable
                   light: !input a4_light
                   script: !input a4_script
-                  al_switch: !input a4_al_switch
+                  bri: "{{ _a4_bri }}"
+                  kel: "{{ _a4_kel }}"
                 - enable: !input a5_enable
                   light: !input a5_light
                   script: !input a5_script
-                  al_switch: !input a5_al_switch
+                  bri: "{{ _a5_bri }}"
+                  kel: "{{ _a5_kel }}"
                 - enable: !input a6_enable
                   light: !input a6_light
                   script: !input a6_script
-                  al_switch: !input a6_al_switch
+                  bri: "{{ _a6_bri }}"
+                  kel: "{{ _a6_kel }}"
                 - enable: !input a7_enable
                   light: !input a7_light
                   script: !input a7_script
-                  al_switch: !input a7_al_switch
+                  bri: "{{ _a7_bri }}"
+                  kel: "{{ _a7_kel }}"
                 - enable: !input a8_enable
                   light: !input a8_light
                   script: !input a8_script
-                  al_switch: !input a8_al_switch
+                  bri: "{{ _a8_bri }}"
+                  kel: "{{ _a8_kel }}"
                 - enable: !input a9_enable
                   light: !input a9_light
                   script: !input a9_script
-                  al_switch: !input a9_al_switch
+                  bri: "{{ _a9_bri }}"
+                  kel: "{{ _a9_kel }}"
                 - enable: !input a10_enable
                   light: !input a10_light
                   script: !input a10_script
-                  al_switch: !input a10_al_switch
+                  bri: "{{ _a10_bri }}"
+                  kel: "{{ _a10_kel }}"
                 - enable: !input a11_enable
                   light: !input a11_light
                   script: !input a11_script
-                  al_switch: !input a11_al_switch
+                  bri: "{{ _a11_bri }}"
+                  kel: "{{ _a11_kel }}"
 
           - repeat:
               for_each: "{{ areas }}"
@@ -275,14 +438,13 @@ actions:
                     {{ repeat.item.enable is not none and
                        repeat.item.light  is not none and
                        repeat.item.script is not none and
-                       repeat.item.al_switch is not none and
+                       repeat.item.bri    is not none and
+                       repeat.item.kel    is not none and
                        is_state(repeat.item.enable, 'on') }}
 
                 - variables:
                     _is_on: "{{ is_state(repeat.item.light, 'on') }}"
                     _target_state: "{{ 'ON' if _is_on else 'OFF' }}"
-                    _bri_pct: "{{ state_attr(repeat.item.al_switch, 'brightness_pct') | int(50) }}"
-                    _kelvin:  "{{ state_attr(repeat.item.al_switch, 'color_temp_kelvin') | float(2700) }}"
 
                 - action: script.turn_on
                   target:
@@ -290,8 +452,8 @@ actions:
                   data:
                     variables:
                       target_state: "{{ _target_state }}"
-                      brightness_pct: "{{ _bri_pct }}"
-                      color_temp_kelvin: "{{ _kelvin }}"
+                      brightness_pct: "{{ repeat.item.bri }}"
+                      color_temp_kelvin: "{{ repeat.item.kel }}"
                       transition: "{{ _transition }}"
 
                 - delay:
