@@ -1,0 +1,476 @@
+blueprint:
+  name: Adaptive Lighting – Master Tick (Looped Fan-out)
+  description: >
+    Master timer tick that reads brightness/kelvin from an Adaptive Lighting
+    switch and fans out to per-area scripts. Each area can be individually
+    enabled via an input_boolean and is updated only if its light is on (will
+    pass target_state ON/OFF accordingly). Includes optional transition
+    (defaults empty) forwarded to each area script.
+  domain: automation
+  source_url: https://example.invalid/adaptive-master-blueprint
+  input:
+    timer_entity:
+      name: Timer
+      description: Timer that paces the update cadence (will be restarted each tick)
+      selector:
+        entity:
+          domain: timer
+    z2m_bridge:
+      name: Zigbee2MQTT Bridge Online Sensor
+      description: Binary sensor that is 'on' when the Z2M bridge is connected
+      selector:
+        entity:
+          domain: binary_sensor
+    al_switch:
+      name: Adaptive Lighting Switch (dummy)
+      description: Switch that exposes brightness_pct and color_temp_kelvin attributes
+      selector:
+        entity:
+          domain: switch
+
+    # Global options
+    per_area_delay:
+      name: Per-area stagger (seconds)
+      default: 4
+      selector:
+        number:
+          min: 0
+          max: 30
+          step: 1
+          mode: slider
+    transition:
+      name: Transition (seconds) – optional
+      description: Left empty = not used by your scripts (they should treat empty as "no transition")
+      default: ""
+      selector:
+        text:
+
+    # ---- Up to 10 area blocks (entity names are templates used directly) ----
+    a1_enable:
+      name: Area 1 – Enable boolean
+      default:
+      selector: { entity: { domain: input_boolean } }
+    a1_light:
+      name: Area 1 – Light entity
+      default:
+      selector: { entity: { domain: light } }
+    a1_script:
+      name: Area 1 – Script to call
+      default:
+      selector: { entity: { domain: script } }
+
+    a2_enable:
+      name: Area 2 – Enable boolean
+      default:
+      selector: { entity: { domain: input_boolean } }
+    a2_light:
+      name: Area 2 – Light entity
+      default:
+      selector: { entity: { domain: light } }
+    a2_script:
+      name: Area 2 – Script to call
+      default:
+      selector: { entity: { domain: script } }
+
+    a3_enable:
+      name: Area 3 – Enable boolean
+      default:
+      selector: { entity: { domain: input_boolean } }
+    a3_light:
+      name: Area 3 – Light entity
+      default:
+      selector: { entity: { domain: light } }
+    a3_script:
+      name: Area 3 – Script to call
+      default:
+      selector: { entity: { domain: script } }
+
+    a4_enable:
+      name: Area 4 – Enable boolean
+      default:
+      selector: { entity: { domain: input_boolean } }
+    a4_light:
+      name: Area 4 – Light entity
+      default:
+      selector: { entity: { domain: light } }
+    a4_script:
+      name: Area 4 – Script to call
+      default:
+      selector: { entity: { domain: script } }
+
+    a5_enable:
+      name: Area 5 – Enable boolean
+      default:
+      selector: { entity: { domain: input_boolean } }
+    a5_light:
+      name: Area 5 – Light entity
+      default:
+      selector: { entity: { domain: light } }
+    a5_script:
+      name: Area 5 – Script to call
+      default:
+      selector: { entity: { domain: script } }
+
+    a6_enable:
+      name: Area 6 – Enable boolean
+      default:
+      selector: { entity: { domain: input_boolean } }
+    a6_light:
+      name: Area 6 – Light entity
+      default:
+      selector: { entity: { domain: light } }
+    a6_script:
+      name: Area 6 – Script to call
+      default:
+      selector: { entity: { domain: script } }
+
+    a7_enable:
+      name: Area 7 – Enable boolean
+      default:
+      selector: { entity: { domain: input_boolean } }
+    a7_light:
+      name: Area 7 – Light entity
+      default:
+      selector: { entity: { domain: light } }
+    a7_script:
+      name: Area 7 – Script to call
+      default:
+      selector: { entity: { domain: script } }
+
+    a8_enable:
+      name: Area 8 – Enable boolean
+      default:
+      selector: { entity: { domain: input_boolean } }
+    a8_light:
+      name: Area 8 – Light entity
+      default:
+      selector: { entity: { domain: light } }
+    a8_script:
+      name: Area 8 – Script to call
+      default:
+      selector: { entity: { domain: script } }
+
+    a9_enable:
+      name: Area 9 – Enable boolean
+      default:
+      selector: { entity: { domain: input_boolean } }
+    a9_light:
+      name: Area 9 – Light entity
+      default:
+      selector: { entity: { domain: light } }
+    a9_script:
+      name: Area 9 – Script to call
+      default:
+      selector: { entity: { domain: script } }
+
+    a10_enable:
+      name: Area 10 – Enable boolean
+      default:
+      selector: { entity: { domain: input_boolean } }
+    a10_light:
+      name: Area 10 – Light entity
+      default:
+      selector: { entity: { domain: light } }
+    a10_script:
+      name: Area 10 – Script to call
+      default:
+      selector: { entity: { domain: script } }
+
+# ---------------------- Automation body ----------------------
+mode: single
+max_exceeded: silent
+
+triggers:
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input timer_entity
+    id: TICK
+  - trigger: homeassistant
+    event: start
+    id: START
+
+conditions: []
+
+actions:
+  - choose:
+      # Kick timer once at HA start
+      - conditions:
+          - condition: trigger
+            id: START
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: !input timer_entity
+
+      # On each timer tick: compute + fan-out
+      - conditions:
+          - condition: trigger
+            id: TICK
+        sequence:
+          # Require Z2M bridge online
+          - condition: state
+            entity_id: !input z2m_bridge
+            state: "on"
+
+          # Pull AL attributes once
+          - variables:
+              _bri_pct: "{{ state_attr((inputs.al_switch), 'brightness_pct') | int(50) }}"
+              _kelvin:  "{{ state_attr((inputs.al_switch), 'color_temp_kelvin') | float(2700) }}"
+              _stagger: !input per_area_delay
+              _transition: !input transition
+
+          # ---- Area 1 ----
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ (inputs.a1_enable is defined and inputs.a1_enable|length > 0) and
+                         (inputs.a1_light  is defined and inputs.a1_light|length  > 0) and
+                         (inputs.a1_script is defined and inputs.a1_script|length > 0) and
+                         is_state(inputs.a1_enable, 'on') }}
+                sequence:
+                  - variables:
+                      _a1_on: "{{ is_state(inputs.a1_light, 'on') }}"
+                      _a1_target: "{{ 'ON' if _a1_on else 'OFF' }}"
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input a1_script
+                    data:
+                      variables:
+                        target_state: "{{ _a1_target }}"
+                        brightness_pct: "{{ _bri_pct }}"
+                        color_temp_kelvin: "{{ _kelvin }}"
+                        transition: "{{ _transition }}"
+                  - delay:
+                      seconds: "{{ _stagger | int(0) }}"
+
+          # ---- Area 2 ----
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ (inputs.a2_enable is defined and inputs.a2_enable|length > 0) and
+                         (inputs.a2_light  is defined and inputs.a2_light|length  > 0) and
+                         (inputs.a2_script is defined and inputs.a2_script|length > 0) and
+                         is_state(inputs.a2_enable, 'on') }}
+                sequence:
+                  - variables:
+                      _a2_on: "{{ is_state(inputs.a2_light, 'on') }}"
+                      _a2_target: "{{ 'ON' if _a2_on else 'OFF' }}"
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input a2_script
+                    data:
+                      variables:
+                        target_state: "{{ _a2_target }}"
+                        brightness_pct: "{{ _bri_pct }}"
+                        color_temp_kelvin: "{{ _kelvin }}"
+                        transition: "{{ _transition }}"
+                  - delay:
+                      seconds: "{{ _stagger | int(0) }}"
+
+          # ---- Area 3 ----
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ (inputs.a3_enable is defined and inputs.a3_enable|length > 0) and
+                         (inputs.a3_light  is defined and inputs.a3_light|length  > 0) and
+                         (inputs.a3_script is defined and inputs.a3_script|length > 0) and
+                         is_state(inputs.a3_enable, 'on') }}
+                sequence:
+                  - variables:
+                      _a3_on: "{{ is_state(inputs.a3_light, 'on') }}"
+                      _a3_target: "{{ 'ON' if _a3_on else 'OFF' }}"
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input a3_script
+                    data:
+                      variables:
+                        target_state: "{{ _a3_target }}"
+                        brightness_pct: "{{ _bri_pct }}"
+                        color_temp_kelvin: "{{ _kelvin }}"
+                        transition: "{{ _transition }}"
+                  - delay:
+                      seconds: "{{ _stagger | int(0) }}"
+
+          # ---- Area 4 ----
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ (inputs.a4_enable is defined and inputs.a4_enable|length > 0) and
+                         (inputs.a4_light  is defined and inputs.a4_light|length  > 0) and
+                         (inputs.a4_script is defined and inputs.a4_script|length > 0) and
+                         is_state(inputs.a4_enable, 'on') }}
+                sequence:
+                  - variables:
+                      _a4_on: "{{ is_state(inputs.a4_light, 'on') }}"
+                      _a4_target: "{{ 'ON' if _a4_on else 'OFF' }}"
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input a4_script
+                    data:
+                      variables:
+                        target_state: "{{ _a4_target }}"
+                        brightness_pct: "{{ _bri_pct }}"
+                        color_temp_kelvin: "{{ _kelvin }}"
+                        transition: "{{ _transition }}"
+                  - delay:
+                      seconds: "{{ _stagger | int(0) }}"
+
+          # ---- Area 5 ----
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ (inputs.a5_enable is defined and inputs.a5_enable|length > 0) and
+                         (inputs.a5_light  is defined and inputs.a5_light|length  > 0) and
+                         (inputs.a5_script is defined and inputs.a5_script|length > 0) and
+                         is_state(inputs.a5_enable, 'on') }}
+                sequence:
+                  - variables:
+                      _a5_on: "{{ is_state(inputs.a5_light, 'on') }}"
+                      _a5_target: "{{ 'ON' if _a5_on else 'OFF' }}"
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input a5_script
+                    data:
+                      variables:
+                        target_state: "{{ _a5_target }}"
+                        brightness_pct: "{{ _bri_pct }}"
+                        color_temp_kelvin: "{{ _kelvin }}"
+                        transition: "{{ _transition }}"
+                  - delay:
+                      seconds: "{{ _stagger | int(0) }}"
+
+          # ---- Area 6 ----
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ (inputs.a6_enable is defined and inputs.a6_enable|length > 0) and
+                         (inputs.a6_light  is defined and inputs.a6_light|length  > 0) and
+                         (inputs.a6_script is defined and inputs.a6_script|length > 0) and
+                         is_state(inputs.a6_enable, 'on') }}
+                sequence:
+                  - variables:
+                      _a6_on: "{{ is_state(inputs.a6_light, 'on') }}"
+                      _a6_target: "{{ 'ON' if _a6_on else 'OFF' }}"
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input a6_script
+                    data:
+                      variables:
+                        target_state: "{{ _a6_target }}"
+                        brightness_pct: "{{ _bri_pct }}"
+                        color_temp_kelvin: "{{ _kelvin }}"
+                        transition: "{{ _transition }}"
+                  - delay:
+                      seconds: "{{ _stagger | int(0) }}"
+
+          # ---- Area 7 ----
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ (inputs.a7_enable is defined and inputs.a7_enable|length > 0) and
+                         (inputs.a7_light  is defined and inputs.a7_light|length  > 0) and
+                         (inputs.a7_script is defined and inputs.a7_script|length > 0) and
+                         is_state(inputs.a7_enable, 'on') }}
+                sequence:
+                  - variables:
+                      _a7_on: "{{ is_state(inputs.a7_light, 'on') }}"
+                      _a7_target: "{{ 'ON' if _a7_on else 'OFF' }}"
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input a7_script
+                    data:
+                      variables:
+                        target_state: "{{ _a7_target }}"
+                        brightness_pct: "{{ _bri_pct }}"
+                        color_temp_kelvin: "{{ _kelvin }}"
+                        transition: "{{ _transition }}"
+                  - delay:
+                      seconds: "{{ _stagger | int(0) }}"
+
+          # ---- Area 8 ----
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ (inputs.a8_enable is defined and inputs.a8_enable|length > 0) and
+                         (inputs.a8_light  is defined and inputs.a8_light|length  > 0) and
+                         (inputs.a8_script is defined and inputs.a8_script|length > 0) and
+                         is_state(inputs.a8_enable, 'on') }}
+                sequence:
+                  - variables:
+                      _a8_on: "{{ is_state(inputs.a8_light, 'on') }}"
+                      _a8_target: "{{ 'ON' if _a8_on else 'OFF' }}"
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input a8_script
+                    data:
+                      variables:
+                        target_state: "{{ _a8_target }}"
+                        brightness_pct: "{{ _bri_pct }}"
+                        color_temp_kelvin: "{{ _kelvin }}"
+                        transition: "{{ _transition }}"
+                  - delay:
+                      seconds: "{{ _stagger | int(0) }}"
+
+          # ---- Area 9 ----
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ (inputs.a9_enable is defined and inputs.a9_enable|length > 0) and
+                         (inputs.a9_light  is defined and inputs.a9_light|length  > 0) and
+                         (inputs.a9_script is defined and inputs.a9_script|length > 0) and
+                         is_state(inputs.a9_enable, 'on') }}
+                sequence:
+                  - variables:
+                      _a9_on: "{{ is_state(inputs.a9_light, 'on') }}"
+                      _a9_target: "{{ 'ON' if _a9_on else 'OFF' }}"
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input a9_script
+                    data:
+                      variables:
+                        target_state: "{{ _a9_target }}"
+                        brightness_pct: "{{ _bri_pct }}"
+                        color_temp_kelvin: "{{ _kelvin }}"
+                        transition: "{{ _transition }}"
+                  - delay:
+                      seconds: "{{ _stagger | int(0) }}"
+
+          # ---- Area 10 ----
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ (inputs.a10_enable is defined and inputs.a10_enable|length > 0) and
+                         (inputs.a10_light  is defined and inputs.a10_light|length  > 0) and
+                         (inputs.a10_script is defined and inputs.a10_script|length > 0) and
+                         is_state(inputs.a10_enable, 'on') }}
+                sequence:
+                  - variables:
+                      _a10_on: "{{ is_state(inputs.a10_light, 'on') }}"
+                      _a10_target: "{{ 'ON' if _a10_on else 'OFF' }}"
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input a10_script
+                    data:
+                      variables:
+                        target_state: "{{ _a10_target }}"
+                        brightness_pct: "{{ _bri_pct }}"
+                        color_temp_kelvin: "{{ _kelvin }}"
+                        transition: "{{ _transition }}"
+                  - delay:
+                      seconds: "{{ _stagger | int(0) }}"
+
+          # Re-arm timer
+          - action: timer.start
+            target:
+              entity_id: !input timer_entity
