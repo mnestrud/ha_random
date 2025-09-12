@@ -1,4 +1,28 @@
-# ---------- Script body (logic unchanged; only delay condition + group OFF handling updated) ----------
+blueprint:
+  name: Ataraxia Lighting Script
+  domain: script
+  author: mnestrud
+  input:
+    al_switch:
+      name: Adaptive Lighting switch
+      description: Adaptive Lighting Switch entity providing brightness_pct & color_temp_kelvin attributes
+      selector:
+        entity:
+          domain: switch
+    inovelli_set_topic:
+      name: Light Switch - Zigbee2MQTT /set topic (Inovelli Blue)
+      description: e.g. "zigbee2mqtt/Primary Bedroom Overhead Light Switch/set" - May be blank.
+      default: ""
+      selector:
+        text:
+    group_set_topic:
+      name: Light Group or Individual Light - Zigbee2MQTT /set topic.
+      description: e.g. "zigbee2mqtt/zgb_primary_bedroom/set" - May be blank.
+      default: ""
+      selector:
+        text:
+
+# ---------- Script body (logic unchanged; only 'OFF' handling for lights and separation of states added) ----------
 alias: AL Bedroom Overhead
 mode: single
 fields:
@@ -33,6 +57,12 @@ sequence:
       mired_raw: "{{ (1000000 / kelvin) | round(0) | int }}"
       mired: "{{ [ [ mired_raw, 153 ] | max, 500 ] | min }}"
       target_state_norm: "{{ target_state | upper }}"
+      # Always send ON/OFF to the Inovelli switch (never null)
+      state_for_inovelli: >-
+        {{ "ON" if target_state_norm == "ON" else "OFF" }}
+      # For lights/groups: OFF becomes null so state is not affected
+      state_for_lights: >-
+        {{ target_state_norm if target_state_norm == "ON" else None }}
 
   # Publish to Inovelli only if topic input is non-blank
   - choose:
@@ -52,7 +82,7 @@ sequence:
                     "defaultLevelLocal": bri,
                     "defaultLevelRemote": bri,
                     "brightness": bri,
-                    "state": target_state_norm
+                    "state": state_for_inovelli
                   } | tojson
                 }}
 
@@ -80,7 +110,7 @@ sequence:
               payload: |-
                 {{
                   {
-                    "state": (target_state_norm if target_state_norm == "ON" else None),
+                    "state": state_for_lights,
                     "level_config": {"execute_if_off": true},
                     "color_options": {"execute_if_off": true},
                     "brightness": bri,
