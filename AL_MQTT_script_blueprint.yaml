@@ -22,22 +22,21 @@ blueprint:
       selector:
         text:
 
-# ---------- Script body (logic unchanged; only delay condition updated) ----------
 alias: AL Bedroom Overhead
 mode: single
 fields:
   target_state:
-    description: "\"ON\" or \"OFF\" (required)"
-    example: "ON"
+    description: "\"ON\" / \"OFF\" or null. If null, publishes JSON null (leaves state unchanged)."
+    example: null
   brightness_pct:
     description: Optional brightness percent (0–100). Falls back to AL dummy switch.
     example: 72
   color_temp_kelvin:
     description: Optional color temp in Kelvin. Falls back to AL dummy switch.
     example: 2700
+
 sequence:
   - variables:
-      # Blueprint inputs
       al_sw: !input al_switch
       inovelli_topic: !input inovelli_set_topic
       group_topic: !input group_set_topic
@@ -56,7 +55,6 @@ sequence:
       bri: "{{ [ [ bri_raw, 1 ] | max, 254 ] | min }}"
       mired_raw: "{{ (1000000 / kelvin) | round(0) | int }}"
       mired: "{{ [ [ mired_raw, 153 ] | max, 500 ] | min }}"
-      target_state_norm: "{{ target_state | upper }}"
 
   # Publish to Inovelli only if topic input is non-blank
   - choose:
@@ -70,13 +68,25 @@ sequence:
               qos: 0
               retain: false
               payload: |-
+                {# derive state: null/none/'' -> none (JSON null); else uppercase #}
+                {% set s = target_state %}
+                {% if s is not defined or s is none %}
+                  {% set s = none %}
+                {% elif s is string %}
+                  {% set s = s | trim %}
+                  {% if s | lower in ['null','none',''] %}
+                    {% set s = none %}
+                  {% else %}
+                    {% set s = s | upper %}
+                  {% endif %}
+                {% endif %}
                 {{
                   {
                     "level_config": {"execute_if_off": true},
                     "defaultLevelLocal": bri,
                     "defaultLevelRemote": bri,
                     "brightness": bri,
-                    "state": target_state_norm
+                    "state": s
                   } | tojson
                 }}
 
@@ -102,9 +112,20 @@ sequence:
               qos: 0
               retain: false
               payload: |-
+                {% set s = target_state %}
+                {% if s is not defined or s is none %}
+                  {% set s = none %}
+                {% elif s is string %}
+                  {% set s = s | trim %}
+                  {% if s | lower in ['null','none',''] %}
+                    {% set s = none %}
+                  {% else %}
+                    {% set s = s | upper %}
+                  {% endif %}
+                {% endif %}
                 {{
                   {
-                    "state": target_state_norm,
+                    "state": s,
                     "level_config": {"execute_if_off": true},
                     "color_options": {"execute_if_off": true},
                     "brightness": bri,
