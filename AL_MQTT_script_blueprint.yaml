@@ -27,7 +27,7 @@ mode: single
 fields:
   target_state:
     description: "\"ON\" / \"OFF\" or null. If null, publishes JSON null (leaves state unchanged)."
-    example: null
+    example: "null"
   brightness_pct:
     description: Optional brightness percent (0–100). Falls back to AL dummy switch.
     example: 72
@@ -132,3 +132,4 @@ sequence:
                     "color_temp": mired
                   } | tojson
                 }}
+
