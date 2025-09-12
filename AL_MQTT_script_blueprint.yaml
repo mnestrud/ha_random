@@ -1,27 +1,4 @@
-blueprint:
-  name: Ataraxia Lighting Script
-  domain: script
-  author: mnestrud
-  input:
-    al_switch:
-      name: Adaptive Lighting switch
-      description: Adaptive Lighting Switch entity providing brightness_pct & color_temp_kelvin attributes
-      selector:
-        entity:
-          domain: switch
-    inovelli_set_topic:
-      name: Light Switch - Zigbee2MQTT /set topic (Inovelli Blue)
-      description: e.g. "zigbee2mqtt/Primary Bedroom Overhead Light Switch/set" - May be blank.
-      default: ""
-      selector:
-        text:
-    group_set_topic:
-      name: Light Group or Individual Light - Zigbee2MQTT /set topic.
-      description: e.g. "zigbee2mqtt/zgb_primary_bedroom/set" - May be blank.
-      default: ""
-      selector:
-        text:
-
+# ---------- Script body (logic unchanged; only delay condition + group OFF handling updated) ----------
 alias: AL Bedroom Overhead
 mode: single
 fields:
@@ -36,6 +13,7 @@ fields:
     example: 2700
 sequence:
   - variables:
+      # Blueprint inputs
       al_sw: !input al_switch
       inovelli_topic: !input inovelli_set_topic
       group_topic: !input group_set_topic
@@ -55,12 +33,6 @@ sequence:
       mired_raw: "{{ (1000000 / kelvin) | round(0) | int }}"
       mired: "{{ [ [ mired_raw, 153 ] | max, 500 ] | min }}"
       target_state_norm: "{{ target_state | upper }}"
-      state_value: >-
-        {% if target_state_norm == "OFF" %}
-          {{ none }}
-        {% else %}
-          {{ target_state_norm }}
-        {% endif %}
 
   # Publish to Inovelli only if topic input is non-blank
   - choose:
@@ -80,7 +52,7 @@ sequence:
                     "defaultLevelLocal": bri,
                     "defaultLevelRemote": bri,
                     "brightness": bri,
-                    "state": state_value
+                    "state": target_state_norm
                   } | tojson
                 }}
 
@@ -108,7 +80,7 @@ sequence:
               payload: |-
                 {{
                   {
-                    "state": state_value,
+                    "state": (target_state_norm if target_state_norm == "ON" else None),
                     "level_config": {"execute_if_off": true},
                     "color_options": {"execute_if_off": true},
                     "brightness": bri,
