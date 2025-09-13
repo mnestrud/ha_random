@@ -21,8 +21,26 @@ blueprint:
       default: ""
       selector:
         text:
+    # === New (optional) ===
+    inovelli_entity:
+      name: Inovelli entity (optional)
+      description: HA entity used to read current brightness & default levels. Leave blank to skip check.
+      default: ""
+      selector:
+        entity:
+          multiple: false
+          # Typically a light entity discovered by Z2M
+          domain: light
+    group_light_entity:
+      name: Light group / light entity (optional)
+      description: HA entity used to read current brightness & color_temp. Leave blank to skip check.
+      default: ""
+      selector:
+        entity:
+          multiple: false
+          domain: light
 
-# ---------- Script body (logic unchanged; only 'OFF' handling for lights and separation of states added) ----------
+# ---------- Script body ----------
 alias: AL Bedroom Overhead
 mode: single
 fields:
@@ -41,6 +59,8 @@ sequence:
       al_sw: !input al_switch
       inovelli_topic: !input inovelli_set_topic
       group_topic: !input group_set_topic
+      inovelli_ent: !input inovelli_entity
+      group_ent: !input group_light_entity
 
       pct: >-
         {% set p = brightness_pct | default(None) %}
@@ -57,18 +77,72 @@ sequence:
       mired_raw: "{{ (1000000 / kelvin) | round(0) | int }}"
       mired: "{{ [ [ mired_raw, 153 ] | max, 500 ] | min }}"
       target_state_norm: "{{ target_state | upper }}"
-      # Always send ON/OFF to the Inovelli switch (never null)
+      # Always compute desired states
       state_for_inovelli: >-
         {{ "ON" if target_state_norm == "ON" else "OFF" }}
-      # For lights/groups: OFF becomes null so state is not affected
       state_for_lights: >-
         {{ target_state_norm if target_state_norm == "ON" else None }}
 
-  # Publish to Inovelli only if topic input is non-blank
+      # ---------- Current values for "already correct?" checks ----------
+      # Inovelli current values (try both camelCase and snake_case attribute names)
+      _inv_bri: >-
+        {% if inovelli_ent | string | length > 0 %}
+          {{ state_attr(inovelli_ent, 'brightness')
+             | default(state_attr(inovelli_ent, 'brightness_pct'), true) }}
+        {% else %}{{ None }}{% endif %}
+      _inv_dll: >-
+        {% if inovelli_ent | string | length > 0 %}
+          {{ state_attr(inovelli_ent, 'defaultLevelLocal')
+             | default(state_attr(inovelli_ent, 'default_level_local'), true) }}
+        {% else %}{{ None }}{% endif %}
+      _inv_dlr: >-
+        {% if inovelli_ent | string | length > 0 %}
+          {{ state_attr(inovelli_ent, 'defaultLevelRemote')
+             | default(state_attr(inovelli_ent, 'default_level_remote'), true) }}
+        {% else %}{{ None }}{% endif %}
+      # Normalize any percentage-like brightness to 0..254 if needed
+      inv_bri_norm: >-
+        {% set v = _inv_bri %}
+        {% if v is number and v <= 1 %}{{ (v * 254) | round(0) | int }}
+        {% elif v is number and v <= 100 and v == v | int %}{{ (v * 254 / 100) | round(0) | int }}
+        {% else %}{{ v }}{% endif %}
+
+      # "All three match?" → skip Inovelli publish
+      inovelli_already_correct: >-
+        {% if inovelli_ent | string | length == 0 %}
+          false
+        {% else %}
+          {{ (inv_bri_norm is number and inv_bri_norm == bri)
+             and (_inv_dll is number and _inv_dll == bri)
+             and (_inv_dlr is number and _inv_dlr == bri) }}
+        {% endif %}
+
+      # Group/light current values
+      grp_bri: >-
+        {% if group_ent | string | length > 0 %}
+          {{ state_attr(group_ent, 'brightness') }}
+        {% else %}{{ None }}{% endif %}
+      grp_ct: >-
+        {% if group_ent | string | length > 0 %}
+          {{ state_attr(group_ent, 'color_temp') }}
+        {% else %}{{ None }}{% endif %}
+
+      # Both brightness & color_temp match? → skip group publish
+      group_already_correct: >-
+        {% if group_ent | string | length == 0 %}
+          false
+        {% else %}
+          {{ (grp_bri is number and grp_bri == bri)
+             and (grp_ct is number and grp_ct == mired) }}
+        {% endif %}
+
+  # Publish to Inovelli only if topic is non-blank AND values are not already correct
   - choose:
       - conditions:
           - condition: template
             value_template: "{{ (inovelli_topic | string | trim) | length > 0 }}"
+          - condition: template
+            value_template: "{{ not inovelli_already_correct }}"
         sequence:
           - action: mqtt.publish
             data:
@@ -96,11 +170,13 @@ sequence:
         sequence:
           - delay: "00:00:01"
 
-  # Publish to Zigbee2MQTT group only if topic input is non-blank
+  # Publish to Zigbee2MQTT group only if topic is non-blank AND values are not already correct
   - choose:
       - conditions:
           - condition: template
             value_template: "{{ (group_topic | string | trim) | length > 0 }}"
+          - condition: template
+            value_template: "{{ not group_already_correct }}"
         sequence:
           - action: mqtt.publish
             data:
