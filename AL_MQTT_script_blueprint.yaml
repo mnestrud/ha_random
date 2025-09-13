@@ -1,13 +1,22 @@
+# =============================================================================
+# Changelog
+# v0.5 (current)
+# - Added "already-correct?" checks to skip redundant publishes:
+#   • Inovelli: compares adapted bri against brightness, defaultLevelLocal, defaultLevelRemote.
+#   • Group: compares adapted bri & mired against brightness & color_temp.
+# - Added optional inputs to point at HA entities for accurate comparison.
+# - Improved input/field descriptions and structure for clarity.
+# - Delay logic updated: 1s delay now occurs only when the first mqtt.publish runs.
+# =============================================================================
+
 blueprint:
   name: Ataraxia Lighting Adaptation Control Script (v0.5)
   domain: script
   author: mnestrud
   description: >
-    Syncs Adaptive Lighting values to Inovelli switches and/or Zigbee2MQTT
-    light groups.  
-    - Prevents redundant MQTT publishes if brightness/color temp already match.  
-    - Supports direct control of both switches and light groups.  
-    - Optional: add HA entities for precise state comparison.  
+    Syncs Adaptive Lighting values to Inovelli switches and/or Zigbee2MQTT light groups.
+    Skips MQTT publishes when targets already match. Optional HA entity inputs enable
+    precise comparisons. Delay before group publish runs only if the Inovelli publish ran.
 
   input:
     al_switch:
@@ -22,8 +31,8 @@ blueprint:
     inovelli_set_topic:
       name: Inovelli switch MQTT topic
       description: >
-        Zigbee2MQTT `/set` topic for the Inovelli Blue switch.  
-        Example: "zigbee2mqtt/Primary Bedroom Overhead Light Switch/set".  
+        Zigbee2MQTT `/set` topic for the Inovelli Blue switch.
+        Example: "zigbee2mqtt/Primary Bedroom Overhead Light Switch/set".
         Leave blank to disable Inovelli publishing.
       default: ""
       selector:
@@ -32,8 +41,8 @@ blueprint:
     group_set_topic:
       name: Light group / light MQTT topic
       description: >
-        Zigbee2MQTT `/set` topic for a light group or individual light.  
-        Example: "zigbee2mqtt/zgb_primary_bedroom/set".  
+        Zigbee2MQTT `/set` topic for a light group or individual light.
+        Example: "zigbee2mqtt/zgb_primary_bedroom/set".
         Leave blank to disable group publishing.
       default: ""
       selector:
@@ -44,7 +53,7 @@ blueprint:
       name: Inovelli HA entity
       description: >
         Home Assistant entity representing the Inovelli switch/light. Used to
-        compare current brightness & default levels.  
+        compare current brightness & default levels.
         Leave blank to skip state checks (always publishes).
       default: ""
       selector:
@@ -56,7 +65,7 @@ blueprint:
       name: Light group HA entity
       description: >
         Home Assistant light group (or single light). Used to compare current
-        brightness & color temperature.  
+        brightness & color temperature.
         Leave blank to skip state checks (always publishes).
       default: ""
       selector:
@@ -70,19 +79,19 @@ mode: single
 fields:
   target_state:
     description: >
-      Target power state ("ON" or "OFF").  
+      Target power state ("ON" or "OFF").
       Required: ensures devices turn on/off as expected.
     example: "ON"
 
   brightness_pct:
     description: >
-      Optional brightness percent (0–100).  
+      Optional brightness percent (0–100).
       If omitted, falls back to brightness from the Adaptive Lighting switch.
     example: 72
 
   color_temp_kelvin:
     description: >
-      Optional color temperature in Kelvin.  
+      Optional color temperature in Kelvin.
       If omitted, falls back to the Adaptive Lighting switch value.
     example: 2700
 
@@ -195,18 +204,10 @@ sequence:
                     "state": state_for_inovelli
                   } | tojson
                 }}
-
-  # Add delay only if BOTH Inovelli and group topics are used
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: >-
-              {{ (inovelli_topic | string | trim) | length > 0 and
-                 (group_topic | string | trim) | length > 0 }}
-        sequence:
+          # Delay runs only if the above publish executes
           - delay: "00:00:01"
 
-  # Publish to group only if topic is non-blank AND values are not already correct
+  # Publish to Zigbee2MQTT group only if topic is non-blank AND values are not already correct
   - choose:
       - conditions:
           - condition: template
