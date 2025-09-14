@@ -278,32 +278,38 @@ variables:
   scene_down_triple_set: >
     {{ scene_down_triple != [] }}
 
+  # Selected battery sensors (skip blanks)
   battery_sensors: >
     {{ [battery_sensor_1_entity, battery_sensor_2_entity, battery_sensor_3_entity, battery_sensor_4_entity]
        | reject('equalto', []) | list }}
 
-  # Robustly extract a numeric percent from each sensor (handles "20", "20.0", "20 %", or attr-based)
-  lowest_battery_pct: >
-    {% set minv = 101 %}
+  # Robust numeric extraction from each sensor state ("20", "20 %", or attribute-based)
+  battery_values: >
+    {% set vals = [] %}
     {% for e in battery_sensors %}
-      {% set raw = states(e) %}
-      {% set val = raw | float(-9999) %}
-      {% if val == -9999 %}
-        {% set val = state_attr(e, 'battery') | float(-9999) %}
+      {% set s = states(e) %}
+      {% set n = s | float(none) %}
+      {% if n is none %}
+        {% set m = (s | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+')) %}
+        {% set n = m | float(none) %}
       {% endif %}
-      {% if val == -9999 %}
-        {% set num = (raw | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+')) %}
-        {% set val = num | float(101) %}
+      {% if n is none %}
+        {% set n = state_attr(e, 'battery') | float(none) %}
       {% endif %}
-      {% if val < minv %}
-        {% set minv = val %}
+      {% if n is not none %}
+        {% set vals = vals + [n] %}
       {% endif %}
     {% endfor %}
-    {{ minv }}
+    {{ vals }}
+
+  lowest_battery_pct: >
+    {{ (battery_values | min(default=101)) }}
+
+  battery_low: >
+    {{ (lowest_battery_pct | float(101)) < (battery_low_pct | int(30)) }}
 
   led_color_resolved: >
-    {% set threshold = battery_low_pct | int(30) %}
-    {{ 'Red' if (lowest_battery_pct | float(101)) < threshold else led_color_ok }}
+    {{ 'Red' if battery_low else led_color_ok }}
 
 triggers:
   - trigger: device
@@ -538,7 +544,7 @@ actions:
                     target:
                       entity_id: !input shade_scene_down
 
-              # UP triple (“Shady”)
+              # UP triple (“Shady”) → Chase
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_SHADY' and scene_shady_set }}"
@@ -548,7 +554,7 @@ actions:
                       led: "All"
                       color: "{{ led_color_resolved }}"
                       level: "{{ led_level_pct }}"
-                      effect: "Pulse"
+                      effect: "Chase"
                       duration: "{{ led_duration_text }}"
                       target:
                         entity_id: "{{ led_target_light }}"
@@ -556,7 +562,7 @@ actions:
                     target:
                       entity_id: !input shade_scene_shady
 
-              # DOWN triple
+              # DOWN triple → Chase
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_DOWN_TRIPLE' and scene_down_triple_set }}"
@@ -566,7 +572,7 @@ actions:
                       led: "All"
                       color: "{{ led_color_resolved }}"
                       level: "{{ led_level_pct }}"
-                      effect: "Slow Falling"
+                      effect: "Chase"
                       duration: "{{ led_duration_text }}"
                       target:
                         entity_id: "{{ led_target_light }}"
