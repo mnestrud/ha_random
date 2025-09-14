@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.7.7)
+  name: Ataraxia Lighting - Inovelli Switch Taps (v0.8)
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
     - Config single = Night (only if a Light target is provided)
@@ -9,11 +9,10 @@ blueprint:
     - Up double / Down double / Up triple / Down triple = optional Shade scenes (auto LED with battery-aware color)
 
     Notes:
-    • Uses Home Assistant 2024.8+ “actions” style (service calls are actions).
+    • Uses Home Assistant 2024.8+ “actions” style.
     • Shade scenes are optional; if left blank, that key press does nothing (no scene, no LED).
     • Adaptive is enabled ONLY if BOTH 'Adaptive helper' and 'Adaptive script' are set.
     • Shade LED color switches to Red when ANY provided battery sensor is below the low threshold.
-    • Triggers use MQTT topic `BASE_TOPIC/FRIENDLY_NAME/action` (default base: zigbee2mqtt).
 
   domain: automation
   author: mnestrud
@@ -23,26 +22,10 @@ blueprint:
 
   input:
 
-    # ---- Zigbee2MQTT (for triggers)
-    z2m_base_topic:
-      name: Zigbee2MQTT base topic
-      description: The base MQTT topic configured in Zigbee2MQTT.
-      default: zigbee2mqtt
-      selector:
-        text:
-
-    z2m_friendly_name:
-      name: Zigbee2MQTT friendly name
-      description: >
-        The device's friendly name in Zigbee2MQTT (used in the MQTT topic).
-        Example: "Primary Bedroom Overhead Light Switch"
-      selector:
-        text:
-
-    # ---- Switch (used to find the built-in light entity for LED target)
+    # ---- Switch
     inovelli_device:
-      name: Inovelli switch (device)
-      description: Select the Inovelli Blue 2-in-1 device so we can find its light entity for LED effects.
+      name: Inovelli switch (Zigbee2MQTT)
+      description: Select the Inovelli Blue 2-in-1 controlling this room.
       selector:
         device:
           filter:
@@ -134,7 +117,7 @@ blueprint:
 
     adaptive_script:
       name: Adaptive script
-      description: Must be set together with Adaptive helper; otherwise adaptive is disabled. Accepts variable 'target_state' "ON"/"OFF".
+      description: Must be set together with Adaptive helper; otherwise adaptive is disabled. Accepts 'target_state' "ON"/"OFF".
       default: []
       selector:
         entity:
@@ -177,7 +160,7 @@ blueprint:
     # ---- LED effects
     led_script:
       name: Inovelli LED effect script
-      description: "Call your LED script (Zanix): fields color, level, effect, duration, target.entity_id. 'led' optional."
+      description: "Direct call to your LED script (must accept: led, color, level, effect, duration, target)."
       default: script.inovelli_blue_led_2025_1
       selector:
         entity:
@@ -247,12 +230,6 @@ blueprint:
           domain: sensor
           device_class: battery
 
-# MQTT trigger variables (build the action topic from inputs)
-trigger_variables:
-  z2m_base: !input z2m_base_topic
-  z2m_name: !input z2m_friendly_name
-  z2m_action_topic: "{{ z2m_base ~ '/' ~ z2m_name ~ '/action' }}"
-
 variables:
   # ---- Direct inputs
   switch_device: !input inovelli_device
@@ -291,96 +268,117 @@ variables:
 
   scene_up_set: >
     {{ scene_up != [] }}
+
   scene_down_set: >
     {{ scene_down != [] }}
+
   scene_shady_set: >
     {{ scene_shady != [] }}
+
   scene_down_triple_set: >
     {{ scene_down_triple != [] }}
 
-  # Selected battery sensors (skip blanks)
   battery_sensors: >
     {{ [battery_sensor_1_entity, battery_sensor_2_entity, battery_sensor_3_entity, battery_sensor_4_entity]
        | reject('equalto', []) | list }}
 
-  # Extract numeric % robustly ("20", "20 %", attr 'battery', etc.)
-  battery_values: >
-    {% set vals = [] %}
+  # Robustly extract a numeric percent from each sensor (handles "20", "20.0", "20 %", or attr-based)
+  lowest_battery_pct: >
+    {% set minv = 101 %}
     {% for e in battery_sensors %}
-      {% set s = states(e) %}
-      {% set n = s | float(none) %}
-      {% if n is none %}
-        {% set m = (s | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+')) %}
-        {% set n = m | float(none) %}
+      {% set raw = states(e) %}
+      {% set val = raw | float(-9999) %}
+      {% if val == -9999 %}
+        {% set val = state_attr(e, 'battery') | float(-9999) %}
       {% endif %}
-      {% if n is none %}
-        {% set n = state_attr(e, 'battery') | float(none) %}
+      {% if val == -9999 %}
+        {% set num = (raw | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+')) %}
+        {% set val = num | float(101) %}
       {% endif %}
-      {% if n is not none %}
-        {% set vals = vals + [n] %}
+      {% if val < minv %}
+        {% set minv = val %}
       {% endif %}
     {% endfor %}
-    {{ vals }}
-
-  lowest_battery_pct: >
-    {{ (battery_values | min(default=101)) }}
-
-  battery_low: >
-    {{ (lowest_battery_pct | float(101)) < (battery_low_pct | int(30)) }}
+    {{ minv }}
 
   led_color_resolved: >
-    {{ 'Red' if battery_low else led_color_ok }}
+    {% set threshold = battery_low_pct | int(30) %}
+    {{ 'Red' if (lowest_battery_pct | float(101)) < threshold else led_color_ok }}
 
-trigger:
-  # Config/Night & Config/Day
-  - trigger: mqtt
-    topic: "{{ z2m_action_topic }}"
-    payload: config_single
+triggers:
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: config_single
     id: SCENE_NIGHT
-  - trigger: mqtt
-    topic: "{{ z2m_action_topic }}"
-    payload: config_double
+
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: config_double
     id: SCENE_DAY
 
-  # Adaptive live/prestage + stop (held)
-  - trigger: mqtt
-    topic: "{{ z2m_action_topic }}"
-    payload: up_single
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_single
     id: ADAPT_LIVE
-  - trigger: mqtt
-    topic: "{{ z2m_action_topic }}"
-    payload: down_single
+
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_single
     id: ADAPT_PRESTAGE
-  - trigger: mqtt
-    topic: "{{ z2m_action_topic }}"
-    payload: up_held
-    id: STOP_ADAPT
-  - trigger: mqtt
-    topic: "{{ z2m_action_topic }}"
-    payload: down_held
+
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_held
     id: STOP_ADAPT
 
-  # Shades (double/triple)
-  - trigger: mqtt
-    topic: "{{ z2m_action_topic }}"
-    payload: up_double
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_held
+    id: STOP_ADAPT
+
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_double
     id: SHADES_UP
-  - trigger: mqtt
-    topic: "{{ z2m_action_topic }}"
-    payload: down_double
+
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_double
     id: SHADES_DOWN
-  - trigger: mqtt
-    topic: "{{ z2m_action_topic }}"
-    payload: up_triple
+
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_triple
     id: SHADES_SHADY
-  - trigger: mqtt
-    topic: "{{ z2m_action_topic }}"
-    payload: down_triple
+
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_triple
     id: SHADES_DOWN_TRIPLE
 
-condition: []
+conditions: []
 
-action:
+actions:
   - choose:
 
       # ========== CONFIG BUTTON: DAY ==========
@@ -446,7 +444,7 @@ action:
                 value_template: "{{ is_adaptive_enabled }}"
             then:
               - choose:
-                  # LIVE/PRESTAGE: helper OFF → turn ON, delay 0.5s, then run once
+                  # LIVE/PRESTAGE: only if helper is OFF → turn ON, delay 0.5s, then run script once
                   - conditions:
                       - condition: template
                         value_template: "{{ trigger.id in ['ADAPT_LIVE','ADAPT_PRESTAGE'] and is_state(adaptive_helper_entity, 'off') }}"
@@ -509,9 +507,7 @@ action:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_UP' and scene_up_set }}"
                 sequence:
-                  - action: script.turn_on
-                    target:
-                      entity_id: !input led_script
+                  - action: !input led_script
                     data:
                       led: "All"
                       color: "{{ led_color_resolved }}"
@@ -529,9 +525,7 @@ action:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_DOWN' and scene_down_set }}"
                 sequence:
-                  - action: script.turn_on
-                    target:
-                      entity_id: !input led_script
+                  - action: !input led_script
                     data:
                       led: "All"
                       color: "{{ led_color_resolved }}"
@@ -544,19 +538,17 @@ action:
                     target:
                       entity_id: !input shade_scene_down
 
-              # UP triple (“Shady”) → Chase
+              # UP triple (“Shady”)
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_SHADY' and scene_shady_set }}"
                 sequence:
-                  - action: script.turn_on
-                    target:
-                      entity_id: !input led_script
+                  - action: !input led_script
                     data:
                       led: "All"
                       color: "{{ led_color_resolved }}"
                       level: "{{ led_level_pct }}"
-                      effect: "Chase"
+                      effect: "Pulse"
                       duration: "{{ led_duration_text }}"
                       target:
                         entity_id: "{{ led_target_light }}"
@@ -564,19 +556,17 @@ action:
                     target:
                       entity_id: !input shade_scene_shady
 
-              # DOWN triple → Chase
+              # DOWN triple
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_DOWN_TRIPLE' and scene_down_triple_set }}"
                 sequence:
-                  - action: script.turn_on
-                    target:
-                      entity_id: !input led_script
+                  - action: !input led_script
                     data:
                       led: "All"
                       color: "{{ led_color_resolved }}"
                       level: "{{ led_level_pct }}"
-                      effect: "Chase"
+                      effect: "Slow Falling"
                       duration: "{{ led_duration_text }}"
                       target:
                         entity_id: "{{ led_target_light }}"
