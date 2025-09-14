@@ -16,7 +16,7 @@ blueprint:
 
   domain: automation
   author: mnestrud
-  source_url: https://github.com/mnestrud/ha_random/blob/main/Ataraxia%20Inovelli%20Switch%20Automations
+  source_url: https://raw.githubusercontent.com/mnestrud/ha_random/main/Ataraxia%20Inovelli%20Switch%20Automations
   homeassistant:
     min_version: 2024.8.0
 
