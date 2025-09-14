@@ -1,19 +1,18 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.6)
+  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.7)
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
-    - Config single = Night (only if light_group provided)
-    - Config double = Day (only if light_group provided)
+    - Config single = Night (only if a Light target is provided)
+    - Config double = Day (only if a Light target is provided)
     - Up single / Down single = Adaptive Lighting (turn ON helper if OFF; 0.5s delay; run script only on that transition)
     - Up/Down held = Stop Adaptive (turn helper OFF)
-    - Up double / Down double / Up triple = optional Shade scenes (auto LED).
-      If selected covers are moving, the tap will STOP them instead.
-    - Battery-aware LED on shade taps: if ANY selected cover's battery sensor is below the threshold, LED color switches to Red.
+    - Up double / Down double / Up triple / Down triple = optional Shade scenes (auto LED with battery-aware color)
 
     Notes:
     • Uses Home Assistant 2024.8+ “actions” style.
     • Shade scenes are optional; if left blank, that key press does nothing (no scene, no LED).
-    • Adaptive is enabled ONLY if BOTH 'adaptive_helper' and 'adaptive_script' are set.
+    • Adaptive is enabled ONLY if BOTH 'Adaptive helper' and 'Adaptive script' are set.
+    • Shade LED color switches to Red when ANY provided battery sensor is below the low threshold.
 
   domain: automation
   author: mnestrud
@@ -22,6 +21,8 @@ blueprint:
     min_version: 2024.8.0
 
   input:
+
+    # ---- Switch
     inovelli_device:
       name: Inovelli switch (Zigbee2MQTT)
       description: Select the Inovelli Blue 2-in-1 controlling this room.
@@ -31,8 +32,9 @@ blueprint:
             - integration: mqtt
           multiple: false
 
+    # ---- Lights
     light_group:
-      name: Target light / Zigbee group
+      name: Light target (single light or Zigbee group)
       description: >
         Optional: If set, Config single/double applies Night/Day brightness & color temp.
         If left blank, those button presses are disabled.
@@ -103,8 +105,9 @@ blueprint:
           step: 0.1
           unit_of_measurement: s
 
+    # ---- Adaptive Lighting
     adaptive_helper:
-      name: Adaptive Lighting helper (input_boolean)
+      name: Adaptive helper (input_boolean)
       description: Must be set together with Adaptive script; otherwise adaptive is disabled.
       default: []
       selector:
@@ -113,7 +116,7 @@ blueprint:
             domain: input_boolean
 
     adaptive_script:
-      name: Adaptive script to call
+      name: Adaptive script
       description: Must be set together with Adaptive helper; otherwise adaptive is disabled. Accepts 'target_state' "ON"/"OFF".
       default: []
       selector:
@@ -121,8 +124,8 @@ blueprint:
           filter:
             domain: script
 
-    # Shade scenes — if left blank, that key press does nothing (and no LED effect)
-    shade_up_scene:
+    # ---- Shades (Scenes)
+    shade_scene_up:
       name: Shade UP scene (Up double)
       default: []
       selector:
@@ -130,7 +133,7 @@ blueprint:
           filter:
             domain: scene
 
-    shade_down_scene:
+    shade_scene_down:
       name: Shade DOWN scene (Down double)
       default: []
       selector:
@@ -138,7 +141,7 @@ blueprint:
           filter:
             domain: scene
 
-    shade_shady_scene:
+    shade_scene_shady:
       name: Shade “Shady” scene (Up triple)
       default: []
       selector:
@@ -146,7 +149,15 @@ blueprint:
           filter:
             domain: scene
 
-    # LED EFFECTS (auto-run when corresponding shade scene is set)
+    shade_scene_down_triple:
+      name: Shade DOWN-TRIPLE scene (Down triple)
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: scene
+
+    # ---- LED effects
     led_script:
       name: Inovelli LED effect script
       description: "Direct call to your LED script (must accept: led, color, level, effect, duration, target)."
@@ -176,6 +187,7 @@ blueprint:
       selector:
         text:
 
+    # ---- Battery-aware LED (direct battery sensors)
     battery_low_threshold:
       name: Battery low threshold (%)
       default: 30
@@ -186,104 +198,101 @@ blueprint:
           step: 1
           unit_of_measurement: "%"
 
-    # Covers for stop-if-moving and battery LED override (select up to ~4)
-    shade_covers:
-      name: Covers to manage (stop & battery check)
-      description: >
-        Select up to 4 cover entities controlled by these taps.
-        • If any selected cover is opening/closing when a shade tap is pressed, the tap will send cover.stop_cover.
-        • LED will turn Red on shade taps if any selected cover's battery sensor is below the threshold.
+    battery_sensor_1:
+      name: Battery sensor 1 (optional)
       default: []
       selector:
         entity:
-          domain: cover
-          multiple: true
+          domain: sensor
+          device_class: battery
+
+    battery_sensor_2:
+      name: Battery sensor 2 (optional)
+      default: []
+      selector:
+        entity:
+          domain: sensor
+          device_class: battery
+
+    battery_sensor_3:
+      name: Battery sensor 3 (optional)
+      default: []
+      selector:
+        entity:
+          domain: sensor
+          device_class: battery
+
+    battery_sensor_4:
+      name: Battery sensor 4 (optional)
+      default: []
+      selector:
+        entity:
+          domain: sensor
+          device_class: battery
 
 variables:
-  # Inputs
-  inovelli_device_var: !input inovelli_device
-  light_group_var: !input light_group
+  # ---- Direct inputs
+  switch_device: !input inovelli_device
+  light_target: !input light_group
 
-  adaptive_helper_var: !input adaptive_helper
-  adaptive_script_var: !input adaptive_script
+  adaptive_helper_entity: !input adaptive_helper
+  adaptive_script_entity: !input adaptive_script
 
-  shade_up_scene_var: !input shade_up_scene
-  shade_down_scene_var: !input shade_down_scene
-  shade_shady_scene_var: !input shade_shady_scene
+  scene_up: !input shade_scene_up
+  scene_down: !input shade_scene_down
+  scene_shady: !input shade_scene_shady
+  scene_down_triple: !input shade_scene_down_triple
 
-  led_script_var: !input led_script
-  led_color_var: !input led_color
-  led_level_var: !input led_level
-  led_duration_var: !input led_duration
+  led_script_entity: !input led_script
+  led_color_ok: !input led_color
+  led_level_pct: !input led_level
+  led_duration_text: !input led_duration
 
-  battery_low_threshold_var: !input battery_low_threshold
+  battery_low_pct: !input battery_low_threshold
+  battery_sensor_1_entity: !input battery_sensor_1
+  battery_sensor_2_entity: !input battery_sensor_2
+  battery_sensor_3_entity: !input battery_sensor_3
+  battery_sensor_4_entity: !input battery_sensor_4
 
-  shade_covers_var: !input shade_covers
-
-  # Derived targets / guards
-  inovelli_led_light: >
-    {{ device_entities(inovelli_device_var)
+  # ---- Derived
+  led_target_light: >
+    {{ device_entities(switch_device)
        | select('match', '^light\\.')
        | list | first }}
 
-  adaptive_enabled: >
-    {{ adaptive_helper_var != [] and adaptive_script_var != [] }}
+  is_adaptive_enabled: >
+    {{ adaptive_helper_entity != [] and adaptive_script_entity != [] }}
 
-  daynight_enabled: >
-    {{ light_group_var != [] }}
+  has_light_target: >
+    {{ light_target != [] }}
 
-  shade_up_enabled: >
-    {{ shade_up_scene_var != [] }}
+  scene_up_set: >
+    {{ scene_up != [] }}
 
-  shade_down_enabled: >
-    {{ shade_down_scene_var != [] }}
+  scene_down_set: >
+    {{ scene_down != [] }}
 
-  shade_shady_enabled: >
-    {{ shade_shady_scene_var != [] }}
+  scene_shady_set: >
+    {{ scene_shady != [] }}
 
-  # Limit covers list to the first 4
-  shade_covers_4: >
-    {{ (shade_covers_var | list)[:4] }}
+  scene_down_triple_set: >
+    {{ scene_down_triple != [] }}
 
-  can_stop_shades: >
-    {{ (shade_covers_4 | length) > 0 }}
+  battery_sensors: >
+    {{ [battery_sensor_1_entity, battery_sensor_2_entity, battery_sensor_3_entity, battery_sensor_4_entity]
+       | reject('equalto', []) | list }}
 
-  shades_moving: >
-    {% set moving = false %}
-    {% for c in shade_covers_4 %}
-      {% if states(c) in ['opening','closing'] %}
-        {% set moving = true %}
-      {% endif %}
-    {% endfor %}
-    {{ moving }}
-
-  # Derive battery sensors from the selected covers (same device, device_class=battery)
-  battery_entities: >
-    {% set out = [] %}
-    {% for c in shade_covers_4 %}
-      {% set did = device_id(c) %}
-      {% if did %}
-        {% for e in device_entities(did) %}
-          {% if e.startswith('sensor.') and state_attr(e, 'device_class') == 'battery' %}
-            {% set out = out + [e] %}
-          {% endif %}
-        {% endfor %}
-      {% endif %}
-    {% endfor %}
-    {{ out }}
-
-  # Lowest battery % across provided sensors (101 if none/unknown)
   lowest_battery_pct: >
     {% set minv = 101 %}
-    {% for e in battery_entities %}
+    {% for e in battery_sensors %}
       {% set v = states(e) | float(101) %}
       {% if v < minv %}{% set minv = v %}{% endif %}
     {% endfor %}
     {{ minv }}
 
-  led_color_effective: >
-    {% set threshold = battery_low_threshold_var | int(30) %}
-    {{ 'Red' if (lowest_battery_pct | float(101)) < threshold else led_color_var }}
+  led_color_resolved: >
+    {% set threshold = battery_low_pct | int(30) %}
+    {{ 'Red' if (lowest_battery_pct | float(101)) < threshold else led_color_ok }}
 
 triggers:
   - trigger: device
@@ -349,23 +358,30 @@ triggers:
     subtype: up_triple
     id: SHADES_SHADY
 
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_triple
+    id: SHADES_DOWN_TRIPLE
+
 conditions: []
 
 actions:
   - choose:
 
-      # ========== CONFIG BUTTON: DAY/NIGHT (only if light_group provided) ==========
+      # ========== CONFIG BUTTON: DAY ==========
       - conditions:
           - condition: trigger
             id: SCENE_DAY
         sequence:
           - if:
               - condition: template
-                value_template: "{{ daynight_enabled }}"
+                value_template: "{{ has_light_target }}"
             then:
               - if:
                   - condition: template
-                    value_template: "{{ adaptive_enabled }}"
+                    value_template: "{{ is_adaptive_enabled }}"
                 then:
                   - action: input_boolean.turn_off
                     target:
@@ -379,17 +395,18 @@ actions:
                   transition: !input day_transition
             else: []
 
+      # ========== CONFIG BUTTON: NIGHT ==========
       - conditions:
           - condition: trigger
             id: SCENE_NIGHT
         sequence:
           - if:
               - condition: template
-                value_template: "{{ daynight_enabled }}"
+                value_template: "{{ has_light_target }}"
             then:
               - if:
                   - condition: template
-                    value_template: "{{ adaptive_enabled }}"
+                    value_template: "{{ is_adaptive_enabled }}"
                 then:
                   - action: input_boolean.turn_off
                     target:
@@ -403,7 +420,7 @@ actions:
                   transition: !input night_transition
             else: []
 
-      # ========== ADAPTIVE: LIVE / PRESTAGE / STOP (variables-first) ==========
+      # ========== ADAPTIVE: LIVE / PRESTAGE / STOP ==========
       - conditions:
           - condition: trigger
             id:
@@ -413,13 +430,13 @@ actions:
         sequence:
           - if:
               - condition: template
-                value_template: "{{ adaptive_enabled }}"
+                value_template: "{{ is_adaptive_enabled }}"
             then:
               - choose:
                   # LIVE/PRESTAGE: only if helper is OFF → turn ON, delay 0.5s, then run script once
                   - conditions:
                       - condition: template
-                        value_template: "{{ trigger.id in ['ADAPT_LIVE','ADAPT_PRESTAGE'] and is_state(adaptive_helper_var, 'off') }}"
+                        value_template: "{{ trigger.id in ['ADAPT_LIVE','ADAPT_PRESTAGE'] and is_state(adaptive_helper_entity, 'off') }}"
                     sequence:
                       - action: input_boolean.turn_on
                         target:
@@ -451,7 +468,7 @@ actions:
                   # LIVE/PRESTAGE while helper already ON → do nothing
                   - conditions:
                       - condition: template
-                        value_template: "{{ trigger.id in ['ADAPT_LIVE','ADAPT_PRESTAGE'] and is_state(adaptive_helper_var, 'on') }}"
+                        value_template: "{{ trigger.id in ['ADAPT_LIVE','ADAPT_PRESTAGE'] and is_state(adaptive_helper_entity, 'on') }}"
                     sequence: []
 
                   # STOP: always turn helper OFF
@@ -464,92 +481,87 @@ actions:
                           entity_id: !input adaptive_helper
             else: []
 
-      # ========== SHADES (SCENES) + AUTO LED EFFECTS + STOP-IF-MOVING ==========
+      # ========== SHADES (SCENES) + AUTO LED (battery-aware) ==========
       - conditions:
           - condition: trigger
             id:
               - SHADES_UP
               - SHADES_DOWN
               - SHADES_SHADY
+              - SHADES_DOWN_TRIPLE
         sequence:
           # UP double
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'SHADES_UP' and shade_up_enabled }}"
+                    value_template: "{{ trigger.id == 'SHADES_UP' and scene_up_set }}"
                 sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ can_stop_shades and shades_moving }}"
-                    then:
-                      - action: cover.stop_cover
-                        target:
-                          entity_id: !input shade_covers
-                    else:
-                      - action: !input led_script
-                        data:
-                          led: "All"
-                          color: "{{ led_color_effective }}"
-                          level: "{{ led_level_var }}"
-                          effect: "Slow Rising"
-                          duration: "{{ led_duration_var }}"
-                          target:
-                            entity_id: "{{ inovelli_led_light }}"
-                      - action: scene.turn_on
-                        target:
-                          entity_id: !input shade_up_scene
+                  - action: !input led_script
+                    data:
+                      led: "All"
+                      color: "{{ led_color_resolved }}"
+                      level: "{{ led_level_pct }}"
+                      effect: "Slow Rising"
+                      duration: "{{ led_duration_text }}"
+                      target:
+                        entity_id: "{{ led_target_light }}"
+                  - action: scene.turn_on
+                    target:
+                      entity_id: !input shade_scene_up
 
               # DOWN double
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'SHADES_DOWN' and shade_down_enabled }}"
+                    value_template: "{{ trigger.id == 'SHADES_DOWN' and scene_down_set }}"
                 sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ can_stop_shades and shades_moving }}"
-                    then:
-                      - action: cover.stop_cover
-                        target:
-                          entity_id: !input shade_covers
-                    else:
-                      - action: !input led_script
-                        data:
-                          led: "All"
-                          color: "{{ led_color_effective }}"
-                          level: "{{ led_level_var }}"
-                          effect: "Slow Falling"
-                          duration: "{{ led_duration_var }}"
-                          target:
-                            entity_id: "{{ inovelli_led_light }}"
-                      - action: scene.turn_on
-                        target:
-                          entity_id: !input shade_down_scene
+                  - action: !input led_script
+                    data:
+                      led: "All"
+                      color: "{{ led_color_resolved }}"
+                      level: "{{ led_level_pct }}"
+                      effect: "Slow Falling"
+                      duration: "{{ led_duration_text }}"
+                      target:
+                        entity_id: "{{ led_target_light }}"
+                  - action: scene.turn_on
+                    target:
+                      entity_id: !input shade_scene_down
 
               # UP triple (“Shady”)
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'SHADES_SHADY' and shade_shady_enabled }}"
+                    value_template: "{{ trigger.id == 'SHADES_SHADY' and scene_shady_set }}"
                 sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ can_stop_shades and shades_moving }}"
-                    then:
-                      - action: cover.stop_cover
-                        target:
-                          entity_id: !input shade_covers
-                    else:
-                      - action: !input led_script
-                        data:
-                          led: "All"
-                          color: "{{ led_color_effective }}"
-                          level: "{{ led_level_var }}"
-                          effect: "Pulse"
-                          duration: "{{ led_duration_var }}"
-                          target:
-                            entity_id: "{{ inovelli_led_light }}"
-                      - action: scene.turn_on
-                        target:
-                          entity_id: !input shade_shady_scene
+                  - action: !input led_script
+                    data:
+                      led: "All"
+                      color: "{{ led_color_resolved }}"
+                      level: "{{ led_level_pct }}"
+                      effect: "Pulse"
+                      duration: "{{ led_duration_text }}"
+                      target:
+                        entity_id: "{{ led_target_light }}"
+                  - action: scene.turn_on
+                    target:
+                      entity_id: !input shade_scene_shady
+
+              # DOWN triple
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.id == 'SHADES_DOWN_TRIPLE' and scene_down_triple_set }}"
+                sequence:
+                  - action: !input led_script
+                    data:
+                      led: "All"
+                      color: "{{ led_color_resolved }}"
+                      level: "{{ led_level_pct }}"
+                      effect: "Slow Falling"
+                      duration: "{{ led_duration_text }}"
+                      target:
+                        entity_id: "{{ led_target_light }}"
+                  - action: scene.turn_on
+                    target:
+                      entity_id: !input shade_scene_down_triple
 
 mode: queued
 max: 3
