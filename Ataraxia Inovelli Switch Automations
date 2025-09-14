@@ -1,5 +1,5 @@
 blueprint:
-  name: Inovelli Switch – Lights, Shades & LED (v0.1)
+  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.1)
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
     - Config button single = Night settings (brightness/CT) → only if light_group provided
