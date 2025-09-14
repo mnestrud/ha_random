@@ -1,0 +1,430 @@
+blueprint:
+  name: Inovelli Switch – Lights, Shades & LED (v0.1)
+  description: >
+    Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
+    - Config button single = Night settings (brightness/CT)
+    - Config button double = Day settings (brightness/CT)
+    - Up single / Down single = Adaptive Lighting ON (Live / Prestage) via script
+    - Up/Down held = Stop Adaptive (turn off helper)
+    - Up double / Down double / Up triple = optional Shade scenes
+    Optional LED effects are sent to the selected Inovelli device on shade taps.
+
+    Notes:
+    • Uses Home Assistant 2024.8+ “actions” style.
+    • If a Shade scene is left blank, that key press does nothing.
+    • Day/Night settings target a selected light (e.g., a Zigbee group).
+
+  domain: automation
+  source_url: https://example.com/blueprints/inovelli_bedroom_switch  # optional
+
+  input:
+    inovelli_device:
+      name: Inovelli switch (Zigbee2MQTT)
+      description: Select the Inovelli Blue 2-in-1 controlling this room.
+      selector:
+        device:
+          filter:
+            - integration: mqtt  # Zigbee2MQTT devices appear under MQTT
+          multiple: false
+
+    light_group:
+      name: Target light / Zigbee group
+      description: >
+        The light entity (often a Zigbee group) to receive Day/Night brightness & color temperature.
+      selector:
+        entity:
+          domain: light
+
+    enable_daynight:
+      name: Enable Day/Night buttons
+      description: Config single = Night; Config double = Day.
+      default: true
+      selector:
+        boolean: {}
+
+    day_brightness:
+      name: Daytime brightness (%)
+      default: 80
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: slider
+          unit_of_measurement: "%"
+
+    day_color_temp_k:
+      name: Daytime color temperature (K)
+      default: 4000
+      selector:
+        number:
+          min: 2000
+          max: 6500
+          step: 50
+          unit_of_measurement: "K"
+
+    night_brightness:
+      name: Nighttime brightness (%)
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: slider
+          unit_of_measurement: "%"
+
+    night_color_temp_k:
+      name: Nighttime color temperature (K)
+      default: 2700
+      selector:
+        number:
+          min: 1800
+          max: 4000
+          step: 50
+          unit_of_measurement: "K"
+
+    enable_adaptive:
+      name: Enable Adaptive Lighting helper + script actions
+      default: true
+      selector:
+        boolean: {}
+
+    adaptive_helper:
+      name: Adaptive Lighting helper (input_boolean)
+      description: Turned ON for ADAPT events and OFF when stopping. Leave blank to skip.
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
+
+    adaptive_script:
+      name: Adaptive script to call
+      description: >
+        Script that accepts a 'target_state' field with values "ON" or "OFF".
+        Example: script.al_primary_bedroom
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: script
+
+    enable_shades:
+      name: Enable Shade controls (scenes)
+      default: true
+      selector:
+        boolean: {}
+
+    shade_up_scene:
+      name: Shade UP scene (Up double)
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: scene
+
+    shade_down_scene:
+      name: Shade DOWN scene (Down double)
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: scene
+
+    shade_shady_scene:
+      name: Shade “Shady” scene (Up triple)
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: scene
+
+    enable_led_effects:
+      name: Enable LED effects on shade taps
+      description: Sends effect to the selected Inovelli device by calling your LED script.
+      default: true
+      selector:
+        boolean: {}
+
+    led_script:
+      name: Inovelli LED effect script
+      description: >
+        Script that accepts fields: led, color, level, effect, duration and supports 'target:'.
+        Example: script.inovelli_blue_led_2025_1
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: script
+
+    led_color:
+      name: LED color
+      default: Pink
+      selector:
+        text:
+
+    led_level:
+      name: LED level (1-100)
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 100
+
+    led_duration:
+      name: LED duration (e.g., "10 Seconds")
+      default: 10 Seconds
+      selector:
+        text:
+
+triggers:
+  # Config single → Night
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: config_single
+    id: SCENE_NIGHT
+
+  # Config double → Day
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: config_double
+    id: SCENE_DAY
+
+  # Up single → Adaptive Live
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_single
+    id: ADAPT_LIVE
+
+  # Down single → Adaptive Prestage
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_single
+    id: ADAPT_PRESTAGE
+
+  # Up held → Stop Adaptive
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_held
+    id: STOP_ADAPT
+
+  # Down held → Stop Adaptive
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_held
+    id: STOP_ADAPT
+
+  # Shades: Up double
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_double
+    id: SHADES_UP
+
+  # Shades: Down double
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_double
+    id: SHADES_DOWN
+
+  # Shades: Up triple (“Shady”)
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_triple
+    id: SHADES_SHADY
+
+conditions: []
+
+actions:
+  - choose:
+
+      # ========== CONFIG BUTTON: DAY/NIGHT ==========
+      - conditions:
+          - condition: trigger
+            id:
+              - SCENE_DAY
+              - SCENE_NIGHT
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ !input('enable_daynight') }}"
+            then: []
+            else:
+              - choose:
+                  - conditions:
+                      - condition: trigger
+                        id: SCENE_DAY
+                    sequence:
+                      - action: light.turn_on
+                        target:
+                          entity_id: !input light_group
+                        data:
+                          brightness_pct: !input day_brightness
+                          color_temp_kelvin: !input day_color_temp_k
+                          transition: 0.1
+                  - conditions:
+                      - condition: trigger
+                        id: SCENE_NIGHT
+                    sequence:
+                      - action: light.turn_on
+                        target:
+                          entity_id: !input light_group
+                        data:
+                          brightness_pct: !input night_brightness
+                          color_temp_kelvin: !input night_color_temp_k
+                          transition: 0.1
+
+      # ========== ADAPTIVE: LIVE / PRESTAGE / STOP ==========
+      - conditions:
+          - condition: trigger
+            id:
+              - ADAPT_LIVE
+              - ADAPT_PRESTAGE
+              - STOP_ADAPT
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ !input('enable_adaptive') }}"
+            then: []
+            else:
+              # Turn helper ON for ADAPT actions; OFF for STOP
+              - choose:
+                  - conditions:
+                      - condition: trigger
+                        id:
+                          - ADAPT_LIVE
+                          - ADAPT_PRESTAGE
+                      - condition: template
+                        value_template: >
+                          {{ (i := input('adaptive_helper')) != [] and
+                             states(i) == 'off' }}
+                    sequence:
+                      - action: input_boolean.turn_on
+                        target:
+                          entity_id: !input adaptive_helper
+                  - conditions:
+                      - condition: trigger
+                        id: STOP_ADAPT
+                      - condition: template
+                        value_template: "{{ input('adaptive_helper') != [] }}"
+                    sequence:
+                      - action: input_boolean.turn_off
+                        target:
+                          entity_id: !input adaptive_helper
+
+              # Call adaptive script if provided
+              - if:
+                  - condition: template
+                    value_template: "{{ input('adaptive_script') != [] }}"
+                then:
+                  - choose:
+                      - conditions:
+                          - condition: trigger
+                            id: ADAPT_LIVE
+                        sequence:
+                          - action: script.turn_on
+                            target:
+                              entity_id: !input adaptive_script
+                            data:
+                              variables:
+                                target_state: "ON"
+                      - conditions:
+                          - condition: trigger
+                            id: ADAPT_PRESTAGE
+                        sequence:
+                          - action: script.turn_on
+                            target:
+                              entity_id: !input adaptive_script
+                            data:
+                              variables:
+                                target_state: "OFF"
+                else: []
+
+      # ========== SHADES (SCENES) + OPTIONAL LED EFFECTS ==========
+      - conditions:
+          - condition: trigger
+            id:
+              - SHADES_UP
+              - SHADES_DOWN
+              - SHADES_SHADY
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ !input('enable_shades') }}"
+            then: []
+            else:
+              # Optional LED effect on shade taps
+              - if:
+                  - condition: template
+                    value_template: >
+                      {{ input('enable_led_effects')
+                         and input('led_script') != [] }}
+                then:
+                  - choose:
+                      - conditions:
+                          - condition: trigger
+                            id: SHADES_UP
+                        sequence:
+                          - action: script.turn_on
+                            target:
+                              entity_id: !input led_script
+                              device_id: !input inovelli_device
+                            data:
+                              variables:
+                                led: "All"
+                                color: !input led_color
+                                level: !input led_level
+                                effect: "Slow Rising"
+                                duration: !input led_duration
+                      - conditions:
+                          - condition: trigger
+                            id: SHADES_DOWN
+                        sequence:
+                          - action: script.turn_on
+                            target:
+                              entity_id: !input led_script
+                              device_id: !input inovelli_device
+                            data:
+                              variables:
+                                led: "All"
+                                color: !input led_color
+                                level: !input led_level
+                                effect: "Slow Falling"
+                                duration: !input led_duration
+                      - conditions:
+                          - condition: trigger
+                            id: SHADES_SHADY
+                        sequence:
+                          - action: script.turn_on
+                            target:
+                              entity_id: !input led_script
+                              device_id: !input inovelli_device
+                            data:
+                              variables:
+                                led: "All"
+                                color: !input led_color
+                                level: !input led_level
+                                effect: "Pulse"
+                                duration: !input led_duration
+                else: []
+
+              # Only call scenes when provided
+              - choose:
+                  - conditions:
+                      - condition: trigger
