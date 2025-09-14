@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.7.5)
+  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.7.6)
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
     - Config single = Night (only if a Light target is provided)
@@ -283,7 +283,7 @@ variables:
     {{ [battery_sensor_1_entity, battery_sensor_2_entity, battery_sensor_3_entity, battery_sensor_4_entity]
        | reject('equalto', []) | list }}
 
-  # Extract numeric % from each sensor state robustly ("20", "20 %", attr 'battery', etc.)
+  # Extract numeric % robustly ("20", "20 %", attr 'battery', etc.)
   battery_values: >
     {% set vals = [] %}
     {% for e in battery_sensors %}
@@ -311,80 +311,80 @@ variables:
   led_color_resolved: >
     {{ 'Red' if battery_low else led_color_ok }}
 
-triggers:
-  - trigger: device
+trigger:
+  - platform: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: config_single
     id: SCENE_NIGHT
 
-  - trigger: device
+  - platform: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: config_double
     id: SCENE_DAY
 
-  - trigger: device
+  - platform: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_single
     id: ADAPT_LIVE
 
-  - trigger: device
+  - platform: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_single
     id: ADAPT_PRESTAGE
 
-  - trigger: device
+  - platform: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_held
     id: STOP_ADAPT
 
-  - trigger: device
+  - platform: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_held
     id: STOP_ADAPT
 
-  - trigger: device
+  - platform: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_double
     id: SHADES_UP
 
-  - trigger: device
+  - platform: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_double
     id: SHADES_DOWN
 
-  - trigger: device
+  - platform: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_triple
     id: SHADES_SHADY
 
-  - trigger: device
+  - platform: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_triple
     id: SHADES_DOWN_TRIPLE
 
-conditions: []
+condition: []
 
-actions:
+action:
   - choose:
 
       # ========== CONFIG BUTTON: DAY ==========
@@ -450,7 +450,7 @@ actions:
                 value_template: "{{ is_adaptive_enabled }}"
             then:
               - choose:
-                  # LIVE/PRESTAGE: only if helper is OFF → turn ON, delay 0.5s, then run script once
+                  # LIVE/PRESTAGE: helper OFF → turn ON, delay 0.5s, then run once
                   - conditions:
                       - condition: template
                         value_template: "{{ trigger.id in ['ADAPT_LIVE','ADAPT_PRESTAGE'] and is_state(adaptive_helper_entity, 'off') }}"
