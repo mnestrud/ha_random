@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Switch Taps (v0.8)
+  name: Ataraxia Lighting - Inovelli Switch Taps (v0.8.1)
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
     - Config single = Night (only if a Light target is provided)
@@ -278,38 +278,32 @@ variables:
   scene_down_triple_set: >
     {{ scene_down_triple != [] }}
 
-  # Selected battery sensors (skip blanks)
   battery_sensors: >
     {{ [battery_sensor_1_entity, battery_sensor_2_entity, battery_sensor_3_entity, battery_sensor_4_entity]
        | reject('equalto', []) | list }}
 
-  # Robust numeric extraction from each sensor state ("20", "20 %", or attribute-based)
-  battery_values: >
-    {% set vals = [] %}
+  # Robustly extract a numeric percent from each sensor (handles "20", "20.0", "20 %", or attr-based)
+  lowest_battery_pct: >
+    {% set minv = 101 %}
     {% for e in battery_sensors %}
-      {% set s = states(e) %}
-      {% set n = s | float(none) %}
-      {% if n is none %}
-        {% set m = (s | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+')) %}
-        {% set n = m | float(none) %}
+      {% set raw = states(e) %}
+      {% set val = raw | float(-9999) %}
+      {% if val == -9999 %}
+        {% set val = state_attr(e, 'battery') | float(-9999) %}
       {% endif %}
-      {% if n is none %}
-        {% set n = state_attr(e, 'battery') | float(none) %}
+      {% if val == -9999 %}
+        {% set num = (raw | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+')) %}
+        {% set val = num | float(101) %}
       {% endif %}
-      {% if n is not none %}
-        {% set vals = vals + [n] %}
+      {% if val < minv %}
+        {% set minv = val %}
       {% endif %}
     {% endfor %}
-    {{ vals }}
-
-  lowest_battery_pct: >
-    {{ (battery_values | min(default=101)) }}
-
-  battery_low: >
-    {{ (lowest_battery_pct | float(101)) < (battery_low_pct | int(30)) }}
+    {{ minv }}
 
   led_color_resolved: >
-    {{ 'Red' if battery_low else led_color_ok }}
+    {% set threshold = battery_low_pct | int(30) %}
+    {{ 'Red' if (lowest_battery_pct | float(101)) < threshold else led_color_ok }}
 
 triggers:
   - trigger: device
@@ -544,7 +538,7 @@ actions:
                     target:
                       entity_id: !input shade_scene_down
 
-              # UP triple (“Shady”) → Chase
+              # UP triple (“Shady”)
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_SHADY' and scene_shady_set }}"
@@ -562,7 +556,7 @@ actions:
                     target:
                       entity_id: !input shade_scene_shady
 
-              # DOWN triple → Chase
+              # DOWN triple
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_DOWN_TRIPLE' and scene_down_triple_set }}"
