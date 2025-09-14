@@ -126,7 +126,7 @@ blueprint:
     # LED EFFECTS (auto-run when corresponding shade scene is set)
     led_script:
       name: Inovelli LED effect script
-      description: Direct call to your LED script (must accept: led, color, level, effect, duration, target).
+      description: "Direct call to your LED script (must accept: led, color, level, effect, duration, target)."
       default: script.inovelli_blue_led_2025_1
       selector:
         entity:
@@ -290,3 +290,145 @@ actions:
                         target:
                           entity_id: !input light_group
                         data:
+                          brightness_pct: !input night_brightness
+                          color_temp_kelvin: !input night_color_temp_k
+                          transition: 0.1
+            else: []
+
+      # ========== ADAPTIVE: LIVE / PRESTAGE / STOP ==========
+      - conditions:
+          - condition: trigger
+            id:
+              - ADAPT_LIVE
+              - ADAPT_PRESTAGE
+              - STOP_ADAPT
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ adaptive_enabled }}"
+            then:
+              # Helper ON for ADAPT_* if currently off
+              - choose:
+                  - conditions:
+                      - condition: trigger
+                        id:
+                          - ADAPT_LIVE
+                          - ADAPT_PRESTAGE
+                      - condition: template
+                        value_template: "{{ is_state(adaptive_helper_var, 'off') }}"
+                    sequence:
+                      - action: input_boolean.turn_on
+                        target:
+                          entity_id: !input adaptive_helper
+                  # Helper OFF on STOP
+                  - conditions:
+                      - condition: trigger
+                        id: STOP_ADAPT
+                    sequence:
+                      - action: input_boolean.turn_off
+                        target:
+                          entity_id: !input adaptive_helper
+
+              # Call adaptive script
+              - choose:
+                  - conditions:
+                      - condition: trigger
+                        id: ADAPT_LIVE
+                    sequence:
+                      - action: script.turn_on
+                        target:
+                          entity_id: !input adaptive_script
+                        data:
+                          variables:
+                            target_state: "ON"
+                  - conditions:
+                      - condition: trigger
+                        id: ADAPT_PRESTAGE
+                    sequence:
+                      - action: script.turn_on
+                        target:
+                          entity_id: !input adaptive_script
+                        data:
+                          variables:
+                            target_state: "OFF"
+            else: []
+
+      # ========== SHADES (SCENES) + AUTO LED EFFECTS ==========
+      - conditions:
+          - condition: trigger
+            id:
+              - SHADES_UP
+              - SHADES_DOWN
+              - SHADES_SHADY
+        sequence:
+          # UP double
+          - choose:
+              - conditions:
+                  - condition: trigger
+                    id: SHADES_UP
+                  - condition: template
+                    value_template: "{{ shade_up_scene_var != [] }}"
+                sequence:
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input led_script
+                    data:
+                      variables:
+                        led: "All"
+                        color: "{{ led_color_var }}"
+                        level: "{{ led_level_var }}"
+                        effect: "Slow Rising"
+                        duration: "{{ led_duration_var }}"
+                        target:
+                          entity_id: "{{ inovelli_led_light }}"
+                  - action: scene.turn_on
+                    target:
+                      entity_id: !input shade_up_scene
+
+              # DOWN double
+              - conditions:
+                  - condition: trigger
+                    id: SHADES_DOWN
+                  - condition: template
+                    value_template: "{{ shade_down_scene_var != [] }}"
+                sequence:
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input led_script
+                    data:
+                      variables:
+                        led: "All"
+                        color: "{{ led_color_var }}"
+                        level: "{{ led_level_var }}"
+                        effect: "Slow Falling"
+                        duration: "{{ led_duration_var }}"
+                        target:
+                          entity_id: "{{ inovelli_led_light }}"
+                  - action: scene.turn_on
+                    target:
+                      entity_id: !input shade_down_scene
+
+              # UP triple (“Shady”)
+              - conditions:
+                  - condition: trigger
+                    id: SHADES_SHADY
+                  - condition: template
+                    value_template: "{{ shade_shady_scene_var != [] }}"
+                sequence:
+                  - action: script.turn_on
+                    target:
+                      entity_id: !input led_script
+                    data:
+                      variables:
+                        led: "All"
+                        color: "{{ led_color_var }}"
+                        level: "{{ led_level_var }}"
+                        effect: "Pulse"
+                        duration: "{{ led_duration_var }}"
+                        target:
+                          entity_id: "{{ inovelli_led_light }}"
+                  - action: scene.turn_on
+                    target:
+                      entity_id: !input shade_shady_scene
+
+mode: single
