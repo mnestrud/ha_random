@@ -282,11 +282,22 @@ variables:
     {{ [battery_sensor_1_entity, battery_sensor_2_entity, battery_sensor_3_entity, battery_sensor_4_entity]
        | reject('equalto', []) | list }}
 
+  # Robustly extract a numeric percent from each sensor (handles "20", "20.0", "20 %", or attr-based)
   lowest_battery_pct: >
     {% set minv = 101 %}
     {% for e in battery_sensors %}
-      {% set v = states(e) | float(101) %}
-      {% if v < minv %}{% set minv = v %}{% endif %}
+      {% set raw = states(e) %}
+      {% set val = raw | float(-9999) %}
+      {% if val == -9999 %}
+        {% set val = state_attr(e, 'battery') | float(-9999) %}
+      {% endif %}
+      {% if val == -9999 %}
+        {% set num = (raw | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+')) %}
+        {% set val = num | float(101) %}
+      {% endif %}
+      {% if val < minv %}
+        {% set minv = val %}
+      {% endif %}
     {% endfor %}
     {{ minv }}
 
