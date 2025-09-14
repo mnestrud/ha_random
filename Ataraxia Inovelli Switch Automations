@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.4)
+  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.5)
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
     - Config button single = Night settings (brightness/CT) → only if light_group provided
@@ -13,7 +13,7 @@ blueprint:
     • Uses Home Assistant 2024.8+ “actions” style.
     • Shade scenes are optional; if left blank, that key press does nothing (no scene, no LED).
     • Adaptive is enabled ONLY if BOTH 'adaptive_helper' and 'adaptive_script' are set.
-    • Shade LED color switches to Orange when the battery entity is below the low threshold.
+    • Shade LED color switches to Red when ANY provided battery entity is below the low threshold.
 
   domain: automation
   author: mnestrud
@@ -157,7 +157,7 @@ blueprint:
             domain: script
 
     led_color:
-      name: LED color when battery is OK
+      name: LED color when batteries are OK
       default: Pink
       selector:
         text:
@@ -176,12 +176,33 @@ blueprint:
       selector:
         text:
 
-    # Battery-aware LED color on shade scenes
-    battery_entity:
-      name: Battery entity (optional)
-      description: >
-        Optional sensor with a numeric % state. If below the low threshold, shade LED color becomes Orange.
-        Leave blank to always use the normal LED color.
+    # Up to 4 optional battery entities. If ANY are below threshold, LED uses Red.
+    battery_entity_1:
+      name: Battery entity 1 (optional)
+      default: []
+      selector:
+        entity:
+          domain: sensor
+          device_class: battery
+
+    battery_entity_2:
+      name: Battery entity 2 (optional)
+      default: []
+      selector:
+        entity:
+          domain: sensor
+          device_class: battery
+
+    battery_entity_3:
+      name: Battery entity 3 (optional)
+      default: []
+      selector:
+        entity:
+          domain: sensor
+          device_class: battery
+
+    battery_entity_4:
+      name: Battery entity 4 (optional)
       default: []
       selector:
         entity:
@@ -214,7 +235,10 @@ variables:
   led_level_var: !input led_level
   led_duration_var: !input led_duration
 
-  battery_entity_var: !input battery_entity
+  battery_entity_1_var: !input battery_entity_1
+  battery_entity_2_var: !input battery_entity_2
+  battery_entity_3_var: !input battery_entity_3
+  battery_entity_4_var: !input battery_entity_4
   battery_low_threshold_var: !input battery_low_threshold
 
   # First light.* on the selected Inovelli device (used as LED target)
@@ -229,16 +253,23 @@ variables:
   daynight_enabled: >
     {{ light_group_var != [] }}
 
-  # Numeric battery %; if missing/unknown, use 101 so it's treated as "OK"
-  battery_level_pct: >
-    {% if battery_entity_var != [] %}
-      {{ states(battery_entity_var) | float(101) }}
-    {% else %}
-      101
-    {% endif %}
+  # List of provided battery entities (skip blanks)
+  battery_entities: >
+    {{ [battery_entity_1_var, battery_entity_2_var, battery_entity_3_var, battery_entity_4_var]
+       | reject('equalto', []) | list }}
+
+  # Lowest battery % across provided sensors (101 if none/unknown)
+  lowest_battery_pct: >
+    {% set minv = 101 %}
+    {% for e in battery_entities %}
+      {% set v = states(e) | float(101) %}
+      {% if v < minv %}{% set minv = v %}{% endif %}
+    {% endfor %}
+    {{ minv }}
 
   led_color_effective: >
-    {{ 'Orange' if (battery_level_pct | float(101)) < (battery_low_threshold_var | int(30)) else led_color_var }}
+    {% set threshold = battery_low_threshold_var | int(30) %}
+    {{ 'Red' if (lowest_battery_pct | float(101)) < threshold else led_color_var }}
 
 triggers:
   - trigger: device
