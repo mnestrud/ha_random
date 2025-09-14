@@ -1,10 +1,10 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.2)
+  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.3)
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
     - Config button single = Night settings (brightness/CT) → only if light_group provided
     - Config button double = Day settings (brightness/CT) → only if light_group provided
-    - Up single / Down single = Adaptive Lighting (turn ON helper if OFF; call script only on that transition)
+    - Up single / Down single = Adaptive Lighting (turn ON helper if OFF; 0.5s delay; call script only on that transition)
     - Up/Down held = Stop Adaptive (turn helper OFF)
     - Up double / Down double / Up triple = optional Shade scenes (and auto LED effects)
     LED effects are automatically sent on shade taps when the corresponding scene is set.
@@ -79,6 +79,28 @@ blueprint:
           max: 4000
           step: 50
           unit_of_measurement: "K"
+
+    day_transition:
+      name: Day transition (seconds)
+      description: Smoother fade when applying Day settings.
+      default: 0.4
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.1
+          unit_of_measurement: s
+
+    night_transition:
+      name: Night transition (seconds)
+      description: Smoother fade when applying Night settings.
+      default: 0.4
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.1
+          unit_of_measurement: s
 
     adaptive_helper:
       name: Adaptive Lighting helper (input_boolean)
@@ -269,7 +291,7 @@ actions:
                   - action: input_boolean.turn_off
                     target:
                       entity_id: !input adaptive_helper
-              # Apply Day/Night settings directly to the selected group/light
+              # Apply Day/Night settings directly to the selected group/light (smooth transitions)
               - choose:
                   - conditions:
                       - condition: trigger
@@ -281,7 +303,7 @@ actions:
                         data:
                           brightness_pct: !input day_brightness
                           color_temp_kelvin: !input day_color_temp_k
-                          transition: 0.1
+                          transition: !input day_transition
                   - conditions:
                       - condition: trigger
                         id: SCENE_NIGHT
@@ -292,7 +314,7 @@ actions:
                         data:
                           brightness_pct: !input night_brightness
                           color_temp_kelvin: !input night_color_temp_k
-                          transition: 0.1
+                          transition: !input night_transition
             else: []
 
       # ========== ADAPTIVE: LIVE / PRESTAGE / STOP ==========
@@ -308,7 +330,7 @@ actions:
                 value_template: "{{ adaptive_enabled }}"
             then:
               - choose:
-                  # LIVE/PRESTAGE: only act if helper is OFF → turn ON and run the script once
+                  # LIVE/PRESTAGE: only act if helper is OFF → turn ON, delay 0.5s, then run the script once
                   - conditions:
                       - condition: trigger
                         id:
@@ -320,27 +342,23 @@ actions:
                       - action: input_boolean.turn_on
                         target:
                           entity_id: !input adaptive_helper
+                      - delay:
+                          milliseconds: 500
                       - choose:
                           - conditions:
                               - condition: trigger
                                 id: ADAPT_LIVE
                             sequence:
-                              - action: script.turn_on
-                                target:
-                                  entity_id: !input adaptive_script
+                              - action: !input adaptive_script
                                 data:
-                                  variables:
-                                    target_state: "ON"
+                                  target_state: "ON"
                           - conditions:
                               - condition: trigger
                                 id: ADAPT_PRESTAGE
                             sequence:
-                              - action: script.turn_on
-                                target:
-                                  entity_id: !input adaptive_script
+                              - action: !input adaptive_script
                                 data:
-                                  variables:
-                                    target_state: "OFF"
+                                  target_state: "OFF"
 
                   # If helper already ON for LIVE/PRESTAGE → do nothing (no script)
                   - conditions:
@@ -378,18 +396,15 @@ actions:
                   - condition: template
                     value_template: "{{ shade_up_scene_var != [] }}"
                 sequence:
-                  - action: script.turn_on
-                    target:
-                      entity_id: !input led_script
+                  - action: !input led_script
                     data:
-                      variables:
-                        led: "All"
-                        color: "{{ led_color_var }}"
-                        level: "{{ led_level_var }}"
-                        effect: "Slow Rising"
-                        duration: "{{ led_duration_var }}"
-                        target:
-                          entity_id: "{{ inovelli_led_light }}"
+                      led: "All"
+                      color: "{{ led_color_var }}"
+                      level: "{{ led_level_var }}"
+                      effect: "Slow Rising"
+                      duration: "{{ led_duration_var }}"
+                      target:
+                        entity_id: "{{ inovelli_led_light }}"
                   - action: scene.turn_on
                     target:
                       entity_id: !input shade_up_scene
@@ -401,18 +416,15 @@ actions:
                   - condition: template
                     value_template: "{{ shade_down_scene_var != [] }}"
                 sequence:
-                  - action: script.turn_on
-                    target:
-                      entity_id: !input led_script
+                  - action: !input led_script
                     data:
-                      variables:
-                        led: "All"
-                        color: "{{ led_color_var }}"
-                        level: "{{ led_level_var }}"
-                        effect: "Slow Falling"
-                        duration: "{{ led_duration_var }}"
-                        target:
-                          entity_id: "{{ inovelli_led_light }}"
+                      led: "All"
+                      color: "{{ led_color_var }}"
+                      level: "{{ led_level_var }}"
+                      effect: "Slow Falling"
+                      duration: "{{ led_duration_var }}"
+                      target:
+                        entity_id: "{{ inovelli_led_light }}"
                   - action: scene.turn_on
                     target:
                       entity_id: !input shade_down_scene
@@ -424,18 +436,15 @@ actions:
                   - condition: template
                     value_template: "{{ shade_shady_scene_var != [] }}"
                 sequence:
-                  - action: script.turn_on
-                    target:
-                      entity_id: !input led_script
+                  - action: !input led_script
                     data:
-                      variables:
-                        led: "All"
-                        color: "{{ led_color_var }}"
-                        level: "{{ led_level_var }}"
-                        effect: "Pulse"
-                        duration: "{{ led_duration_var }}"
-                        target:
-                          entity_id: "{{ inovelli_led_light }}"
+                      led: "All"
+                      color: "{{ led_color_var }}"
+                      level: "{{ led_level_var }}"
+                      effect: "Pulse"
+                      duration: "{{ led_duration_var }}"
+                      target:
+                        entity_id: "{{ inovelli_led_light }}"
                   - action: scene.turn_on
                     target:
                       entity_id: !input shade_shady_scene
