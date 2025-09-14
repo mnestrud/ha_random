@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.7.6)
+  name: Ataraxia Lighting - Inovelli Switch Taps – Lights, Shades & LED (v0.7.7)
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
     - Config single = Night (only if a Light target is provided)
@@ -13,6 +13,7 @@ blueprint:
     • Shade scenes are optional; if left blank, that key press does nothing (no scene, no LED).
     • Adaptive is enabled ONLY if BOTH 'Adaptive helper' and 'Adaptive script' are set.
     • Shade LED color switches to Red when ANY provided battery sensor is below the low threshold.
+    • Triggers use MQTT topic `BASE_TOPIC/FRIENDLY_NAME/action` (default base: zigbee2mqtt).
 
   domain: automation
   author: mnestrud
@@ -22,10 +23,26 @@ blueprint:
 
   input:
 
-    # ---- Switch
+    # ---- Zigbee2MQTT (for triggers)
+    z2m_base_topic:
+      name: Zigbee2MQTT base topic
+      description: The base MQTT topic configured in Zigbee2MQTT.
+      default: zigbee2mqtt
+      selector:
+        text:
+
+    z2m_friendly_name:
+      name: Zigbee2MQTT friendly name
+      description: >
+        The device's friendly name in Zigbee2MQTT (used in the MQTT topic).
+        Example: "Primary Bedroom Overhead Light Switch"
+      selector:
+        text:
+
+    # ---- Switch (used to find the built-in light entity for LED target)
     inovelli_device:
-      name: Inovelli switch (Zigbee2MQTT)
-      description: Select the Inovelli Blue 2-in-1 controlling this room.
+      name: Inovelli switch (device)
+      description: Select the Inovelli Blue 2-in-1 device so we can find its light entity for LED effects.
       selector:
         device:
           filter:
@@ -117,7 +134,7 @@ blueprint:
 
     adaptive_script:
       name: Adaptive script
-      description: Must be set together with Adaptive helper; otherwise adaptive is disabled. Accepts 'target_state' "ON"/"OFF".
+      description: Must be set together with Adaptive helper; otherwise adaptive is disabled. Accepts variable 'target_state' "ON"/"OFF".
       default: []
       selector:
         entity:
@@ -230,6 +247,12 @@ blueprint:
           domain: sensor
           device_class: battery
 
+# MQTT trigger variables (build the action topic from inputs)
+trigger_variables:
+  z2m_base: !input z2m_base_topic
+  z2m_name: !input z2m_friendly_name
+  z2m_action_topic: "{{ z2m_base ~ '/' ~ z2m_name ~ '/action' }}"
+
 variables:
   # ---- Direct inputs
   switch_device: !input inovelli_device
@@ -268,13 +291,10 @@ variables:
 
   scene_up_set: >
     {{ scene_up != [] }}
-
   scene_down_set: >
     {{ scene_down != [] }}
-
   scene_shady_set: >
     {{ scene_shady != [] }}
-
   scene_down_triple_set: >
     {{ scene_down_triple != [] }}
 
@@ -312,74 +332,50 @@ variables:
     {{ 'Red' if battery_low else led_color_ok }}
 
 trigger:
-  - platform: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: config_single
+  # Config/Night & Config/Day
+  - trigger: mqtt
+    topic: "{{ z2m_action_topic }}"
+    payload: config_single
     id: SCENE_NIGHT
-
-  - platform: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: config_double
+  - trigger: mqtt
+    topic: "{{ z2m_action_topic }}"
+    payload: config_double
     id: SCENE_DAY
 
-  - platform: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: up_single
+  # Adaptive live/prestage + stop (held)
+  - trigger: mqtt
+    topic: "{{ z2m_action_topic }}"
+    payload: up_single
     id: ADAPT_LIVE
-
-  - platform: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: down_single
+  - trigger: mqtt
+    topic: "{{ z2m_action_topic }}"
+    payload: down_single
     id: ADAPT_PRESTAGE
-
-  - platform: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: up_held
+  - trigger: mqtt
+    topic: "{{ z2m_action_topic }}"
+    payload: up_held
+    id: STOP_ADAPT
+  - trigger: mqtt
+    topic: "{{ z2m_action_topic }}"
+    payload: down_held
     id: STOP_ADAPT
 
-  - platform: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: down_held
-    id: STOP_ADAPT
-
-  - platform: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: up_double
+  # Shades (double/triple)
+  - trigger: mqtt
+    topic: "{{ z2m_action_topic }}"
+    payload: up_double
     id: SHADES_UP
-
-  - platform: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: down_double
+  - trigger: mqtt
+    topic: "{{ z2m_action_topic }}"
+    payload: down_double
     id: SHADES_DOWN
-
-  - platform: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: up_triple
+  - trigger: mqtt
+    topic: "{{ z2m_action_topic }}"
+    payload: up_triple
     id: SHADES_SHADY
-
-  - platform: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: down_triple
+  - trigger: mqtt
+    topic: "{{ z2m_action_topic }}"
+    payload: down_triple
     id: SHADES_DOWN_TRIPLE
 
 condition: []
