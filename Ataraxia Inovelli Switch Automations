@@ -1,21 +1,11 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Switch Taps (v0.8.1)
+  name: Ataraxia Lighting - Inovelli Switch Taps (v0.8.1 - fixed)
   description: >
-    Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
-    - Config single = Night (only if a Light target is provided)
-    - Config double = Day (only if a Light target is provided)
-    - Up single / Down single = Adaptive Lighting (turn ON helper if OFF; 0.5s delay; run script only on that transition)
-    - Up/Down held = Stop Adaptive (turn helper OFF)
-    - Up double / Down double / Up triple / Down triple = optional Shade scenes (auto LED with battery-aware color)
-
-    Notes:
-    • Uses Home Assistant 2024.8+ “actions” style.
-    • Shade scenes are optional; if left blank, that key press does nothing (no scene, no LED).
-    • Adaptive is enabled ONLY if BOTH 'Adaptive helper' and 'Adaptive script' are set.
-    • Shade LED color switches to Red when ANY provided battery sensor is below the low threshold.
+    Inovelli Blue 2‑in‑1 (Zigbee2MQTT) multi‑tap blueprint with improved battery parsing
+    and LED color logic. Also includes optional logging of battery level & resolved LED color.
 
   domain: automation
-  author: mnestrud
+  author: mnestrud (modified)
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/main/Ataraxia%20Inovelli%20Switch%20Automations
   homeassistant:
     min_version: 2024.8.0
@@ -25,7 +15,7 @@ blueprint:
     # ---- Switch
     inovelli_device:
       name: Inovelli switch (Zigbee2MQTT)
-      description: Select the Inovelli Blue 2-in-1 controlling this room.
+      description: Select the Inovelli Blue 2‑in‑1 controlling this room.
       selector:
         device:
           filter:
@@ -150,7 +140,7 @@ blueprint:
             domain: scene
 
     shade_scene_down_triple:
-      name: Shade DOWN-TRIPLE scene (Down triple)
+      name: Shade DOWN‑TRIPLE scene (Down triple)
       default: []
       selector:
         entity:
@@ -174,7 +164,7 @@ blueprint:
         text:
 
     led_level:
-      name: LED level (1-100)
+      name: LED level (1‑100)
       default: 100
       selector:
         number:
@@ -187,7 +177,7 @@ blueprint:
       selector:
         text:
 
-    # ---- Battery-aware LED (direct battery sensors)
+    # ---- Battery‑aware LED (direct battery sensors)
     battery_low_threshold:
       name: Battery low threshold (%)
       default: 30
@@ -282,18 +272,20 @@ variables:
     {{ [battery_sensor_1_entity, battery_sensor_2_entity, battery_sensor_3_entity, battery_sensor_4_entity]
        | reject('equalto', []) | list }}
 
-  # Robustly extract a numeric percent from each sensor (handles "20", "20.0", "20 %", or attr-based)
+  # Robustly extract a numeric percent from each sensor (handles "20", "20.0", "20 %", or attr‑based)
   lowest_battery_pct: >
+    {% set sensors = [battery_sensor_1_entity, battery_sensor_2_entity, battery_sensor_3_entity, battery_sensor_4_entity]
+         | reject('equalto', []) | list %}
     {% set minv = 101 %}
-    {% for e in battery_sensors %}
+    {% for e in sensors %}
       {% set raw = states(e) %}
-      {% set val = raw | float(-9999) %}
+      {% set val = (
+          raw | float(-9999)
+          if raw | float(-9999) > -9999 else
+          state_attr(e, 'battery') | float(-9999)
+        ) %}
       {% if val == -9999 %}
-        {% set val = state_attr(e, 'battery') | float(-9999) %}
-      {% endif %}
-      {% if val == -9999 %}
-        {% set num = (raw | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+')) %}
-        {% set val = num | float(101) %}
+        {% set val = (raw | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+') | default('101')) | float(101) %}
       {% endif %}
       {% if val < minv %}
         {% set minv = val %}
@@ -302,8 +294,8 @@ variables:
     {{ minv }}
 
   led_color_resolved: >
-    {% set threshold = battery_low_pct | int(30) %}
-    {{ 'Red' if (lowest_battery_pct | float(101)) < threshold else led_color_ok }}
+    {% set threshold = battery_low_pct | float(30) %}
+    {{ 'Red' if (lowest_battery_pct | float(101)) <= threshold else led_color_ok }}
 
 triggers:
   - trigger: device
@@ -492,7 +484,7 @@ actions:
                           entity_id: !input adaptive_helper
             else: []
 
-      # ========== SHADES (SCENES) + AUTO LED (battery-aware) ==========
+      # ========== SHADES (SCENES) + AUTO LED (battery‐aware) ==========
       - conditions:
           - condition: trigger
             id:
@@ -507,6 +499,11 @@ actions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_UP' and scene_up_set }}"
                 sequence:
+                  - alias: Debug battery color
+                    action: system_log.write
+                    data:
+                      message: "Battery level = {{ lowest_battery_pct }}%, LED color = {{ led_color_resolved }}"
+                      level: info
                   - action: !input led_script
                     data:
                       led: "All"
@@ -525,6 +522,11 @@ actions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_DOWN' and scene_down_set }}"
                 sequence:
+                  - alias: Debug battery color
+                    action: system_log.write
+                    data:
+                      message: "Battery level = {{ lowest_battery_pct }}%, LED color = {{ led_color_resolved }}"
+                      level: info
                   - action: !input led_script
                     data:
                       led: "All"
@@ -543,6 +545,11 @@ actions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_SHADY' and scene_shady_set }}"
                 sequence:
+                  - alias: Debug battery color
+                    action: system_log.write
+                    data:
+                      message: "Battery level = {{ lowest_battery_pct }}%, LED color = {{ led_color_resolved }}"
+                      level: info
                   - action: !input led_script
                     data:
                       led: "All"
@@ -561,6 +568,11 @@ actions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_DOWN_TRIPLE' and scene_down_triple_set }}"
                 sequence:
+                  - alias: Debug battery color
+                    action: system_log.write
+                    data:
+                      message: "Battery level = {{ lowest_battery_pct }}%, LED color = {{ led_color_resolved }}"
+                      level: info
                   - action: !input led_script
                     data:
                       led: "All"
