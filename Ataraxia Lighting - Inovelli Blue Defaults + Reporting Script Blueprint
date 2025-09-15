@@ -1,22 +1,24 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults + Reporting (v0.4.0)
+  name: Ataraxia Lighting - Inovelli Blue Defaults + Reporting (v0.5.0)
   description: >
-    Sets Inovelli Blue parameters (diff-only) and resets/applies Zigbee reporting
-    for On/Off, Level, and Inovelli default levels via Zigbee2MQTT.
-    Assumes HA device name == Zigbee2MQTT friendly name. Base topic: zigbee2mqtt.
-    Uses HA 2024.8+ (service calls are now actions). Param 26 removed; Params 55, 56, 125 included.
+    Push defaults to Inovelli Blue dimmers via Zigbee2MQTT using a newline-
+    separated list of MQTT device names (friendly names). For each device:
+    1) disable reporting on 4 attrs, 2) apply desired reporting config,
+    3) send parameters diff-only if we can map the device name to a HA light entity,
+       otherwise send full set unverified. Base topic fixed: zigbee2mqtt.
+    Requires Home Assistant 2024.8+ (service calls are now actions).
 
   domain: script
 
   input:
-    targets:
-      name: Target Inovelli Blues
-      description: Select devices and/or light entities. Blank selections are ignored; max 20 used.
+    devices_multiline:
+      name: Zigbee2MQTT device names (one per line)
+      description: >
+        Paste MQTT device names exactly as they appear under zigbee2mqtt/<name>/set.
+        Blank lines are ignored. First 20 will be used.
       selector:
-        target:
-          entity:
-            domain: [light]
-          device: {}
+        text:
+          multiline: true
 
     # -------- Dimming / Ramp (Params 1-8) --------
     p1_dimming_speed_up_remote:
@@ -175,7 +177,7 @@ blueprint:
     # -------- Binding Default Level (Param 125) --------
     p125_binding_default_level:
       name: 125. Binding Default Level
-      description: 0=Disabled, 1=Enabled. (Sync bound device to default level.) Default 0.
+      description: 0=Disabled, 1=Enabled. Default 0.
       default: "Disabled"
       selector: { select: { options: ["Disabled","Enabled"] } }
 
@@ -210,9 +212,9 @@ mode: single
 
 # ===== Variables (bind !input to plain variables FIRST; then use in Jinja) =====
 variables:
-  targets_input: !input targets
+  devices_raw: !input devices_multiline
 
-  # Inputs mapped to simple vars (omitted here for brevity; same as your last version)
+  # Inputs -> plain vars
   p1:  !input p1_dimming_speed_up_remote
   p2:  !input p2_dimming_speed_up_local
   p3:  !input p3_ramp_off_on_remote
@@ -248,43 +250,13 @@ variables:
   p261: !input p261_relay_click
   p260: !input p260_fw_update_indicator
 
-  # ✅ Robust target expansion: entities + devices + areas -> flat list of light.* entities
-  selected_entities: >
-    {% set t = targets_input or {} %}
-    {% set e = t.entity_id if t is mapping and 'entity_id' in t else [] %}
-    {% set d = t.device_id if t is mapping and 'device_id' in t else [] %}
-    {% set a = t.area_id   if t is mapping and 'area_id'   in t else [] %}
+  # Prepare list of MQTT device names (flat list, trimmed, non-blank, up to 20)
+  device_names: >
+    {{ devices_raw.splitlines() | map('trim') | reject('equalto','') | list | unique | list | map('string') | list }}
+  device_names_limited: >
+    {{ device_names[:20] }}
 
-    {% set ents = [] %}
-
-    {# from explicitly-selected entities #}
-    {% for ent in e %}
-      {% if ent.startswith('light.') %}
-        {% set ents = ents + [ent] %}
-      {% endif %}
-    {% endfor %}
-
-    {# from selected devices -> their entities #}
-    {% for dev in d %}
-      {% for ent in device_entities(dev) %}
-        {% if ent.startswith('light.') %}
-          {% set ents = ents + [ent] %}
-        {% endif %}
-      {% endfor %}
-    {% endfor %}
-
-    {# from selected areas -> their entities #}
-    {% for ar in a %}
-      {% for ent in area_entities(ar) %}
-        {% if ent.startswith('light.') %}
-          {% set ents = ents + [ent] %}
-        {% endif %}
-      {% endfor %}
-    {% endfor %}
-
-    {{ (ents | unique | list)[:20] }}
-
-  # Build desired map (no read-only params; Param 26 removed)
+  # Build desired map (no read-only; Param 26 removed)
   desired_common: >
     {{
       dict(
@@ -336,29 +308,44 @@ variables:
 sequence:
   - variables:
       report: >
-        {% if selected_entities|length == 0 %}
-        No target entities selected.
+        {% if device_names_limited|length == 0 %}
+        No device names provided.
         {% else %}
-        Starting updates for {{ selected_entities|length }} device(s)...
+        Starting updates for {{ device_names_limited|length }} device(s)...
         {% endif %}
 
   - repeat:
-      for_each: "{{ selected_entities }}"
+      for_each: "{{ device_names_limited }}"
       sequence:
         - variables:
-            ent: "{{ repeat.item }}"
-            dev_name: "{{ device_attr(device_id(repeat.item), 'name') }}"
-            desired: "{{ desired_common }}"
-            diff: >
-              {% set out = dict() %}
-              {% for k, v in desired.items() %}
-                {% if state_attr(ent, k) != v %}
-                  {% set out = dict(out, **{k: v}) %}
+            dev_name: "{{ repeat.item }}"
+            # Try to find a light entity whose *device name* equals this MQTT friendly name
+            matched_entity: >
+              {% set found = namespace(e=None) %}
+              {% for e in states.light | map(attribute='entity_id') | list %}
+                {% if device_attr(device_id(e), 'name') == dev_name %}
+                  {% set found.e = e %}
+                  {% break %}
                 {% endif %}
               {% endfor %}
-              {{ out }}
+              {{ found.e }}
+            can_verify: "{{ matched_entity is not none }}"
+            desired: "{{ desired_common }}"
+            # If we found an entity, compute diff; otherwise send full map
+            diff: >
+              {% if matched_entity %}
+                {% set out = dict() %}
+                {% for k, v in desired.items() %}
+                  {% if state_attr(matched_entity, k) != v %}
+                    {% set out = dict(out, **{k: v}) %}
+                  {% endif %}
+                {% endfor %}
+                {{ out }}
+              {% else %}
+                {{ desired }}
+              {% endif %}
 
-        # ----- Reporting: disable existing (set max interval to 65535) -----
+        # ----- Reporting: disable existing (max interval = 65535) -----
         - variables:
             txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
         - action: mqtt.publish
@@ -490,59 +477,66 @@ sequence:
           timeout: "00:00:10"
           continue_on_timeout: true
 
-        # ----- Params: push diff-only to /set -----
-        - variables:
-            sent_any: "{{ diff|length > 0 }}"
+        # ----- Params: push diff-only (if we can verify) or full set -----
         - choose:
-            - conditions: "{{ not sent_any }}"
+            - conditions: "{{ can_verify and (diff|length == 0) }}"
               sequence:
                 - action: logbook.log
                   data:
                     name: "Inovelli Defaults"
                     message: "{{ dev_name }}: params up-to-date (no changes sent)."
-                    entity_id: "{{ ent }}"
-          default:
-            - action: mqtt.publish
-              data:
-                topic: "zigbee2mqtt/{{ dev_name }}/set"
-                qos: 0
-                retain: false
-                payload: "{{ diff | tojson }}"
-            - wait_template: >
-                {% set ok = true %}
-                {% for k, v in diff.items() %}
-                  {% if state_attr(ent, k) != v %}
-                    {% set ok = false %}
-                  {% endif %}
-                {% endfor %}
-                {{ ok }}
-              timeout: "00:00:15"
-              continue_on_timeout: true
-            - choose:
-                - conditions: >
-                    {% set ok = true %}
-                    {% for k, v in diff.items() %}
-                      {% if state_attr(ent, k) != v %}
-                        {% set ok = false %}
-                      {% endif %}
-                    {% endfor %}
-                    {{ ok }}
-                  sequence:
-                    - action: logbook.log
-                      data:
-                        name: "Inovelli Defaults"
-                        message: "{{ dev_name }}: updated {{ diff|length }} setting(s)."
-                        entity_id: "{{ ent }}"
-              default:
-                - action: logbook.log
+            - conditions: []
+              sequence:
+                - action: mqtt.publish
                   data:
-                    name: "Inovelli Defaults"
-                    message: "{{ dev_name }}: FAILED to update params within timeout. Check Z2M logs."
-                    entity_id: "{{ ent }}"
+                    topic: "zigbee2mqtt/{{ dev_name }}/set"
+                    qos: 0
+                    retain: false
+                    payload: "{{ diff | tojson }}"
+                - choose:
+                    - conditions: "{{ can_verify }}"
+                      sequence:
+                        - wait_template: >
+                            {% set ok = true %}
+                            {% for k, v in diff.items() %}
+                              {% set e = matched_entity %}
+                              {% if state_attr(e, k) != v %}
+                                {% set ok = false %}
+                              {% endif %}
+                            {% endfor %}
+                            {{ ok }}
+                          timeout: "00:00:15"
+                          continue_on_timeout: true
+                        - choose:
+                            - conditions: >
+                                {% set ok = true %}
+                                {% for k, v in diff.items() %}
+                                  {% if state_attr(matched_entity, k) != v %}
+                                    {% set ok = false %}
+                                  {% endif %}
+                                {% endfor %}
+                                {{ ok }}
+                              sequence:
+                                - action: logbook.log
+                                  data:
+                                    name: "Inovelli Defaults"
+                                    message: "{{ dev_name }}: updated {{ diff|length }} setting(s)."
+                            - conditions: []
+                              sequence:
+                                - action: logbook.log
+                                  data:
+                                    name: "Inovelli Defaults"
+                                    message: "{{ dev_name }}: FAILED to update params within timeout. Check Z2M logs."
+                    - conditions: []
+                      sequence:
+                        - action: logbook.log
+                          data:
+                            name: "Inovelli Defaults"
+                            message: "{{ dev_name }}: params sent (unverified — no matching HA light entity)."
 
   - action: persistent_notification.create
     data:
       title: "Inovelli Blue – Results"
       message: >
-        Finished processing {{ selected_entities|length }} device(s).
-        See Logbook for per-device results.
+        Finished processing {{ device_names_limited|length }} device(s).
+        See Logbook for per-device details.
