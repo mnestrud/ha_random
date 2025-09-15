@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults + Reporting (v0.4)
+  name: Ataraxia Lighting - Inovelli Blue Defaults + Reporting (v0.4.0)
   description: >
     Sets Inovelli Blue parameters (diff-only) and resets/applies Zigbee reporting
     for On/Off, Level, and Inovelli default levels via Zigbee2MQTT.
