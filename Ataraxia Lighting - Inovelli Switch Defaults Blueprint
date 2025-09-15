@@ -63,14 +63,14 @@ blueprint:
     # ------------------ Min/Max/Invert/Auto-Off ------------------
     p9_min_level:
       name: 9. Minimum Dim Level
-      description: Range 1–253. Default 1.
+      description: Range 1–254 (Inovelli says 1–254; many UIs bound 1–253). Default 1.
       default: 1
-      selector: { number: { min: 1, max: 253, step: 1 } }
+      selector: { number: { min: 1, max: 254, step: 1 } }
     p10_max_level:
       name: 10. Maximum Dim Level
-      description: Range 2–254. Default 255 (~100%).
+      description: Range 2–255 (255≈100%). Default 255.
       default: 255
-      selector: { number: { min: 2, max: 254, step: 1 } }
+      selector: { number: { min: 2, max: 255, step: 1 } }
     p11_invert_switch:
       name: 11. Invert Switch
       description: 0=No, 1=Yes.
@@ -111,17 +111,12 @@ blueprint:
       default: 0
       selector: { number: { min: 0, max: 32767, step: 1 } }
 
-    # ------------------ Switch Type / Dimming Mode ------------------
+    # ------------------ Switch Type (keep Param 22; Param 26 removed) ------------------
     p22_switch_type:
       name: 22. Switch Type
       description: 0=Single Pole, 1=3-Way Dumb, 2=3-Way Aux, 3=Full Sine Wave Mode.
       default: "Single Pole"
       selector: { select: { options: ["Single Pole","3-Way Dumb","3-Way Aux","Full Sine Wave Mode"] } }
-    p26_dimming_mode:
-      name: 26. Leading / Trailing Edge
-      description: 0=Leading edge, 1=Trailing edge.
-      default: "Leading edge"
-      selector: { select: { options: ["Leading edge","Trailing edge"] } }
 
     # ------------------ Smart Bulb / Double Tap ------------------
     p52_smart_bulb_mode:
@@ -140,10 +135,15 @@ blueprint:
       default: "Disabled"
       selector: { select: { options: ["Disabled","Enabled"] } }
     p55_double_tap_up_level:
-      name: 56. 2x Tap Up Level (Param 55)
-      description: 2–254 (~1–100%). Default 254.
+      name: 55. 2x Tap Up Level
+      description: Range 2–254. Default 254. :contentReference[oaicite:1]{index=1}
       default: 254
       selector: { number: { min: 2, max: 254, step: 1 } }
+    p56_double_tap_down_level:
+      name: 56. 2x Tap Down Level
+      description: Range 0–254 (0 often used as "off"). Default 2. :contentReference[oaicite:2]{index=2}
+      default: 2
+      selector: { number: { min: 0, max: 254, step: 1 } }
 
     # ------------------ LED Colors / Intensities ------------------
     p60_led_color_on:
@@ -171,6 +171,13 @@ blueprint:
       description: 0=Gen3 method (VZM-style), 1=Gen2 scaling.
       default: "Gen3 method (VZM-style)"
       selector: { select: { options: ["Gen3 method (VZM-style)","Match Gen 2 (LZWxx Scaling)"] } }
+
+    # ------------------ Binding Default Level (Param 125) ------------------
+    p125_binding_default_level:
+      name: 125. Binding Default Level
+      description: 0=Disabled, 1=Enabled. (Sync bound device to default level.) Default 0. :contentReference[oaicite:3]{index=3}
+      default: "Disabled"
+      selector: { select: { options: ["Disabled","Enabled"] } }
 
     # ------------------ Misc Options ------------------
     p50_button_delay:
@@ -209,6 +216,7 @@ variables:
        | select('match','^light\\.')
        | list | unique | slice(20) }}
 
+  # Build desired map ONCE from inputs (no read-only keys included; Param 26 removed).
   desired_common: >
     {{
       dict(
@@ -220,26 +228,35 @@ variables:
         dimmingSpeedDownLocal  = !input p6_dimming_speed_down_local,
         rampRateOnToOffRemote  = !input p7_ramp_on_off_remote,
         rampRateOnToOffLocal   = !input p8_ramp_on_off_local,
+
         minimumLevel = !input p9_min_level,
         maximumLevel = !input p10_max_level,
         invertSwitch = !input p11_invert_switch,
         autoTimerOff = !input p12_auto_off,
+
         stateAfterPowerRestored = !input p15_level_after_power,
         loadLevelIndicatorTimeout = !input p17_led_indicator_timeout,
+
         activePowerReports = !input p18_active_power_reports,
         periodicPowerAndEnergyReports = !input p19_periodic_reports,
         activeEnergyReports = !input p20_active_energy_reports,
+
         switchType = !input p22_switch_type,
-        dimmingMode = !input p26_dimming_mode,
+
         smartBulbMode = !input p52_smart_bulb_mode,
         doubleTapUpToParam55 = !input p53_double_tap_up_to_p55,
         doubleTapDownToParam56 = !input p54_double_tap_down_to_p56,
         brightnessLevelForDoubleTapUp = !input p55_double_tap_up_level,
+        brightnessLevelForDoubleTapDown = !input p56_double_tap_down_level,
+
         ledColorWhenOn = !input p60_led_color_on,
         ledColorWhenOff = !input p61_led_color_off,
         ledIntensityWhenOn = !input p62_led_intensity_on,
         ledIntensityWhenOff = !input p63_led_intensity_off,
         ledBarScaling = !input p64_led_bar_scaling,
+
+        bindingOffToOnSyncLevel = !input p125_binding_default_level,
+
         buttonDelay = !input p50_button_delay,
         localProtection = !input p256_local_protection,
         remoteProtection = !input p257_remote_protection,
@@ -275,199 +292,140 @@ sequence:
               {% endfor %}
               {{ out }}
 
-        # ------------------ 1) REPORTING: disable (remove) existing for 4 attrs ------------------
+        # ------------------ REPORTING RESET ------------------
         - variables:
             txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
-        # OnOff.onOff -> disable
+        # Disable reports by setting max interval = 65535
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
             payload: >-
               {{
-                dict(
-                  id=dev_name,
-                  endpoint=1,
-                  cluster='genOnOff',
-                  attribute='onOff',
-                  minimum_report_interval=0,
-                  maximum_report_interval=65535,
-                  reportable_change=0,
-                  transaction=txn_base ~ '_onoff_disable'
-                ) | tojson
+                dict(id=dev_name, endpoint=1, cluster='genOnOff', attribute='onOff',
+                     minimum_report_interval=0, maximum_report_interval=65535,
+                     reportable_change=0, transaction=txn_base ~ '_onoff_disable') | tojson
               }}
         - wait_for_trigger:
             - platform: mqtt
               topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: >
-                {{ value_json.transaction == (txn_base ~ '_onoff_disable') }}
+              value_template: "{{ value_json.transaction == (txn_base ~ '_onoff_disable') }}"
           timeout: "00:00:10"
           continue_on_timeout: true
 
-        # LevelCtrl.currentLevel -> disable
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
             payload: >-
               {{
-                dict(
-                  id=dev_name,
-                  endpoint=1,
-                  cluster='genLevelCtrl',
-                  attribute='currentLevel',
-                  minimum_report_interval=0,
-                  maximum_report_interval=65535,
-                  reportable_change=1,
-                  transaction=txn_base ~ '_level_disable'
-                ) | tojson
+                dict(id=dev_name, endpoint=1, cluster='genLevelCtrl', attribute='currentLevel',
+                     minimum_report_interval=0, maximum_report_interval=65535,
+                     reportable_change=1, transaction=txn_base ~ '_level_disable') | tojson
               }}
         - wait_for_trigger:
             - platform: mqtt
               topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: >
-                {{ value_json.transaction == (txn_base ~ '_level_disable') }}
+              value_template: "{{ value_json.transaction == (txn_base ~ '_level_disable') }}"
           timeout: "00:00:10"
           continue_on_timeout: true
 
-        # manuSpecificInovelli.defaultLevelLocal -> disable
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
             payload: >-
               {{
-                dict(
-                  id=dev_name,
-                  endpoint=1,
-                  cluster='manuSpecificInovelli',
-                  attribute='defaultLevelLocal',
-                  minimum_report_interval=0,
-                  maximum_report_interval=65535,
-                  reportable_change=1,
-                  transaction=txn_base ~ '_dll_disable'
-                ) | tojson
+                dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelLocal',
+                     minimum_report_interval=0, maximum_report_interval=65535,
+                     reportable_change=1, transaction=txn_base ~ '_dll_disable') | tojson
               }}
         - wait_for_trigger:
             - platform: mqtt
               topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: >
-                {{ value_json.transaction == (txn_base ~ '_dll_disable') }}
+              value_template: "{{ value_json.transaction == (txn_base ~ '_dll_disable') }}"
           timeout: "00:00:10"
           continue_on_timeout: true
 
-        # manuSpecificInovelli.defaultLevelRemote -> disable
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
             payload: >-
               {{
-                dict(
-                  id=dev_name,
-                  endpoint=1,
-                  cluster='manuSpecificInovelli',
-                  attribute='defaultLevelRemote',
-                  minimum_report_interval=0,
-                  maximum_report_interval=65535,
-                  reportable_change=1,
-                  transaction=txn_base ~ '_dlr_disable'
-                ) | tojson
+                dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelRemote',
+                     minimum_report_interval=0, maximum_report_interval=65535,
+                     reportable_change=1, transaction=txn_base ~ '_dlr_disable') | tojson
               }}
         - wait_for_trigger:
             - platform: mqtt
               topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: >
-                {{ value_json.transaction == (txn_base ~ '_dlr_disable') }}
+              value_template: "{{ value_json.transaction == (txn_base ~ '_dlr_disable') }}"
           timeout: "00:00:10"
           continue_on_timeout: true
 
-        # ------------------ 2) REPORTING: set your 4 desired reports ------------------
-        # OnOff.onOff: min 0, max 10800, change 0
+        # ------------------ REPORTING APPLY ------------------
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
             payload: >-
               {{
-                dict(
-                  id=dev_name, endpoint=1,
-                  cluster='genOnOff', attribute='onOff',
-                  minimum_report_interval=0, maximum_report_interval=10800,
-                  reportable_change=0,
-                  transaction=txn_base ~ '_onoff_set'
-                ) | tojson
+                dict(id=dev_name, endpoint=1, cluster='genOnOff', attribute='onOff',
+                     minimum_report_interval=0, maximum_report_interval=10800,
+                     reportable_change=0, transaction=txn_base ~ '_onoff_set') | tojson
               }}
         - wait_for_trigger:
             - platform: mqtt
               topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: >
-                {{ value_json.transaction == (txn_base ~ '_onoff_set') and value_json.status == 'ok' }}
+              value_template: "{{ value_json.transaction == (txn_base ~ '_onoff_set') and value_json.status == 'ok' }}"
           timeout: "00:00:10"
           continue_on_timeout: true
 
-        # LevelCtrl.currentLevel: min 5, max 10800, change 1
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
             payload: >-
               {{
-                dict(
-                  id=dev_name, endpoint=1,
-                  cluster='genLevelCtrl', attribute='currentLevel',
-                  minimum_report_interval=5, maximum_report_interval=10800,
-                  reportable_change=1,
-                  transaction=txn_base ~ '_level_set'
-                ) | tojson
+                dict(id=dev_name, endpoint=1, cluster='genLevelCtrl', attribute='currentLevel',
+                     minimum_report_interval=5, maximum_report_interval=10800,
+                     reportable_change=1, transaction=txn_base ~ '_level_set') | tojson
               }}
         - wait_for_trigger:
             - platform: mqtt
               topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: >
-                {{ value_json.transaction == (txn_base ~ '_level_set') and value_json.status == 'ok' }}
+              value_template: "{{ value_json.transaction == (txn_base ~ '_level_set') and value_json.status == 'ok' }}"
           timeout: "00:00:10"
           continue_on_timeout: true
 
-        # manuSpecificInovelli.defaultLevelLocal: min 0, max 10800, change 1
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
             payload: >-
               {{
-                dict(
-                  id=dev_name, endpoint=1,
-                  cluster='manuSpecificInovelli', attribute='defaultLevelLocal',
-                  minimum_report_interval=0, maximum_report_interval=10800,
-                  reportable_change=1,
-                  transaction=txn_base ~ '_dll_set'
-                ) | tojson
+                dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelLocal',
+                     minimum_report_interval=0, maximum_report_interval=10800,
+                     reportable_change=1, transaction=txn_base ~ '_dll_set') | tojson
               }}
         - wait_for_trigger:
             - platform: mqtt
               topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: >
-                {{ value_json.transaction == (txn_base ~ '_dll_set') and value_json.status == 'ok' }}
+              value_template: "{{ value_json.transaction == (txn_base ~ '_dll_set') and value_json.status == 'ok' }}"
           timeout: "00:00:10"
           continue_on_timeout: true
 
-        # manuSpecificInovelli.defaultLevelRemote: min 0, max 10800, change 1
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
             payload: >-
               {{
-                dict(
-                  id=dev_name, endpoint=1,
-                  cluster='manuSpecificInovelli', attribute='defaultLevelRemote',
-                  minimum_report_interval=0, maximum_report_interval=10800,
-                  reportable_change=1,
-                  transaction=txn_base ~ '_dlr_set'
-                ) | tojson
+                dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelRemote',
+                     minimum_report_interval=0, maximum_report_interval=10800,
+                     reportable_change=1, transaction=txn_base ~ '_dlr_set') | tojson
               }}
         - wait_for_trigger:
             - platform: mqtt
               topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: >
-                {{ value_json.transaction == (txn_base ~ '_dlr_set') and value_json.status == 'ok' }}
+              value_template: "{{ value_json.transaction == (txn_base ~ '_dlr_set') and value_json.status == 'ok' }}"
           timeout: "00:00:10"
           continue_on_timeout: true
 
-        # ------------------ 3) PARAMETERS: push diff-only JSON to /set ------------------
+        # ------------------ PARAMETERS: push diff-only JSON to /set ------------------
         - choose:
             - conditions: "{{ diff|length == 0 }}"
               sequence:
@@ -484,7 +442,6 @@ sequence:
                     qos: 0
                     retain: false
                     payload: "{{ diff | tojson }}"
-                # verify after send (attributes reflect our desired values)
                 - wait_template: >
                     {% set ok = true %}
                     {% for k, v in diff.items() %}
@@ -517,11 +474,9 @@ sequence:
                             message: "{{ dev_name }}: FAILED to update params within timeout. Check Z2M logs."
                             entity_id: "{{ ent }}"
 
-  # Final summary as persistent notification
   - action: persistent_notification.create
     data:
       title: "Inovelli Blue – Results"
       message: >
         Finished processing {{ selected_entities|length }} device(s).
-        See Logbook for per-device details.
-
+        See Logbook for per-device results.
