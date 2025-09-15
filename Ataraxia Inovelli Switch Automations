@@ -1,326 +1,224 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Switch Taps (v0.8.1+fix)
+  name: Ataraxia Lighting - Inovelli Switch Taps (v0.8.1, no battery color)
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
     - Config single = Night (only if a Light target is provided)
     - Config double = Day (only if a Light target is provided)
     - Up single / Down single = Adaptive Lighting (turn ON helper if OFF; 0.5s delay; run script only on that transition)
     - Up/Down held = Stop Adaptive (turn helper OFF)
-    - Up double / Down double / Up triple / Down triple = optional Shade scenes (auto LED with battery-aware color)
-
-    Notes:
-    • Uses Home Assistant 2024.8+ “actions” style (service calls are now actions).
-    • Shade scenes are optional; if left blank, that key press does nothing (no scene, no LED).
-    • Adaptive is enabled ONLY if BOTH 'Adaptive helper' and 'Adaptive script' are set.
-    • Shade LED color switches to Red when ANY provided battery sensor is at/below the low threshold.
-    • Optional system log line can be enabled to show chosen LED color & lowest battery value.
-
+    - Up double / Down double / Up triple / Down triple = optional Shade scenes (LED uses fixed color)
+    Notes: • Uses Home Assistant 2024.8+ “actions” style (service calls are now actions).
   domain: automation
-  author: mnestrud (mods by Home Assistant Assistant)
+  author: mnestrud (edited by Home Assistant Assistant)
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/main/Ataraxia%20Inovelli%20Switch%20Automations
   homeassistant:
     min_version: 2024.8.0
 
-  input:
+input:
+  # ---- Switch
+  inovelli_device:
+    name: Inovelli switch (Zigbee2MQTT)
+    description: Select the Inovelli Blue 2-in-1 controlling this room.
+    selector:
+      device:
+        filter:
+          - integration: mqtt
+        multiple: false
 
-    # ---- Switch
-    inovelli_device:
-      name: Inovelli switch (Zigbee2MQTT)
-      description: Select the Inovelli Blue 2-in-1 controlling this room.
-      selector:
-        device:
-          filter:
-            - integration: mqtt
-          multiple: false
+  # ---- Lights
+  light_group:
+    name: Light target (single light or Zigbee group)
+    description: >
+      Optional: If set, Config single/double applies Night/Day brightness & color temp.
+      If left blank, those button presses are disabled.
+    default: []
+    selector:
+      entity:
+        domain: light
 
-    # ---- Lights
-    light_group:
-      name: Light target (single light or Zigbee group)
-      description: >
-        Optional: If set, Config single/double applies Night/Day brightness & color temp.
-        If left blank, those button presses are disabled.
-      default: []
-      selector:
-        entity:
-          domain: light
+  day_brightness:
+    name: Daytime brightness (%)
+    default: 80
+    selector:
+      number:
+        min: 1
+        max: 100
+        mode: slider
+        unit_of_measurement: "%"
 
-    day_brightness:
-      name: Daytime brightness (%)
-      default: 80
-      selector:
-        number:
-          min: 1
-          max: 100
-          mode: slider
-          unit_of_measurement: "%"
+  day_color_temp_k:
+    name: Daytime color temperature (K)
+    default: 4000
+    selector:
+      number:
+        min: 2000
+        max: 6500
+        step: 50
+        unit_of_measurement: "K"
 
-    day_color_temp_k:
-      name: Daytime color temperature (K)
-      default: 4000
-      selector:
-        number:
-          min: 2000
-          max: 6500
-          step: 50
-          unit_of_measurement: "K"
+  night_brightness:
+    name: Nighttime brightness (%)
+    default: 20
+    selector:
+      number:
+        min: 1
+        max: 100
+        mode: slider
+        unit_of_measurement: "%"
 
-    night_brightness:
-      name: Nighttime brightness (%)
-      default: 20
-      selector:
-        number:
-          min: 1
-          max: 100
-          mode: slider
-          unit_of_measurement: "%"
+  night_color_temp_k:
+    name: Nighttime color temperature (K)
+    default: 2700
+    selector:
+      number:
+        min: 1800
+        max: 4000
+        step: 50
+        unit_of_measurement: "K"
 
-    night_color_temp_k:
-      name: Nighttime color temperature (K)
-      default: 2700
-      selector:
-        number:
-          min: 1800
-          max: 4000
-          step: 50
-          unit_of_measurement: "K"
+  day_transition:
+    name: Day transition (seconds)
+    description: Smoother fade when applying Day settings.
+    default: 0.4
+    selector:
+      number:
+        min: 0
+        max: 10
+        step: 0.1
+        unit_of_measurement: s
 
-    day_transition:
-      name: Day transition (seconds)
-      description: Smoother fade when applying Day settings.
-      default: 0.4
-      selector:
-        number:
-          min: 0
-          max: 10
-          step: 0.1
-          unit_of_measurement: s
+  night_transition:
+    name: Night transition (seconds)
+    description: Smoother fade when applying Night settings.
+    default: 0.4
+    selector:
+      number:
+        min: 0
+        max: 10
+        step: 0.1
+        unit_of_measurement: s
 
-    night_transition:
-      name: Night transition (seconds)
-      description: Smoother fade when applying Night settings.
-      default: 0.4
-      selector:
-        number:
-          min: 0
-          max: 10
-          step: 0.1
-          unit_of_measurement: s
+  # ---- Adaptive Lighting
+  adaptive_helper:
+    name: Adaptive helper (input_boolean)
+    description: Must be set together with Adaptive script; otherwise adaptive is disabled.
+    default: []
+    selector:
+      entity:
+        filter:
+          domain: input_boolean
 
-    # ---- Adaptive Lighting
-    adaptive_helper:
-      name: Adaptive helper (input_boolean)
-      description: Must be set together with Adaptive script; otherwise adaptive is disabled.
-      default: []
-      selector:
-        entity:
-          filter:
-            domain: input_boolean
+  adaptive_script:
+    name: Adaptive script
+    description: Must be set together with Adaptive helper; otherwise adaptive is disabled. Accepts 'target_state' "ON"/"OFF".
+    default: []
+    selector:
+      entity:
+        filter:
+          domain: script
 
-    adaptive_script:
-      name: Adaptive script
-      description: Must be set together with Adaptive helper; otherwise adaptive is disabled. Accepts 'target_state' "ON"/"OFF".
-      default: []
-      selector:
-        entity:
-          filter:
-            domain: script
+  # ---- Shades (Scenes)
+  shade_scene_up:
+    name: Shade UP scene (Up double)
+    default: []
+    selector:
+      entity:
+        filter:
+          domain: scene
 
-    # ---- Shades (Scenes)
-    shade_scene_up:
-      name: Shade UP scene (Up double)
-      default: []
-      selector:
-        entity:
-          filter:
-            domain: scene
+  shade_scene_down:
+    name: Shade DOWN scene (Down double)
+    default: []
+    selector:
+      entity:
+        filter:
+          domain: scene
 
-    shade_scene_down:
-      name: Shade DOWN scene (Down double)
-      default: []
-      selector:
-        entity:
-          filter:
-            domain: scene
+  shade_scene_shady:
+    name: Shade “Shady” scene (Up triple)
+    default: []
+    selector:
+      entity:
+        filter:
+          domain: scene
 
-    shade_scene_shady:
-      name: Shade “Shady” scene (Up triple)
-      default: []
-      selector:
-        entity:
-          filter:
-            domain: scene
+  shade_scene_down_triple:
+    name: Shade DOWN-TRIPLE scene (Down triple)
+    default: []
+    selector:
+      entity:
+        filter:
+          domain: scene
 
-    shade_scene_down_triple:
-      name: Shade DOWN-TRIPLE scene (Down triple)
-      default: []
-      selector:
-        entity:
-          filter:
-            domain: scene
+  # ---- LED effects
+  led_script:
+    name: Inovelli LED effect script
+    description: "Direct call to your LED script (must accept: led, color, level, effect, duration, target)."
+    default: script.inovelli_blue_led_2025_1
+    selector:
+      entity:
+        filter:
+          domain: script
 
-    # ---- LED effects
-    led_script:
-      name: Inovelli LED effect script
-      description: "Direct call to your LED script (must accept: led, color, level, effect, duration, target)."
-      default: script.inovelli_blue_led_2025_1
-      selector:
-        entity:
-          filter:
-            domain: script
+  led_color:
+    name: LED color (fixed)
+    default: Pink
+    selector:
+      text:
 
-    led_color:
-      name: LED color when batteries are OK
-      default: Pink
-      selector:
-        text:
+  led_level:
+    name: LED level (1-100)
+    default: 100
+    selector:
+      number:
+        min: 1
+        max: 100
 
-    led_level:
-      name: LED level (1-100)
-      default: 100
-      selector:
-        number:
-          min: 1
-          max: 100
+  led_duration:
+    name: LED duration (e.g., '10 Seconds')
+    default: 10 Seconds
+    selector:
+      text:
 
-    led_duration:
-      name: LED duration (e.g., "10 Seconds")
-      default: 10 Seconds
-      selector:
-        text:
-
-    # ---- Battery-aware LED (direct battery sensors)
-    battery_low_threshold:
-      name: Battery low threshold (%)
-      default: 30
-      selector:
-        number:
-          min: 1
-          max: 100
-          step: 1
-          unit_of_measurement: "%"
-
-    battery_sensor_1:
-      name: Battery sensor 1 (optional)
-      default: []
-      selector:
-        entity:
-          domain: sensor
-          device_class: battery
-
-    battery_sensor_2:
-      name: Battery sensor 2 (optional)
-      default: []
-      selector:
-        entity:
-          domain: sensor
-          device_class: battery
-
-    battery_sensor_3:
-      name: Battery sensor 3 (optional)
-      default: []
-      selector:
-        entity:
-          domain: sensor
-          device_class: battery
-
-    battery_sensor_4:
-      name: Battery sensor 4 (optional)
-      default: []
-      selector:
-        entity:
-          domain: sensor
-          device_class: battery
-
-    # ---- Optional debug logging
-    enable_debug_logging:
-      name: Enable system log line (debug)
-      description: Writes a line to the system log showing lowest battery and chosen LED color on SHADES triggers.
-      default: false
-      selector:
-        boolean:
+  # ---- Optional debug logging
+  enable_debug_logging:
+    name: Enable system log line (debug)
+    description: Writes a line to the system log when SHADES triggers run.
+    default: false
+    selector:
+      boolean:
 
 variables:
   # ---- Direct inputs
   switch_device: !input inovelli_device
   light_target: !input light_group
-
   adaptive_helper_entity: !input adaptive_helper
   adaptive_script_entity: !input adaptive_script
-
   scene_up: !input shade_scene_up
   scene_down: !input shade_scene_down
   scene_shady: !input shade_scene_shady
   scene_down_triple: !input shade_scene_down_triple
-
   led_script_entity: !input led_script
   led_color_ok: !input led_color
   led_level_pct: !input led_level
   led_duration_text: !input led_duration
-
-  battery_low_pct: !input battery_low_threshold
-  battery_sensor_1_entity: !input battery_sensor_1
-  battery_sensor_2_entity: !input battery_sensor_2
-  battery_sensor_3_entity: !input battery_sensor_3
-  battery_sensor_4_entity: !input battery_sensor_4
-
   debug_enabled: !input enable_debug_logging
 
   # ---- Derived
   led_target_light: >
-    {{ device_entities(switch_device)
-       | select('match', '^light\\.')
-       | list | first }}
-
+    {{ device_entities(switch_device) | select('match', '^light\\.') | list | first }}
   is_adaptive_enabled: >
     {{ adaptive_helper_entity != [] and adaptive_script_entity != [] }}
-
   has_light_target: >
     {{ light_target != [] }}
-
   scene_up_set: >
     {{ scene_up != [] }}
-
   scene_down_set: >
     {{ scene_down != [] }}
-
   scene_shady_set: >
     {{ scene_shady != [] }}
-
   scene_down_triple_set: >
     {{ scene_down_triple != [] }}
-
-  battery_sensors: >
-    {{ [battery_sensor_1_entity, battery_sensor_2_entity, battery_sensor_3_entity, battery_sensor_4_entity]
-       | reject('equalto', []) | list }}
-
-  # Robustly extract a numeric percent from each sensor (handles "20", "20.0", "20 %", attr-based, etc.)
-  lowest_battery_pct: >
-    {% set sensors = battery_sensors %}
-    {% set minv = 101 %}
-    {% for e in sensors %}
-      {% set raw = states(e) %}
-      {# 1) direct state parse #}
-      {% set direct = raw | float(none) %}
-      {% set val = direct %}
-      {# 2) attribute fallback (some expose battery as an attribute) #}
-      {% if val is none %}
-        {% set attr_batt = state_attr(e, 'battery') | float(none) %}
-        {% set val = attr_batt %}
-      {% endif %}
-      {# 3) regex fallback if state carried a unit like "57 %" #}
-      {% if val is none %}
-        {% set num = (raw | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+') | default(none)) %}
-        {% set val = num | float(none) %}
-      {% endif %}
-      {% if val is number and val < minv %}
-        {% set minv = val %}
-      {% endif %}
-    {% endfor %}
-    {{ minv }}
-
-  led_color_resolved: >
-    {% set threshold = battery_low_pct | float(30) %}
-    {{ 'Red' if (lowest_battery_pct | float(101)) <= threshold else led_color_ok }}
 
 triggers:
   - trigger: device
@@ -329,63 +227,54 @@ triggers:
     type: action
     subtype: config_single
     id: SCENE_NIGHT
-
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: config_double
     id: SCENE_DAY
-
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_single
     id: ADAPT_LIVE
-
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_single
     id: ADAPT_PRESTAGE
-
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_held
     id: STOP_ADAPT
-
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_held
     id: STOP_ADAPT
-
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_double
     id: SHADES_UP
-
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_double
     id: SHADES_DOWN
-
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_triple
     id: SHADES_SHADY
-
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
@@ -421,7 +310,6 @@ actions:
                   brightness_pct: !input day_brightness
                   color_temp_kelvin: !input day_color_temp_k
                   transition: !input day_transition
-            else: []
 
       # ========== CONFIG BUTTON: NIGHT ==========
       - conditions:
@@ -446,7 +334,6 @@ actions:
                   brightness_pct: !input night_brightness
                   color_temp_kelvin: !input night_color_temp_k
                   transition: !input night_transition
-            else: []
 
       # ========== ADAPTIVE: LIVE / PRESTAGE / STOP ==========
       - conditions:
@@ -507,9 +394,8 @@ actions:
                       - action: input_boolean.turn_off
                         target:
                           entity_id: !input adaptive_helper
-            else: []
 
-      # ========== SHADES (SCENES) + AUTO LED (battery-aware) ==========
+      # ========== SHADES (SCENES) + LED (fixed color) ==========
       - conditions:
           - condition: trigger
             id:
@@ -518,6 +404,7 @@ actions:
               - SHADES_SHADY
               - SHADES_DOWN_TRIPLE
         sequence:
+
           # UP double
           - choose:
               - conditions:
@@ -530,12 +417,12 @@ actions:
                     then:
                       - action: system_log.write
                         data:
-                          message: "Shades UP: lowest_battery_pct={{ lowest_battery_pct }} threshold={{ battery_low_pct }} -> color={{ led_color_resolved }}"
+                          message: "Shades UP: LED color={{ led_color_ok }}"
                           level: info
                   - action: !input led_script
                     data:
                       led: "All"
-                      color: "{{ led_color_resolved }}"
+                      color: "{{ led_color_ok }}"
                       level: "{{ led_level_pct }}"
                       effect: "Slow Rising"
                       duration: "{{ led_duration_text }}"
@@ -545,7 +432,7 @@ actions:
                     target:
                       entity_id: !input shade_scene_up
 
-              # DOWN double
+          # DOWN double
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_DOWN' and scene_down_set }}"
@@ -556,12 +443,12 @@ actions:
                     then:
                       - action: system_log.write
                         data:
-                          message: "Shades DOWN: lowest_battery_pct={{ lowest_battery_pct }} threshold={{ battery_low_pct }} -> color={{ led_color_resolved }}"
+                          message: "Shades DOWN: LED color={{ led_color_ok }}"
                           level: info
                   - action: !input led_script
                     data:
                       led: "All"
-                      color: "{{ led_color_resolved }}"
+                      color: "{{ led_color_ok }}"
                       level: "{{ led_level_pct }}"
                       effect: "Slow Falling"
                       duration: "{{ led_duration_text }}"
@@ -571,7 +458,7 @@ actions:
                     target:
                       entity_id: !input shade_scene_down
 
-              # UP triple (“Shady”)
+          # UP triple (“Shady”)
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_SHADY' and scene_shady_set }}"
@@ -582,12 +469,12 @@ actions:
                     then:
                       - action: system_log.write
                         data:
-                          message: "Shades SHADY: lowest_battery_pct={{ lowest_battery_pct }} threshold={{ battery_low_pct }} -> color={{ led_color_resolved }}"
+                          message: "Shades SHADY: LED color={{ led_color_ok }}"
                           level: info
                   - action: !input led_script
                     data:
                       led: "All"
-                      color: "{{ led_color_resolved }}"
+                      color: "{{ led_color_ok }}"
                       level: "{{ led_level_pct }}"
                       effect: "Chase"
                       duration: "{{ led_duration_text }}"
@@ -597,7 +484,7 @@ actions:
                     target:
                       entity_id: !input shade_scene_shady
 
-              # DOWN triple
+          # DOWN triple
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_DOWN_TRIPLE' and scene_down_triple_set }}"
@@ -608,12 +495,12 @@ actions:
                     then:
                       - action: system_log.write
                         data:
-                          message: "Shades DOWN TRIPLE: lowest_battery_pct={{ lowest_battery_pct }} threshold={{ battery_low_pct }} -> color={{ led_color_resolved }}"
+                          message: "Shades DOWN TRIPLE: LED color={{ led_color_ok }}"
                           level: info
                   - action: !input led_script
                     data:
                       led: "All"
-                      color: "{{ led_color_resolved }}"
+                      color: "{{ led_color_ok }}"
                       level: "{{ led_level_pct }}"
                       effect: "Chase"
                       duration: "{{ led_duration_text }}"
