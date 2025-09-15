@@ -185,7 +185,7 @@ blueprint:
             - 'Small to Big'
     up_single_color:
       name: up_single • Color
-      default: Pink
+      default: Light Pink
       selector:
         select:
           custom_value: true
@@ -276,7 +276,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *effects_opts}}
     down_single_color:
       name: down_single • Color
-      default: Pink
+      default: Light Pink
       selector: {select: {custom_value: true, options: *color_opts}}
     down_single_level:
       name: down_single • LED level (1–100)
@@ -293,7 +293,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *effects_opts}}
     up_double_color:
       name: up_double • Color
-      default: Pink
+      default: Light Pink
       selector: {select: {custom_value: true, options: *color_opts}}
     up_double_level:
       name: up_double • LED level (1–100)
@@ -310,7 +310,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *effects_opts}}
     down_double_color:
       name: down_double • Color
-      default: Pink
+      default: Light Pink
       selector: {select: {custom_value: true, options: *color_opts}}
     down_double_level:
       name: down_double • LED level (1–100)
@@ -327,7 +327,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *effects_opts}}
     up_triple_color:
       name: up_triple • Color
-      default: Pink
+      default: Light Pink
       selector: {select: {custom_value: true, options: *color_opts}}
     up_triple_level:
       name: up_triple • LED level (1–100)
@@ -344,7 +344,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *effects_opts}}
     down_triple_color:
       name: down_triple • Color
-      default: Pink
+      default: Light Pink
       selector: {select: {custom_value: true, options: *color_opts}}
     down_triple_level:
       name: down_triple • LED level (1–100)
