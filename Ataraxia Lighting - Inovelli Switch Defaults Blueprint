@@ -1,10 +1,10 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults + Reporting (v0.2)
+  name: Ataraxia Lighting - Inovelli Blue Defaults + Reporting (v0.3)
   description: >
     Sets Inovelli Blue parameters (diff-only) and resets/applies Zigbee reporting
     for On/Off, Level, and Inovelli default levels via Zigbee2MQTT.
     Assumes HA device name == Zigbee2MQTT friendly name. Base topic: zigbee2mqtt.
-    Uses HA 2024.8+ (service calls are now actions).
+    Uses HA 2024.8+ (service calls are now actions). Param 26 removed; Params 55, 56, 125 included.
 
   domain: script
 
@@ -212,58 +212,66 @@ mode: single
 variables:
   targets_input: !input targets
 
-  # Inputs mapped to simple vars
-  p1: !input p1_dimming_speed_up_remote
-  p2: !input p2_dimming_speed_up_local
-  p3: !input p3_ramp_off_on_remote
-  p4: !input p4_ramp_off_on_local
-  p5: !input p5_dimming_speed_down_remote
-  p6: !input p6_dimming_speed_down_local
-  p7: !input p7_ramp_on_off_remote
-  p8: !input p8_ramp_on_off_local
-
+  # Inputs mapped to simple vars (omitted here for brevity; same as your last version)
+  p1:  !input p1_dimming_speed_up_remote
+  p2:  !input p2_dimming_speed_up_local
+  p3:  !input p3_ramp_off_on_remote
+  p4:  !input p4_ramp_off_on_local
+  p5:  !input p5_dimming_speed_down_remote
+  p6:  !input p6_dimming_speed_down_local
+  p7:  !input p7_ramp_on_off_remote
+  p8:  !input p8_ramp_on_off_local
   p9:  !input p9_min_level
   p10: !input p10_max_level
   p11: !input p11_invert_switch
   p12: !input p12_auto_off
-
   p15: !input p15_level_after_power
   p17: !input p17_led_indicator_timeout
-
   p18: !input p18_active_power_reports
   p19: !input p19_periodic_reports
   p20: !input p20_active_energy_reports
-
   p22: !input p22_switch_type
-
   p52: !input p52_smart_bulb_mode
   p53: !input p53_double_tap_up_to_p55
   p54: !input p54_double_tap_down_to_p56
   p55: !input p55_double_tap_up_level
   p56: !input p56_double_tap_down_level
-
   p60: !input p60_led_color_on
   p61: !input p61_led_color_off
   p62: !input p62_led_intensity_on
   p63: !input p63_led_intensity_off
   p64: !input p64_led_bar_scaling
-
   p125: !input p125_binding_default_level
-
   p50: !input p50_button_delay
   p256: !input p256_local_protection
   p257: !input p257_remote_protection
   p261: !input p261_relay_click
   p260: !input p260_fw_update_indicator
 
-  # Expand/clean selection: only lights, unique, max 20. (Blank target -> empty list)
+  # ✅ Robust target expansion: entities + devices + areas -> light.* entities
   selected_entities: >
-    {{ expand(targets_input)
-       | map(attribute='entity_id')
-       | select('match','^light\\.')
-       | list | unique | slice(20) }}
+    {% set t = targets_input if targets_input is mapping else {} %}
+    {% set e = t.get('entity_id', []) %}
+    {% set d = t.get('device_id', []) %}
+    {% set a = t.get('area_id', []) %}
 
-  # Build desired map (no read-only params)
+    {% set from_entities = e %}
+    {% set from_devices = [] %}
+    {% for dev in d %}
+      {% set from_devices = from_devices + device_entities(dev) %}
+    {% endfor %}
+    {% set from_areas = [] %}
+    {% for ar in a %}
+      {% set from_areas = from_areas + area_entities(ar) %}
+    {% endfor %}
+
+    {% set all_ents = (from_entities + from_devices + from_areas)
+        | select('match','^light\\.')
+        | list %}
+
+    {{ all_ents | unique | list | slice(20) }}
+
+  # Build desired map (no read-only params; Param 26 removed)
   desired_common: >
     {{
       dict(
@@ -328,7 +336,6 @@ sequence:
             ent: "{{ repeat.item }}"
             dev_name: "{{ device_attr(device_id(repeat.item), 'name') }}"
             desired: "{{ desired_common }}"
-            # Diff-only: include only keys where current attribute != desired value
             diff: >
               {% set out = dict() %}
               {% for k, v in desired.items() %}
@@ -471,8 +478,10 @@ sequence:
           continue_on_timeout: true
 
         # ----- Params: push diff-only to /set -----
+        - variables:
+            sent_any: "{{ diff|length > 0 }}"
         - choose:
-            - conditions: "{{ diff|length == 0 }}"
+            - conditions: "{{ not sent_any }}"
               sequence:
                 - action: logbook.log
                   data:
