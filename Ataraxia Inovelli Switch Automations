@@ -203,7 +203,7 @@ blueprint:
             - White
     up_single_level:
       name: up_single • LED level (1–100)
-      default: 80
+      default: 50
       selector: {number: {min: 1, max: 100}}
     up_single_duration:
       name: up_single • Duration
@@ -280,7 +280,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *color_opts}}
     down_single_level:
       name: down_single • LED level (1–100)
-      default: 80
+      default: 50
       selector: {number: {min: 1, max: 100}}
     down_single_duration:
       name: down_single • Duration
@@ -297,7 +297,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *color_opts}}
     up_double_level:
       name: up_double • LED level (1–100)
-      default: 80
+      default: 50
       selector: {number: {min: 1, max: 100}}
     up_double_duration:
       name: up_double • Duration
@@ -314,7 +314,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *color_opts}}
     down_double_level:
       name: down_double • LED level (1–100)
-      default: 80
+      default: 50
       selector: {number: {min: 1, max: 100}}
     down_double_duration:
       name: down_double • Duration
@@ -331,7 +331,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *color_opts}}
     up_triple_level:
       name: up_triple • LED level (1–100)
-      default: 80
+      default: 50
       selector: {number: {min: 1, max: 100}}
     up_triple_duration:
       name: up_triple • Duration
@@ -348,7 +348,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *color_opts}}
     down_triple_level:
       name: down_triple • LED level (1–100)
-      default: 80
+      default: 50
       selector: {number: {min: 1, max: 100}}
     down_triple_duration:
       name: down_triple • Duration
