@@ -10,184 +10,183 @@ blueprint:
     Notes: • Uses Home Assistant 2024.8+ “actions” style (service calls are now actions).
   domain: automation
   author: mnestrud (edited by Home Assistant Assistant)
-  source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Inovelli%20Switch%20Automations
-  homeassistant:
-    min_version: 2024.8.0
+  source_url: https://raw.githubusercontent.com/mnestrud/ha_random/main/Ataraxia%20Inovelli%20Switch%20Automations
+  input:
 
-input:
-  # ---- Switch
-  inovelli_device:
-    name: Inovelli switch (Zigbee2MQTT)
-    description: Select the Inovelli Blue 2-in-1 controlling this room.
-    selector:
-      device:
-        filter:
-          - integration: mqtt
-        multiple: false
+    # ---- Switch
+    inovelli_device:
+      name: Inovelli switch (Zigbee2MQTT)
+      description: Select the Inovelli Blue 2-in-1 controlling this room.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+          multiple: false
 
-  # ---- Lights
-  light_group:
-    name: Light target (single light or Zigbee group)
-    description: >
-      Optional: If set, Config single/double applies Night/Day brightness & color temp.
-      If left blank, those button presses are disabled.
-    default: []
-    selector:
-      entity:
-        domain: light
+    # ---- Lights
+    light_group:
+      name: Light target (single light or Zigbee group)
+      description: >
+        Optional: If set, Config single/double applies Night/Day brightness & color temp.
+        If left blank, those button presses are disabled.
+      default: []
+      selector:
+        entity:
+          domain: light
 
-  day_brightness:
-    name: Daytime brightness (%)
-    default: 80
-    selector:
-      number:
-        min: 1
-        max: 100
-        mode: slider
-        unit_of_measurement: "%"
+    day_brightness:
+      name: Daytime brightness (%)
+      default: 80
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: slider
+          unit_of_measurement: "%"
 
-  day_color_temp_k:
-    name: Daytime color temperature (K)
-    default: 4000
-    selector:
-      number:
-        min: 2000
-        max: 6500
-        step: 50
-        unit_of_measurement: "K"
+    day_color_temp_k:
+      name: Daytime color temperature (K)
+      default: 4000
+      selector:
+        number:
+          min: 2000
+          max: 6500
+          step: 50
+          unit_of_measurement: "K"
 
-  night_brightness:
-    name: Nighttime brightness (%)
-    default: 20
-    selector:
-      number:
-        min: 1
-        max: 100
-        mode: slider
-        unit_of_measurement: "%"
+    night_brightness:
+      name: Nighttime brightness (%)
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: slider
+          unit_of_measurement: "%"
 
-  night_color_temp_k:
-    name: Nighttime color temperature (K)
-    default: 2700
-    selector:
-      number:
-        min: 1800
-        max: 4000
-        step: 50
-        unit_of_measurement: "K"
+    night_color_temp_k:
+      name: Nighttime color temperature (K)
+      default: 2700
+      selector:
+        number:
+          min: 1800
+          max: 4000
+          step: 50
+          unit_of_measurement: "K"
 
-  day_transition:
-    name: Day transition (seconds)
-    description: Smoother fade when applying Day settings.
-    default: 0.4
-    selector:
-      number:
-        min: 0
-        max: 10
-        step: 0.1
-        unit_of_measurement: s
+    day_transition:
+      name: Day transition (seconds)
+      description: Smoother fade when applying Day settings.
+      default: 0.4
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.1
+          unit_of_measurement: s
 
-  night_transition:
-    name: Night transition (seconds)
-    description: Smoother fade when applying Night settings.
-    default: 0.4
-    selector:
-      number:
-        min: 0
-        max: 10
-        step: 0.1
-        unit_of_measurement: s
+    night_transition:
+      name: Night transition (seconds)
+      description: Smoother fade when applying Night settings.
+      default: 0.4
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.1
+          unit_of_measurement: s
 
-  # ---- Adaptive Lighting
-  adaptive_helper:
-    name: Adaptive helper (input_boolean)
-    description: Must be set together with Adaptive script; otherwise adaptive is disabled.
-    default: []
-    selector:
-      entity:
-        filter:
-          domain: input_boolean
+    # ---- Adaptive Lighting
+    adaptive_helper:
+      name: Adaptive helper (input_boolean)
+      description: Must be set together with Adaptive script; otherwise adaptive is disabled.
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: input_boolean
 
-  adaptive_script:
-    name: Adaptive script
-    description: Must be set together with Adaptive helper; otherwise adaptive is disabled. Accepts 'target_state' "ON"/"OFF".
-    default: []
-    selector:
-      entity:
-        filter:
-          domain: script
+    adaptive_script:
+      name: Adaptive script
+      description: Must be set together with Adaptive helper; otherwise adaptive is disabled. Accepts 'target_state' "ON"/"OFF".
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: script
 
-  # ---- Shades (Scenes)
-  shade_scene_up:
-    name: Shade UP scene (Up double)
-    default: []
-    selector:
-      entity:
-        filter:
-          domain: scene
+    # ---- Shades (Scenes)
+    shade_scene_up:
+      name: Shade UP scene (Up double)
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: scene
 
-  shade_scene_down:
-    name: Shade DOWN scene (Down double)
-    default: []
-    selector:
-      entity:
-        filter:
-          domain: scene
+    shade_scene_down:
+      name: Shade DOWN scene (Down double)
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: scene
 
-  shade_scene_shady:
-    name: Shade “Shady” scene (Up triple)
-    default: []
-    selector:
-      entity:
-        filter:
-          domain: scene
+    shade_scene_shady:
+      name: Shade “Shady” scene (Up triple)
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: scene
 
-  shade_scene_down_triple:
-    name: Shade DOWN-TRIPLE scene (Down triple)
-    default: []
-    selector:
-      entity:
-        filter:
-          domain: scene
+    shade_scene_down_triple:
+      name: Shade DOWN-TRIPLE scene (Down triple)
+      default: []
+      selector:
+        entity:
+          filter:
+            domain: scene
 
-  # ---- LED effects
-  led_script:
-    name: Inovelli LED effect script
-    description: "Direct call to your LED script (must accept: led, color, level, effect, duration, target)."
-    default: script.inovelli_blue_led_2025_1
-    selector:
-      entity:
-        filter:
-          domain: script
+    # ---- LED effects
+    led_script:
+      name: Inovelli LED effect script
+      description: "Direct call to your LED script (must accept: led, color, level, effect, duration, target)."
+      default: script.inovelli_blue_led_2025_1
+      selector:
+        entity:
+          filter:
+            domain: script
 
-  led_color:
-    name: LED color (fixed)
-    default: Pink
-    selector:
-      text:
+    led_color:
+      name: LED color (fixed)
+      default: Pink
+      selector:
+        text:
 
-  led_level:
-    name: LED level (1-100)
-    default: 100
-    selector:
-      number:
-        min: 1
-        max: 100
+    led_level:
+      name: LED level (1-100)
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 100
 
-  led_duration:
-    name: LED duration (e.g., '10 Seconds')
-    default: 10 Seconds
-    selector:
-      text:
+    led_duration:
+      name: LED duration (e.g., '10 Seconds')
+      default: 10 Seconds
+      selector:
+        text:
 
-  # ---- Optional debug logging
-  enable_debug_logging:
-    name: Enable system log line (debug)
-    description: Writes a line to the system log when SHADES triggers run.
-    default: false
-    selector:
-      boolean:
+    # ---- Optional debug logging
+    enable_debug_logging:
+      name: Enable system log line (debug)
+      description: Writes a line to the system log when SHADES triggers run.
+      default: false
+      selector:
+        boolean:
 
+# ===== Variables
 variables:
   # ---- Direct inputs
   switch_device: !input inovelli_device
