@@ -485,18 +485,12 @@ actions:
                 then:
                   - action: input_boolean.turn_off
                     target: {entity_id: !input adaptive_helper}
-              # pre-stagger to color temp, tiny transition
-              - action: light.turn_on
-                target: {entity_id: !input light_group}
-                data:
-                  color_temp_kelvin: !input day_color_temp_k
-                  transition: "{{ [0.2, (day_transition | float(0.4))] | min }}"
-              - delay: {milliseconds: 150}
-              # then ease brightness with the requested transition
+              # fast transition
               - action: light.turn_on
                 target: {entity_id: !input light_group}
                 data:
                   brightness_pct: !input day_brightness
+                  color_temp_kelvin: !input day_color_temp_k
                   transition: !input day_transition
 
       # ========== CONFIG BUTTON: NIGHT (smooth stagger) ==========
@@ -515,15 +509,9 @@ actions:
               - action: light.turn_on
                 target: {entity_id: !input light_group}
                 data:
-                  color_temp_kelvin: !input night_color_temp_k
-                  transition: "{{ [0.2, (night_transition | float(0.4))] | min }}"
-              - delay: {milliseconds: 150}
-              - action: light.turn_on
-                target: {entity_id: !input light_group}
-                data:
                   brightness_pct: !input night_brightness
+                  color_temp_kelvin: !input night_color_temp_k
                   transition: !input night_transition
-
       # ========== ADAPTIVE: LIVE / PRESTAGE / STOP (LED inline) + optional Single Actions ==========
       - conditions:
           - condition: trigger
