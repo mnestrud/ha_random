@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Switch Taps (v0.8.1+fix)
+  name: Ataraxia Lighting - Inovelli Switch Taps (v0.8.1+fix2)
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
     - Config single = Night (only if a Light target is provided)
@@ -13,7 +13,7 @@ blueprint:
     • Shade scenes are optional; if left blank, that key press does nothing (no scene, no LED).
     • Adaptive is enabled ONLY if BOTH 'Adaptive helper' and 'Adaptive script' are set.
     • Shade LED color switches to Red when ANY provided battery sensor is at/below the low threshold.
-    • Optional system log line can be enabled to show chosen LED color & lowest battery value.
+    • Optional system log line can be enabled to show parsed values and decision.
 
   domain: automation
   author: mnestrud (mods by Home Assistant Assistant)
@@ -234,7 +234,7 @@ blueprint:
     # ---- Optional debug logging
     enable_debug_logging:
       name: Enable system log line (debug)
-      description: Writes a line to the system log showing lowest battery and chosen LED color on SHADES triggers.
+      description: Writes a line to the system log showing parsed battery values, lowest value, threshold, and chosen LED color on SHADES triggers.
       default: false
       selector:
         boolean:
@@ -293,34 +293,38 @@ variables:
     {{ [battery_sensor_1_entity, battery_sensor_2_entity, battery_sensor_3_entity, battery_sensor_4_entity]
        | reject('equalto', []) | list }}
 
-  # Robustly extract a numeric percent from each sensor (handles "20", "20.0", "20 %", attr-based, etc.)
+  # ---- Battery parsing (robust)
+  # Build list of numeric percentages from all provided sensors:
+  battery_values: >
+    {%- set sensors = battery_sensors -%}
+    {%- set vals = [] -%}
+    {%- for e in sensors %}
+      {%- set raw = states(e) -%}
+      {%- set v = raw | float(none) -%}
+      {%- if v is none -%}
+        {%- set v = state_attr(e, 'battery') | float(none) -%}
+      {%- endif -%}
+      {%- if v is none and raw is string -%}
+        {%- set num = (raw | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+') | default(none)) -%}
+        {%- set v = num | float(none) -%}
+      {%- endif -%}
+      {%- if v is not none -%}
+        {%- set _ = vals.append(v) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ vals }}
+
   lowest_battery_pct: >
-    {% set sensors = battery_sensors %}
-    {% set minv = 101 %}
-    {% for e in sensors %}
-      {% set raw = states(e) %}
-      {# 1) direct state parse #}
-      {% set direct = raw | float(none) %}
-      {% set val = direct %}
-      {# 2) attribute fallback (some expose battery as an attribute) #}
-      {% if val is none %}
-        {% set attr_batt = state_attr(e, 'battery') | float(none) %}
-        {% set val = attr_batt %}
-      {% endif %}
-      {# 3) regex fallback if state carried a unit like "57 %" #}
-      {% if val is none %}
-        {% set num = (raw | regex_findall_index('[-+]?[0-9]*\\.?[0-9]+') | default(none)) %}
-        {% set val = num | float(none) %}
-      {% endif %}
-      {% if val is number and val < minv %}
-        {% set minv = val %}
-      {% endif %}
-    {% endfor %}
-    {{ minv }}
+    {%- set vals = battery_values -%}
+    {{ (vals | min) if (vals | count > 0) else 101 }}
+
+  any_battery_low: >
+    {%- set threshold = battery_low_pct | float(30) -%}
+    {%- set vals = battery_values -%}
+    {{ (vals | select('le', threshold) | list | count) > 0 }}
 
   led_color_resolved: >
-    {% set threshold = battery_low_pct | float(30) %}
-    {{ 'Red' if (lowest_battery_pct | float(101)) <= threshold else led_color_ok }}
+    {{ 'Red' if any_battery_low else led_color_ok }}
 
 triggers:
   - trigger: device
@@ -518,20 +522,29 @@ actions:
               - SHADES_SHADY
               - SHADES_DOWN_TRIPLE
         sequence:
-          # UP double
+          # Single debug line at start of SHADES sequence (fires for any branch)
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >
+                    SHADES {{ trigger.id }}:
+                    sensors={{ battery_sensors }},
+                    values={{ battery_values }},
+                    lowest={{ lowest_battery_pct }},
+                    threshold={{ battery_low_pct }},
+                    any_low={{ any_battery_low }},
+                    color={{ led_color_resolved }}
+                  level: info
+
+          # Then branch to the matching scene
           - choose:
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_UP' and scene_up_set }}"
                 sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ debug_enabled }}"
-                    then:
-                      - action: system_log.write
-                        data:
-                          message: "Shades UP: lowest_battery_pct={{ lowest_battery_pct }} threshold={{ battery_low_pct }} -> color={{ led_color_resolved }}"
-                          level: info
                   - action: !input led_script
                     data:
                       led: "All"
@@ -545,19 +558,10 @@ actions:
                     target:
                       entity_id: !input shade_scene_up
 
-              # DOWN double
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_DOWN' and scene_down_set }}"
                 sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ debug_enabled }}"
-                    then:
-                      - action: system_log.write
-                        data:
-                          message: "Shades DOWN: lowest_battery_pct={{ lowest_battery_pct }} threshold={{ battery_low_pct }} -> color={{ led_color_resolved }}"
-                          level: info
                   - action: !input led_script
                     data:
                       led: "All"
@@ -571,19 +575,10 @@ actions:
                     target:
                       entity_id: !input shade_scene_down
 
-              # UP triple (“Shady”)
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_SHADY' and scene_shady_set }}"
                 sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ debug_enabled }}"
-                    then:
-                      - action: system_log.write
-                        data:
-                          message: "Shades SHADY: lowest_battery_pct={{ lowest_battery_pct }} threshold={{ battery_low_pct }} -> color={{ led_color_resolved }}"
-                          level: info
                   - action: !input led_script
                     data:
                       led: "All"
@@ -597,19 +592,10 @@ actions:
                     target:
                       entity_id: !input shade_scene_shady
 
-              # DOWN triple
               - conditions:
                   - condition: template
                     value_template: "{{ trigger.id == 'SHADES_DOWN_TRIPLE' and scene_down_triple_set }}"
                 sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ debug_enabled }}"
-                    then:
-                      - action: system_log.write
-                        data:
-                          message: "Shades DOWN TRIPLE: lowest_battery_pct={{ lowest_battery_pct }} threshold={{ battery_low_pct }} -> color={{ led_color_resolved }}"
-                          level: info
                   - action: !input led_script
                     data:
                       led: "All"
