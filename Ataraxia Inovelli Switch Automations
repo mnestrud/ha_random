@@ -1,5 +1,5 @@
 blueprint:
-  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.6)"
+  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.7)"
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
     - Config single = Night (optional light target)
@@ -102,8 +102,13 @@ blueprint:
     up_single_light_mode:
       name: Up Single • Light mode
       description: What to do if the Up Single Action is a light
-      default: toggle
-      selector: {select: {options: [on, off, toggle]}}
+      default: "toggle"
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
+            - "toggle"
 
     down_single_action:
       name: Down Single Action
@@ -118,8 +123,13 @@ blueprint:
     down_single_light_mode:
       name: Down Single • Light mode
       description: What to do if the Down Single Action is a light
-      default: toggle
-      selector: {select: {options: [on, off, toggle]}}
+      default: "toggle"
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
+            - "toggle"
 
     up_double_action:
       name: Up Double Action
@@ -133,8 +143,13 @@ blueprint:
     up_double_light_mode:
       name: Up Double • Light mode
       description: What to do if the Up Double Action is a light
-      default: toggle
-      selector: {select: {options: [on, off, toggle]}}
+      default: "toggle"
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
+            - "toggle"
 
     down_double_action:
       name: Down Double Action
@@ -148,8 +163,13 @@ blueprint:
     down_double_light_mode:
       name: Down Double • Light mode
       description: What to do if the Down Double Action is a light
-      default: toggle
-      selector: {select: {options: [on, off, toggle]}}
+      default: "toggle"
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
+            - "toggle"
 
     up_triple_action:
       name: Up Triple Action
@@ -163,8 +183,13 @@ blueprint:
     up_triple_light_mode:
       name: Up Triple • Light mode
       description: What to do if the Up Triple Action is a light
-      default: toggle
-      selector: {select: {options: [on, off, toggle]}}
+      default: "toggle"
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
+            - "toggle"
 
     down_triple_action:
       name: Down Triple Action
@@ -178,8 +203,13 @@ blueprint:
     down_triple_light_mode:
       name: Down Triple • Light mode
       description: What to do if the Down Triple Action is a light
-      default: toggle
-      selector: {select: {options: [on, off, toggle]}}
+      default: "toggle"
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
+            - "toggle"
 
     # ---- LED script entity
     led_script:
