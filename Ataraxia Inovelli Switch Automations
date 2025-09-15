@@ -1,5 +1,5 @@
 blueprint:
-  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.5, fix: no extra keys)"
+  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.6)"
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
     - Config single = Night (optional light target) • smooth staggered transition
