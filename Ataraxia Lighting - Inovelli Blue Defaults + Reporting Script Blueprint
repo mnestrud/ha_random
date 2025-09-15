@@ -248,28 +248,41 @@ variables:
   p261: !input p261_relay_click
   p260: !input p260_fw_update_indicator
 
-  # ✅ Robust target expansion: entities + devices + areas -> light.* entities
+  # ✅ Robust target expansion: entities + devices + areas -> flat list of light.* entities
   selected_entities: >
-    {% set t = targets_input if targets_input is mapping else {} %}
-    {% set e = t.get('entity_id', []) %}
-    {% set d = t.get('device_id', []) %}
-    {% set a = t.get('area_id', []) %}
+    {% set t = targets_input or {} %}
+    {% set e = t.entity_id if t is mapping and 'entity_id' in t else [] %}
+    {% set d = t.device_id if t is mapping and 'device_id' in t else [] %}
+    {% set a = t.area_id   if t is mapping and 'area_id'   in t else [] %}
 
-    {% set from_entities = e %}
-    {% set from_devices = [] %}
+    {% set ents = [] %}
+
+    {# from explicitly-selected entities #}
+    {% for ent in e %}
+      {% if ent.startswith('light.') %}
+        {% set ents = ents + [ent] %}
+      {% endif %}
+    {% endfor %}
+
+    {# from selected devices -> their entities #}
     {% for dev in d %}
-      {% set from_devices = from_devices + device_entities(dev) %}
+      {% for ent in device_entities(dev) %}
+        {% if ent.startswith('light.') %}
+          {% set ents = ents + [ent] %}
+        {% endif %}
+      {% endfor %}
     {% endfor %}
-    {% set from_areas = [] %}
+
+    {# from selected areas -> their entities #}
     {% for ar in a %}
-      {% set from_areas = from_areas + area_entities(ar) %}
+      {% for ent in area_entities(ar) %}
+        {% if ent.startswith('light.') %}
+          {% set ents = ents + [ent] %}
+        {% endif %}
+      {% endfor %}
     {% endfor %}
 
-    {% set all_ents = (from_entities + from_devices + from_areas)
-        | select('match','^light\\.')
-        | list %}
-
-    {{ all_ents | unique | list | slice(20) }}
+    {{ (ents | unique | list)[:20] }}
 
   # Build desired map (no read-only params; Param 26 removed)
   desired_common: >
