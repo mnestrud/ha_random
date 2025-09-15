@@ -1,22 +1,23 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Switch Taps (v0.8.1, no battery color)
+  name: Ataraxia Lighting - Inovelli Switch Taps (v0.9.4, refactors + smooth config)
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
-    - Config single = Night (only if a Light target is provided)
-    - Config double = Day (only if a Light target is provided)
-    - Up single / Down single = Adaptive Lighting (turn ON helper if OFF; 0.5s delay; run script only on that transition)
-    - Up/Down held = Stop Adaptive (turn helper OFF)
-    - Up double / Down double / Up triple / Down triple = optional Shade scenes (LED uses fixed color)
-    Notes: • Uses Home Assistant 2024.8+ “actions” style (service calls are now actions).
+    - Config single = Night (optional light target) • smooth staggered transition
+    - Config double = Day (optional light target) • smooth staggered transition
+    - Up/Down single = Adaptive helper control + optional Action (scene/script/light) + optional LED
+    - Up/Down double & triple = optional Action (scene/script/light) + optional LED
+    Uses Home Assistant 2024.8+ action syntax (service calls are now actions).
   domain: automation
   author: mnestrud (edited by Home Assistant Assistant)
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/main/Ataraxia%20Inovelli%20Switch%20Automations
+  homeassistant:
+    min_version: 2024.8.0
+
   input:
 
     # ---- Switch
     inovelli_device:
       name: Inovelli switch (Zigbee2MQTT)
-      description: Select the Inovelli Blue 2-in-1 controlling this room.
       selector:
         device:
           filter:
@@ -26,9 +27,6 @@ blueprint:
     # ---- Lights
     light_group:
       name: Light target (single light or Zigbee group)
-      description: >
-        Optional: If set, Config single/double applies Night/Day brightness & color temp.
-        If left blank, those button presses are disabled.
       default: []
       selector:
         entity:
@@ -38,186 +36,417 @@ blueprint:
       name: Daytime brightness (%)
       default: 80
       selector:
-        number:
-          min: 1
-          max: 100
-          mode: slider
-          unit_of_measurement: "%"
+        number: {min: 1, max: 100, mode: slider, unit_of_measurement: "%"}
 
     day_color_temp_k:
       name: Daytime color temperature (K)
       default: 4000
       selector:
-        number:
-          min: 2000
-          max: 6500
-          step: 50
-          unit_of_measurement: "K"
+        number: {min: 2000, max: 6500, step: 50, unit_of_measurement: "K"}
 
     night_brightness:
       name: Nighttime brightness (%)
       default: 20
       selector:
-        number:
-          min: 1
-          max: 100
-          mode: slider
-          unit_of_measurement: "%"
+        number: {min: 1, max: 100, mode: slider, unit_of_measurement: "%"}
 
     night_color_temp_k:
       name: Nighttime color temperature (K)
       default: 2700
       selector:
-        number:
-          min: 1800
-          max: 4000
-          step: 50
-          unit_of_measurement: "K"
+        number: {min: 1800, max: 4000, step: 50, unit_of_measurement: "K"}
 
     day_transition:
       name: Day transition (seconds)
-      description: Smoother fade when applying Day settings.
       default: 0.4
       selector:
-        number:
-          min: 0
-          max: 10
-          step: 0.1
-          unit_of_measurement: s
+        number: {min: 0, max: 10, step: 0.1, unit_of_measurement: s}
 
     night_transition:
       name: Night transition (seconds)
-      description: Smoother fade when applying Night settings.
       default: 0.4
       selector:
-        number:
-          min: 0
-          max: 10
-          step: 0.1
-          unit_of_measurement: s
+        number: {min: 0, max: 10, step: 0.1, unit_of_measurement: s}
 
     # ---- Adaptive Lighting
     adaptive_helper:
       name: Adaptive helper (input_boolean)
-      description: Must be set together with Adaptive script; otherwise adaptive is disabled.
       default: []
       selector:
         entity:
-          filter:
-            domain: input_boolean
+          filter: {domain: input_boolean}
 
     adaptive_script:
       name: Adaptive script
-      description: Must be set together with Adaptive helper; otherwise adaptive is disabled. Accepts 'target_state' "ON"/"OFF".
+      description: Accepts variable 'target_state' "ON"/"OFF"
+      default: []
+      selector:
+        entity:
+          filter: {domain: script}
+
+    # ---- Actions (Scene / Script / Light)
+    up_single_action:
+      name: Up Single Action
+      description: Optional action to run on up_single.
       default: []
       selector:
         entity:
           filter:
-            domain: script
+            - domain: scene
+            - domain: script
+            - domain: light
 
-    # ---- Shades (Scenes)
-    shade_scene_up:
-      name: Shade UP scene (Up double)
+    down_single_action:
+      name: Down Single Action
+      description: Optional action to run on down_single.
       default: []
       selector:
         entity:
           filter:
-            domain: scene
+            - domain: scene
+            - domain: script
+            - domain: light
 
-    shade_scene_down:
-      name: Shade DOWN scene (Down double)
+    up_double_action:
+      name: Up Double Action
       default: []
       selector:
         entity:
           filter:
-            domain: scene
+            - domain: scene
+            - domain: script
+            - domain: light
 
-    shade_scene_shady:
-      name: Shade “Shady” scene (Up triple)
+    down_double_action:
+      name: Down Double Action
       default: []
       selector:
         entity:
           filter:
-            domain: scene
+            - domain: scene
+            - domain: script
+            - domain: light
 
-    shade_scene_down_triple:
-      name: Shade DOWN-TRIPLE scene (Down triple)
+    up_triple_action:
+      name: Up Triple Action
       default: []
       selector:
         entity:
           filter:
-            domain: scene
+            - domain: scene
+            - domain: script
+            - domain: light
 
-    # ---- LED effects
+    down_triple_action:
+      name: Down Triple Action
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: scene
+            - domain: script
+            - domain: light
+
+    # ---- LED script entity
     led_script:
       name: Inovelli LED effect script
-      description: "Direct call to your LED script (must accept: led, color, level, effect, duration, target)."
+      description: "Must accept: led, color, level, effect, duration, target"
       default: script.inovelli_blue_led_2025_1
-      selector:
-        entity:
-          filter:
-            domain: script
+      selector: {entity: {filter: {domain: script}}}
 
-    led_color:
-      name: LED color (fixed)
+    # ---- Per-action LED configuration (anchors already set in earlier version)
+    # Effects/colors/durations lists via anchors:
+    up_single_effect:
+      name: up_single • Effect (blank = none)
+      default: ""
+      selector:
+        select:
+          custom_value: true
+          options: &effects_opts
+            - 'Off'
+            - 'Clear'
+            - 'Solid'
+            - 'Aurora'
+            - 'Slow Chase'
+            - 'Chase'
+            - 'Fast Chase'
+            - 'Slow Blink'
+            - 'Medium Blink'
+            - 'Fast Blink'
+            - 'Slow Falling'
+            - 'Medium Falling'
+            - 'Fast Falling'
+            - 'Open/Close'
+            - 'Pulse'
+            - 'Slow Rising'
+            - 'Medium Rising'
+            - 'Fast Rising'
+            - 'Slow Siren'
+            - 'Fast Siren'
+            - 'Small to Big'
+    up_single_color:
+      name: up_single • Color
       default: Pink
       selector:
-        text:
-
-    led_level:
-      name: LED level (1-100)
-      default: 100
-      selector:
-        number:
-          min: 1
-          max: 100
-
-    led_duration:
-      name: LED duration (e.g., '10 Seconds')
+        select:
+          custom_value: true
+          options: &color_opts
+            - Red
+            - Orange
+            - Yellow
+            - Green
+            - Cyan
+            - Teal
+            - Blue
+            - Purple
+            - Light Pink
+            - Pink
+            - White
+    up_single_level:
+      name: up_single • LED level (1–100)
+      default: 80
+      selector: {number: {min: 1, max: 100}}
+    up_single_duration:
+      name: up_single • Duration
       default: 10 Seconds
       selector:
-        text:
+        select:
+          custom_value: true
+          options: &duration_opts
+            - 1 Second
+            - 2 Seconds
+            - 3 Seconds
+            - 4 Seconds
+            - 5 Seconds
+            - 6 Seconds
+            - 7 Seconds
+            - 8 Seconds
+            - 9 Seconds
+            - 10 Seconds
+            - 15 Seconds
+            - 20 Seconds
+            - 25 Seconds
+            - 30 Seconds
+            - 35 Seconds
+            - 40 Seconds
+            - 45 Seconds
+            - 50 Seconds
+            - 55 Seconds
+            - 1 Minute
+            - 2 Minutes
+            - 3 Minutes
+            - 4 Minutes
+            - 5 Minutes
+            - 6 Minutes
+            - 7 Minutes
+            - 8 Minutes
+            - 9 Minutes
+            - 10 Minutes
+            - 15 Minutes
+            - 20 Minutes
+            - 25 Minutes
+            - 30 Minutes
+            - 35 Minutes
+            - 40 Minutes
+            - 45 Minutes
+            - 50 Minutes
+            - 55 Minutes
+            - 1 Hour
+            - 2 Hours
+            - 3 Hours
+            - 4 Hours
+            - 5 Hours
+            - 6 Hours
+            - 7 Hours
+            - 8 Hours
+            - 9 Hours
+            - 10 Hours
+            - 15 Hours
+            - 20 Hours
+            - 1 Day
+            - 2 Days
+            - 3 Days
+            - 4 Days
+            - 5 Days
+            - Indefinitely
+            - Forever
+
+    # DOWN SINGLE
+    down_single_effect:
+      name: down_single • Effect (blank = none)
+      default: ""
+      selector: {select: {custom_value: true, options: *effects_opts}}
+    down_single_color:
+      name: down_single • Color
+      default: Pink
+      selector: {select: {custom_value: true, options: *color_opts}}
+    down_single_level:
+      name: down_single • LED level (1–100)
+      default: 80
+      selector: {number: {min: 1, max: 100}}
+    down_single_duration:
+      name: down_single • Duration
+      default: 10 Seconds
+      selector: {select: {custom_value: true, options: *duration_opts}}
+
+    # UP DOUBLE
+    up_double_effect:
+      name: up_double • Effect (blank = none)
+      default: ""
+      selector: {select: {custom_value: true, options: *effects_opts}}
+    up_double_color:
+      name: up_double • Color
+      default: Pink
+      selector: {select: {custom_value: true, options: *color_opts}}
+    up_double_level:
+      name: up_double • LED level (1–100)
+      default: 80
+      selector: {number: {min: 1, max: 100}}
+    up_double_duration:
+      name: up_double • Duration
+      default: 10 Seconds
+      selector: {select: {custom_value: true, options: *duration_opts}}
+
+    # DOWN DOUBLE
+    down_double_effect:
+      name: down_double • Effect (blank = none)
+      default: ""
+      selector: {select: {custom_value: true, options: *effects_opts}}
+    down_double_color:
+      name: down_double • Color
+      default: Pink
+      selector: {select: {custom_value: true, options: *color_opts}}
+    down_double_level:
+      name: down_double • LED level (1–100)
+      default: 80
+      selector: {number: {min: 1, max: 100}}
+    down_double_duration:
+      name: down_double • Duration
+      default: 10 Seconds
+      selector: {select: {custom_value: true, options: *duration_opts}}
+
+    # UP TRIPLE
+    up_triple_effect:
+      name: up_triple • Effect (blank = none)
+      default: ""
+      selector: {select: {custom_value: true, options: *effects_opts}}
+    up_triple_color:
+      name: up_triple • Color
+      default: Pink
+      selector: {select: {custom_value: true, options: *color_opts}}
+    up_triple_level:
+      name: up_triple • LED level (1–100)
+      default: 80
+      selector: {number: {min: 1, max: 100}}
+    up_triple_duration:
+      name: up_triple • Duration
+      default: 10 Seconds
+      selector: {select: {custom_value: true, options: *duration_opts}}
+
+    # DOWN TRIPLE
+    down_triple_effect:
+      name: down_triple • Effect (blank = none)
+      default: ""
+      selector: {select: {custom_value: true, options: *effects_opts}}
+    down_triple_color:
+      name: down_triple • Color
+      default: Pink
+      selector: {select: {custom_value: true, options: *color_opts}}
+    down_triple_level:
+      name: down_triple • LED level (1–100)
+      default: 80
+      selector: {number: {min: 1, max: 100}}
+    down_triple_duration:
+      name: down_triple • Duration
+      default: 10 Seconds
+      selector: {select: {custom_value: true, options: *duration_opts}}
 
     # ---- Optional debug logging
     enable_debug_logging:
       name: Enable system log line (debug)
-      description: Writes a line to the system log when SHADES triggers run.
       default: false
-      selector:
-        boolean:
+      selector: {boolean: {}}
 
 # ===== Variables
 variables:
-  # ---- Direct inputs
   switch_device: !input inovelli_device
   light_target: !input light_group
   adaptive_helper_entity: !input adaptive_helper
   adaptive_script_entity: !input adaptive_script
-  scene_up: !input shade_scene_up
-  scene_down: !input shade_scene_down
-  scene_shady: !input shade_scene_shady
-  scene_down_triple: !input shade_scene_down_triple
+
+  action_up_single: !input up_single_action
+  action_down_single: !input down_single_action
+  action_up_double: !input up_double_action
+  action_down_double: !input down_double_action
+  action_up_triple: !input up_triple_action
+  action_down_triple: !input down_triple_action
+
   led_script_entity: !input led_script
-  led_color_ok: !input led_color
-  led_level_pct: !input led_level
-  led_duration_text: !input led_duration
   debug_enabled: !input enable_debug_logging
 
-  # ---- Derived
+  # derived
   led_target_light: >
     {{ device_entities(switch_device) | select('match', '^light\\.') | list | first }}
   is_adaptive_enabled: >
     {{ adaptive_helper_entity != [] and adaptive_script_entity != [] }}
   has_light_target: >
     {{ light_target != [] }}
-  scene_up_set: >
-    {{ scene_up != [] }}
-  scene_down_set: >
-    {{ scene_down != [] }}
-  scene_shady_set: >
-    {{ scene_shady != [] }}
-  scene_down_triple_set: >
-    {{ scene_down_triple != [] }}
+
+  action_up_single_set: "{{ action_up_single != [] }}"
+  action_down_single_set: "{{ action_down_single != [] }}"
+  action_up_double_set: "{{ action_up_double != [] }}"
+  action_down_double_set: "{{ action_down_double != [] }}"
+  action_up_triple_set: "{{ action_up_triple != [] }}"
+  action_down_triple_set: "{{ action_down_triple != [] }}"
+
+  # per-action effects (for clean templating checks)
+  eff_up_single: !input up_single_effect
+  eff_down_single: !input down_single_effect
+  eff_up_double: !input up_double_effect
+  eff_down_double: !input down_double_effect
+  eff_up_triple: !input up_triple_effect
+  eff_down_triple: !input down_triple_effect
+
+# ===== Reusable helper sequences (anchors)
+# 1) Run LED script only if effect is set and a LED target exists.
+#    Expects _eff, _color, _level, _duration, _led_target variables set by a prior `variables:` step.
+run_led_if_effect: &run_led_if_effect
+  - if:
+      - condition: template
+        value_template: >
+          {{ (_eff | string | trim) != '' and (_led_target | string | trim) != '' }}
+    then:
+      - action: !input led_script
+        data:
+          led: "All"
+          color: "{{ _color }}"
+          level: "{{ _level }}"
+          effect: "{{ _eff }}"
+          duration: "{{ _duration }}"
+          target: {entity_id: "{{ _led_target }}"}
+
+# 2) Run a target entity by domain (script/scene/light).
+#    Expects _target_entity to be set by a prior `variables:` step.
+run_target_entity: &run_target_entity
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ (_target_entity | string)[:7] == 'script.' }}"
+        sequence:
+          - action: script.turn_on
+            target: {entity_id: "{{ _target_entity }}"}
+      - conditions:
+          - condition: template
+            value_template: "{{ (_target_entity | string)[:6] == 'scene.' }}"
+        sequence:
+          - action: scene.turn_on
+            target: {entity_id: "{{ _target_entity }}"}
+      - conditions:
+          - condition: template
+            value_template: "{{ (_target_entity | string)[:6] == 'light.' }}"
+        sequence:
+          - action: light.turn_on
+            target: {entity_id: "{{ _target_entity }}"}
 
 triggers:
   - trigger: device
@@ -232,18 +461,20 @@ triggers:
     type: action
     subtype: config_double
     id: SCENE_DAY
+
+  # renamed IDs per your instruction
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_single
-    id: ADAPT_LIVE
+    id: ACTION_UP_SINGLE_AL_LIVE
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_single
-    id: ADAPT_PRESTAGE
+    id: ACTION_DOWN_SINGLE_AL_PRESTAGE
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
@@ -256,40 +487,40 @@ triggers:
     type: action
     subtype: down_held
     id: STOP_ADAPT
+
+  # Double/Triple
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_double
-    id: SHADES_UP
+    id: ACTION_UP_DOUBLE
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_double
-    id: SHADES_DOWN
+    id: ACTION_DOWN_DOUBLE
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_triple
-    id: SHADES_SHADY
+    id: ACTION_UP_TRIPLE
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_triple
-    id: SHADES_DOWN_TRIPLE
+    id: ACTION_DOWN_TRIPLE
 
 conditions: []
 
 actions:
   - choose:
 
-      # ========== CONFIG BUTTON: DAY ==========
-      - conditions:
-          - condition: trigger
-            id: SCENE_DAY
+      # ========== CONFIG BUTTON: DAY (smooth stagger) ==========
+      - conditions: [{condition: trigger, id: SCENE_DAY}]
         sequence:
           - if:
               - condition: template
@@ -298,216 +529,3 @@ actions:
               - if:
                   - condition: template
                     value_template: "{{ is_adaptive_enabled }}"
-                then:
-                  - action: input_boolean.turn_off
-                    target:
-                      entity_id: !input adaptive_helper
-              - action: light.turn_on
-                target:
-                  entity_id: !input light_group
-                data:
-                  brightness_pct: !input day_brightness
-                  color_temp_kelvin: !input day_color_temp_k
-                  transition: !input day_transition
-
-      # ========== CONFIG BUTTON: NIGHT ==========
-      - conditions:
-          - condition: trigger
-            id: SCENE_NIGHT
-        sequence:
-          - if:
-              - condition: template
-                value_template: "{{ has_light_target }}"
-            then:
-              - if:
-                  - condition: template
-                    value_template: "{{ is_adaptive_enabled }}"
-                then:
-                  - action: input_boolean.turn_off
-                    target:
-                      entity_id: !input adaptive_helper
-              - action: light.turn_on
-                target:
-                  entity_id: !input light_group
-                data:
-                  brightness_pct: !input night_brightness
-                  color_temp_kelvin: !input night_color_temp_k
-                  transition: !input night_transition
-
-      # ========== ADAPTIVE: LIVE / PRESTAGE / STOP ==========
-      - conditions:
-          - condition: trigger
-            id:
-              - ADAPT_LIVE
-              - ADAPT_PRESTAGE
-              - STOP_ADAPT
-        sequence:
-          - if:
-              - condition: template
-                value_template: "{{ is_adaptive_enabled }}"
-            then:
-              - choose:
-                  # LIVE/PRESTAGE: only if helper is OFF → turn ON, delay 0.5s, then run script once
-                  - conditions:
-                      - condition: template
-                        value_template: "{{ trigger.id in ['ADAPT_LIVE','ADAPT_PRESTAGE'] and is_state(adaptive_helper_entity, 'off') }}"
-                    sequence:
-                      - action: input_boolean.turn_on
-                        target:
-                          entity_id: !input adaptive_helper
-                      - delay:
-                          milliseconds: 500
-                      - choose:
-                          - conditions:
-                              - condition: trigger
-                                id: ADAPT_LIVE
-                            sequence:
-                              - action: script.turn_on
-                                target:
-                                  entity_id: !input adaptive_script
-                                data:
-                                  variables:
-                                    target_state: "ON"
-                          - conditions:
-                              - condition: trigger
-                                id: ADAPT_PRESTAGE
-                            sequence:
-                              - action: script.turn_on
-                                target:
-                                  entity_id: !input adaptive_script
-                                data:
-                                  variables:
-                                    target_state: "OFF"
-
-                  # LIVE/PRESTAGE while helper already ON → do nothing
-                  - conditions:
-                      - condition: template
-                        value_template: "{{ trigger.id in ['ADAPT_LIVE','ADAPT_PRESTAGE'] and is_state(adaptive_helper_entity, 'on') }}"
-                    sequence: []
-
-                  # STOP: always turn helper OFF
-                  - conditions:
-                      - condition: trigger
-                        id: STOP_ADAPT
-                    sequence:
-                      - action: input_boolean.turn_off
-                        target:
-                          entity_id: !input adaptive_helper
-
-      # ========== SHADES (SCENES) + LED (fixed color) ==========
-      - conditions:
-          - condition: trigger
-            id:
-              - SHADES_UP
-              - SHADES_DOWN
-              - SHADES_SHADY
-              - SHADES_DOWN_TRIPLE
-        sequence:
-
-          # UP double
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ trigger.id == 'SHADES_UP' and scene_up_set }}"
-                sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ debug_enabled }}"
-                    then:
-                      - action: system_log.write
-                        data:
-                          message: "Shades UP: LED color={{ led_color_ok }}"
-                          level: info
-                  - action: !input led_script
-                    data:
-                      led: "All"
-                      color: "{{ led_color_ok }}"
-                      level: "{{ led_level_pct }}"
-                      effect: "Slow Rising"
-                      duration: "{{ led_duration_text }}"
-                      target:
-                        entity_id: "{{ led_target_light }}"
-                  - action: scene.turn_on
-                    target:
-                      entity_id: !input shade_scene_up
-
-          # DOWN double
-              - conditions:
-                  - condition: template
-                    value_template: "{{ trigger.id == 'SHADES_DOWN' and scene_down_set }}"
-                sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ debug_enabled }}"
-                    then:
-                      - action: system_log.write
-                        data:
-                          message: "Shades DOWN: LED color={{ led_color_ok }}"
-                          level: info
-                  - action: !input led_script
-                    data:
-                      led: "All"
-                      color: "{{ led_color_ok }}"
-                      level: "{{ led_level_pct }}"
-                      effect: "Slow Falling"
-                      duration: "{{ led_duration_text }}"
-                      target:
-                        entity_id: "{{ led_target_light }}"
-                  - action: scene.turn_on
-                    target:
-                      entity_id: !input shade_scene_down
-
-          # UP triple (“Shady”)
-              - conditions:
-                  - condition: template
-                    value_template: "{{ trigger.id == 'SHADES_SHADY' and scene_shady_set }}"
-                sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ debug_enabled }}"
-                    then:
-                      - action: system_log.write
-                        data:
-                          message: "Shades SHADY: LED color={{ led_color_ok }}"
-                          level: info
-                  - action: !input led_script
-                    data:
-                      led: "All"
-                      color: "{{ led_color_ok }}"
-                      level: "{{ led_level_pct }}"
-                      effect: "Chase"
-                      duration: "{{ led_duration_text }}"
-                      target:
-                        entity_id: "{{ led_target_light }}"
-                  - action: scene.turn_on
-                    target:
-                      entity_id: !input shade_scene_shady
-
-          # DOWN triple
-              - conditions:
-                  - condition: template
-                    value_template: "{{ trigger.id == 'SHADES_DOWN_TRIPLE' and scene_down_triple_set }}"
-                sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ debug_enabled }}"
-                    then:
-                      - action: system_log.write
-                        data:
-                          message: "Shades DOWN TRIPLE: LED color={{ led_color_ok }}"
-                          level: info
-                  - action: !input led_script
-                    data:
-                      led: "All"
-                      color: "{{ led_color_ok }}"
-                      level: "{{ led_level_pct }}"
-                      effect: "Chase"
-                      duration: "{{ led_duration_text }}"
-                      target:
-                        entity_id: "{{ led_target_light }}"
-                  - action: scene.turn_on
-                    target:
-                      entity_id: !input shade_scene_down_triple
-
-mode: queued
-max: 3
