@@ -1,24 +1,24 @@
 blueprint:
-  name: Inovelli Blue – Defaults + Reporting (Z2M) · diff-only + results
+  name: Ataraxia Lighting - Inovelli Blue Defaults + Reporting (v0.2)
   description: >
-    Sets Inovelli Blue parameters (diff-only) and resets+applies Zigbee
-    reporting for On/Off, Level, and Inovelli default levels via Zigbee2MQTT.
-    Assumes HA device name == Zigbee2MQTT friendly name. Base topic fixed: zigbee2mqtt.
-    Uses HA 2024.8+ where service calls are now actions.
+    Sets Inovelli Blue parameters (diff-only) and resets/applies Zigbee reporting
+    for On/Off, Level, and Inovelli default levels via Zigbee2MQTT.
+    Assumes HA device name == Zigbee2MQTT friendly name. Base topic: zigbee2mqtt.
+    Uses HA 2024.8+ (service calls are now actions).
 
   domain: script
 
   input:
     targets:
       name: Target Inovelli Blues
-      description: Select devices and/or light entities (blank selections are ignored). Max 20 used.
+      description: Select devices and/or light entities. Blank selections are ignored; max 20 used.
       selector:
         target:
           entity:
             domain: [light]
           device: {}
 
-    # ------------------ Dimming / Ramp (Params 1-8) ------------------
+    # -------- Dimming / Ramp (Params 1-8) --------
     p1_dimming_speed_up_remote:
       name: 1. Dimming Speed Up (Remote)
       description: Range 0–126 (0=instant, 5≈500ms). Default 25.
@@ -60,10 +60,10 @@ blueprint:
       default: 0
       selector: { number: { min: 0, max: 127, step: 1 } }
 
-    # ------------------ Min/Max/Invert/Auto-Off ------------------
+    # -------- Min/Max/Invert/Auto-Off --------
     p9_min_level:
       name: 9. Minimum Dim Level
-      description: Range 1–254 (Inovelli says 1–254; many UIs bound 1–253). Default 1.
+      description: Range 1–254. Default 1.
       default: 1
       selector: { number: { min: 1, max: 254, step: 1 } }
     p10_max_level:
@@ -82,7 +82,7 @@ blueprint:
       default: 0
       selector: { number: { min: 0, max: 32767, step: 1 } }
 
-    # ------------------ Defaults & Indicator Timeout ------------------
+    # -------- Defaults & Indicator Timeout --------
     p15_level_after_power:
       name: 15. Level After Power Restored
       description: 0=off, 1–254≈1–100%, 255=restore last. Default 255.
@@ -94,10 +94,10 @@ blueprint:
       default: 11
       selector: { number: { min: 0, max: 11, step: 1 } }
 
-    # ------------------ Power / Energy ------------------
+    # -------- Power / Energy --------
     p18_active_power_reports:
       name: 18. Active Power Reports (ΔW ×0.1)
-      description: 0–32767 (0=disabled, 1=0.1W...). Default 10.
+      description: 0–32767 (0=disabled, 1=0.1W…). Default 10.
       default: 0
       selector: { number: { min: 0, max: 32767, step: 1 } }
     p19_periodic_reports:
@@ -107,18 +107,18 @@ blueprint:
       selector: { number: { min: 0, max: 32767, step: 1 } }
     p20_active_energy_reports:
       name: 20. Active Energy Reports (ΔkWh ×0.01)
-      description: 0–32767 (0=disabled, 1=0.01kWh...). Default 10.
+      description: 0–32767 (0=disabled, 1=0.01kWh…). Default 10.
       default: 0
       selector: { number: { min: 0, max: 32767, step: 1 } }
 
-    # ------------------ Switch Type (keep Param 22; Param 26 removed) ------------------
+    # -------- Switch Type (Param 26 removed) --------
     p22_switch_type:
       name: 22. Switch Type
       description: 0=Single Pole, 1=3-Way Dumb, 2=3-Way Aux, 3=Full Sine Wave Mode.
       default: "Single Pole"
       selector: { select: { options: ["Single Pole","3-Way Dumb","3-Way Aux","Full Sine Wave Mode"] } }
 
-    # ------------------ Smart Bulb / Double Tap ------------------
+    # -------- Smart Bulb / Double Tap --------
     p52_smart_bulb_mode:
       name: 52. Smart Bulb Mode
       description: 0=Disabled, 1=Enabled (bypasses relay).
@@ -136,16 +136,16 @@ blueprint:
       selector: { select: { options: ["Disabled","Enabled"] } }
     p55_double_tap_up_level:
       name: 55. 2x Tap Up Level
-      description: Range 2–254. Default 254. :contentReference[oaicite:1]{index=1}
+      description: Range 2–254. Default 254.
       default: 254
       selector: { number: { min: 2, max: 254, step: 1 } }
     p56_double_tap_down_level:
       name: 56. 2x Tap Down Level
-      description: Range 0–254 (0 often used as "off"). Default 2. :contentReference[oaicite:2]{index=2}
+      description: Range 0–254 (0 often “off”). Default 2.
       default: 2
       selector: { number: { min: 0, max: 254, step: 1 } }
 
-    # ------------------ LED Colors / Intensities ------------------
+    # -------- LED Colors / Intensities --------
     p60_led_color_on:
       name: 60. LED Color When On
       description: 0–255 (0=white, 1–254=color wheel, 255=sync). Default 170.
@@ -172,17 +172,17 @@ blueprint:
       default: "Gen3 method (VZM-style)"
       selector: { select: { options: ["Gen3 method (VZM-style)","Match Gen 2 (LZWxx Scaling)"] } }
 
-    # ------------------ Binding Default Level (Param 125) ------------------
+    # -------- Binding Default Level (Param 125) --------
     p125_binding_default_level:
       name: 125. Binding Default Level
-      description: 0=Disabled, 1=Enabled. (Sync bound device to default level.) Default 0. :contentReference[oaicite:3]{index=3}
+      description: 0=Disabled, 1=Enabled. (Sync bound device to default level.) Default 0.
       default: "Disabled"
       selector: { select: { options: ["Disabled","Enabled"] } }
 
-    # ------------------ Misc Options ------------------
+    # -------- Misc --------
     p50_button_delay:
       name: Button Delay (Param 50)
-      description: Text like "0ms", "300ms", "500ms". (Enter exactly as Z2M expects.)
+      description: Text like "0ms", "300ms", "500ms". Enter exactly as Z2M expects.
       default: "300ms"
       selector: { text: {} }
     p256_local_protection:
@@ -197,7 +197,7 @@ blueprint:
       selector: { select: { options: ["Disabled","Enabled"] } }
     p261_relay_click:
       name: Relay Click Sound
-      description: String labels from Z2M (e.g., "Enabled (Click Sound Off)").
+      description: Z2M label (e.g., "Enabled (Click Sound Off)").
       default: "Enabled (Click Sound Off)"
       selector: { select: { options: ["Enabled (Click Sound Off)","Audible Click On"] } }
     p260_fw_update_indicator:
@@ -208,60 +208,107 @@ blueprint:
 
 mode: single
 
+# ===== Variables (bind !input to plain variables FIRST; then use in Jinja) =====
 variables:
+  targets_input: !input targets
+
+  # Inputs mapped to simple vars
+  p1: !input p1_dimming_speed_up_remote
+  p2: !input p2_dimming_speed_up_local
+  p3: !input p3_ramp_off_on_remote
+  p4: !input p4_ramp_off_on_local
+  p5: !input p5_dimming_speed_down_remote
+  p6: !input p6_dimming_speed_down_local
+  p7: !input p7_ramp_on_off_remote
+  p8: !input p8_ramp_on_off_local
+
+  p9:  !input p9_min_level
+  p10: !input p10_max_level
+  p11: !input p11_invert_switch
+  p12: !input p12_auto_off
+
+  p15: !input p15_level_after_power
+  p17: !input p17_led_indicator_timeout
+
+  p18: !input p18_active_power_reports
+  p19: !input p19_periodic_reports
+  p20: !input p20_active_energy_reports
+
+  p22: !input p22_switch_type
+
+  p52: !input p52_smart_bulb_mode
+  p53: !input p53_double_tap_up_to_p55
+  p54: !input p54_double_tap_down_to_p56
+  p55: !input p55_double_tap_up_level
+  p56: !input p56_double_tap_down_level
+
+  p60: !input p60_led_color_on
+  p61: !input p61_led_color_off
+  p62: !input p62_led_intensity_on
+  p63: !input p63_led_intensity_off
+  p64: !input p64_led_bar_scaling
+
+  p125: !input p125_binding_default_level
+
+  p50: !input p50_button_delay
+  p256: !input p256_local_protection
+  p257: !input p257_remote_protection
+  p261: !input p261_relay_click
+  p260: !input p260_fw_update_indicator
+
   # Expand/clean selection: only lights, unique, max 20. (Blank target -> empty list)
   selected_entities: >
-    {{ expand(!input targets)
+    {{ expand(targets_input)
        | map(attribute='entity_id')
        | select('match','^light\\.')
        | list | unique | slice(20) }}
 
-  # Build desired map ONCE from inputs (no read-only keys included; Param 26 removed).
+  # Build desired map (no read-only params)
   desired_common: >
     {{
       dict(
-        dimmingSpeedUpRemote = !input p1_dimming_speed_up_remote,
-        dimmingSpeedUpLocal  = !input p2_dimming_speed_up_local,
-        rampRateOffToOnRemote = !input p3_ramp_off_on_remote,
-        rampRateOffToOnLocal  = !input p4_ramp_off_on_local,
-        dimmingSpeedDownRemote = !input p5_dimming_speed_down_remote,
-        dimmingSpeedDownLocal  = !input p6_dimming_speed_down_local,
-        rampRateOnToOffRemote  = !input p7_ramp_on_off_remote,
-        rampRateOnToOffLocal   = !input p8_ramp_on_off_local,
+        dimmingSpeedUpRemote = p1,
+        dimmingSpeedUpLocal  = p2,
+        rampRateOffToOnRemote = p3,
+        rampRateOffToOnLocal  = p4,
+        dimmingSpeedDownRemote = p5,
+        dimmingSpeedDownLocal  = p6,
+        rampRateOnToOffRemote  = p7,
+        rampRateOnToOffLocal   = p8,
 
-        minimumLevel = !input p9_min_level,
-        maximumLevel = !input p10_max_level,
-        invertSwitch = !input p11_invert_switch,
-        autoTimerOff = !input p12_auto_off,
+        minimumLevel = p9,
+        maximumLevel = p10,
+        invertSwitch = p11,
+        autoTimerOff = p12,
 
-        stateAfterPowerRestored = !input p15_level_after_power,
-        loadLevelIndicatorTimeout = !input p17_led_indicator_timeout,
+        stateAfterPowerRestored = p15,
+        loadLevelIndicatorTimeout = p17,
 
-        activePowerReports = !input p18_active_power_reports,
-        periodicPowerAndEnergyReports = !input p19_periodic_reports,
-        activeEnergyReports = !input p20_active_energy_reports,
+        activePowerReports = p18,
+        periodicPowerAndEnergyReports = p19,
+        activeEnergyReports = p20,
 
-        switchType = !input p22_switch_type,
+        switchType = p22,
 
-        smartBulbMode = !input p52_smart_bulb_mode,
-        doubleTapUpToParam55 = !input p53_double_tap_up_to_p55,
-        doubleTapDownToParam56 = !input p54_double_tap_down_to_p56,
-        brightnessLevelForDoubleTapUp = !input p55_double_tap_up_level,
-        brightnessLevelForDoubleTapDown = !input p56_double_tap_down_level,
+        smartBulbMode = p52,
+        doubleTapUpToParam55 = p53,
+        doubleTapDownToParam56 = p54,
+        brightnessLevelForDoubleTapUp = p55,
+        brightnessLevelForDoubleTapDown = p56,
 
-        ledColorWhenOn = !input p60_led_color_on,
-        ledColorWhenOff = !input p61_led_color_off,
-        ledIntensityWhenOn = !input p62_led_intensity_on,
-        ledIntensityWhenOff = !input p63_led_intensity_off,
-        ledBarScaling = !input p64_led_bar_scaling,
+        ledColorWhenOn = p60,
+        ledColorWhenOff = p61,
+        ledIntensityWhenOn = p62,
+        ledIntensityWhenOff = p63,
+        ledBarScaling = p64,
 
-        bindingOffToOnSyncLevel = !input p125_binding_default_level,
+        bindingOffToOnSyncLevel = p125,
 
-        buttonDelay = !input p50_button_delay,
-        localProtection = !input p256_local_protection,
-        remoteProtection = !input p257_remote_protection,
-        relayClick = !input p261_relay_click,
-        firmwareUpdateInProgressIndicator = !input p260_fw_update_indicator
+        buttonDelay = p50,
+        localProtection = p256,
+        remoteProtection = p257,
+        relayClick = p261,
+        firmwareUpdateInProgressIndicator = p260
       )
     }}
 
@@ -281,8 +328,7 @@ sequence:
             ent: "{{ repeat.item }}"
             dev_name: "{{ device_attr(device_id(repeat.item), 'name') }}"
             desired: "{{ desired_common }}"
-
-            # Build diff of parameters vs current attributes (diff-only send)
+            # Diff-only: include only keys where current attribute != desired value
             diff: >
               {% set out = dict() %}
               {% for k, v in desired.items() %}
@@ -292,10 +338,9 @@ sequence:
               {% endfor %}
               {{ out }}
 
-        # ------------------ REPORTING RESET ------------------
+        # ----- Reporting: disable existing (set max interval to 65535) -----
         - variables:
             txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
-        # Disable reports by setting max interval = 65535
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
@@ -360,7 +405,7 @@ sequence:
           timeout: "00:00:10"
           continue_on_timeout: true
 
-        # ------------------ REPORTING APPLY ------------------
+        # ----- Reporting: apply desired -----
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
@@ -425,7 +470,7 @@ sequence:
           timeout: "00:00:10"
           continue_on_timeout: true
 
-        # ------------------ PARAMETERS: push diff-only JSON to /set ------------------
+        # ----- Params: push diff-only to /set -----
         - choose:
             - conditions: "{{ diff|length == 0 }}"
               sequence:
@@ -434,15 +479,25 @@ sequence:
                     name: "Inovelli Defaults"
                     message: "{{ dev_name }}: params up-to-date (no changes sent)."
                     entity_id: "{{ ent }}"
-            - conditions: []
-              sequence:
-                - action: mqtt.publish
-                  data:
-                    topic: "zigbee2mqtt/{{ dev_name }}/set"
-                    qos: 0
-                    retain: false
-                    payload: "{{ diff | tojson }}"
-                - wait_template: >
+          default:
+            - action: mqtt.publish
+              data:
+                topic: "zigbee2mqtt/{{ dev_name }}/set"
+                qos: 0
+                retain: false
+                payload: "{{ diff | tojson }}"
+            - wait_template: >
+                {% set ok = true %}
+                {% for k, v in diff.items() %}
+                  {% if state_attr(ent, k) != v %}
+                    {% set ok = false %}
+                  {% endif %}
+                {% endfor %}
+                {{ ok }}
+              timeout: "00:00:15"
+              continue_on_timeout: true
+            - choose:
+                - conditions: >
                     {% set ok = true %}
                     {% for k, v in diff.items() %}
                       {% if state_attr(ent, k) != v %}
@@ -450,29 +505,18 @@ sequence:
                       {% endif %}
                     {% endfor %}
                     {{ ok }}
-                  timeout: "00:00:15"
-                  continue_on_timeout: true
-                - choose:
-                    - conditions: >
-                        {% set ok = true %}
-                        {% for k, v in diff.items() %}
-                          {% if state_attr(ent, k) != v %}
-                            {% set ok = false %}
-                          {% endif %}
-                        {% endfor %}
-                        {{ ok }}
-                      sequence:
-                        - action: logbook.log
-                          data:
-                            name: "Inovelli Defaults"
-                            message: "{{ dev_name }}: updated {{ diff|length }} setting(s)."
-                            entity_id: "{{ ent }}"
-                      default:
-                        - action: logbook.log
-                          data:
-                            name: "Inovelli Defaults"
-                            message: "{{ dev_name }}: FAILED to update params within timeout. Check Z2M logs."
-                            entity_id: "{{ ent }}"
+                  sequence:
+                    - action: logbook.log
+                      data:
+                        name: "Inovelli Defaults"
+                        message: "{{ dev_name }}: updated {{ diff|length }} setting(s)."
+                        entity_id: "{{ ent }}"
+              default:
+                - action: logbook.log
+                  data:
+                    name: "Inovelli Defaults"
+                    message: "{{ dev_name }}: FAILED to update params within timeout. Check Z2M logs."
+                    entity_id: "{{ ent }}"
 
   - action: persistent_notification.create
     data:
