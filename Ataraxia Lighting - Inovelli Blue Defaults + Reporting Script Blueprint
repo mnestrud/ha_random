@@ -1,388 +1,668 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.5.5)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.5.6)
   description: >
     Push all non-telemetry parameters for Inovelli Blue dimmers via Zigbee2MQTT.
     One input per parameter with descriptions/ranges. Blank inputs are sent as null.
     Removed read-only/problematic keys: powerType, switchType, dimmingMode.
     Also resets & applies Zigbee reporting (OnOff.onOff, LevelCtrl.currentLevel,
     manuSpecificInovelli.defaultLevelLocal/Remote). Requires Home Assistant 2024.8+.
+domain: script
+input:
+  devices_multiline:
+    name: Zigbee2MQTT device names (one per line)
+    description: Exact friendly names as they appear in zigbee2mqtt//set. First 20 used.
+    selector:
+      text:
+        multiline: true
 
-  domain: script
+  # ----------- Time & Level behavior -----------
+  dimmingSpeedUpRemote:
+    name: Dimming Speed Up (Remote)
+    description: "0–127 (0=instant; special values may sync to other params depending on firmware)"
+    default: 50
+    selector:
+      number:
+        min: 0
+        max: 127
+        step: 1
 
-  input:
-    devices_multiline:
-      name: Zigbee2MQTT device names (one per line)
-      description: Exact friendly names as they appear in zigbee2mqtt/<name>/set. First 20 used.
-      selector:
-        text:
-          multiline: true
+  dimmingSpeedUpLocal:
+    name: Dimming Speed Up (Local)
+    description: "0–127 (127 often means \"sync\" behavior)"
+    default: 127
+    selector:
+      number:
+        min: 0
+        max: 127
+        step: 1
 
-    # ----------- Time & Level behavior -----------
-    dimmingSpeedUpRemote:
-      name: Dimming Speed Up (Remote)
-      description: 0–127 (0=instant; special values may sync to other params depending on firmware)
-      default: 50
-      selector: { number: { min: 0, max: 127, step: 1 } }
+  rampRateOffToOnRemote:
+    name: Ramp Rate – Off → On (Remote)
+    description: "0–127 (0=instant)"
+    default: 0
+    selector:
+      number:
+        min: 0
+        max: 127
+        step: 1
 
-    dimmingSpeedUpLocal:
-      name: Dimming Speed Up (Local)
-      description: 0–127 (127 often means "sync" behavior)
-      default: 127
-      selector: { number: { min: 0, max: 127, step: 1 } }
+  rampRateOffToOnLocal:
+    name: Ramp Rate – Off → On (Local)
+    description: "0–127 (0=instant)"
+    default: 0
+    selector:
+      number:
+        min: 0
+        max: 127
+        step: 1
 
-    rampRateOffToOnRemote:
-      name: Ramp Rate – Off → On (Remote)
-      description: 0–127 (0=instant)
-      default: 0
-      selector: { number: { min: 0, max: 127, step: 1 } }
+  dimmingSpeedDownRemote:
+    name: Dimming Speed Down (Remote)
+    description: "0–127 (0=instant)"
+    default: 127
+    selector:
+      number:
+        min: 0
+        max: 127
+        step: 1
 
-    rampRateOffToOnLocal:
-      name: Ramp Rate – Off → On (Local)
-      description: 0–127 (0=instant)
-      default: 0
-      selector: { number: { min: 0, max: 127, step: 1 } }
+  dimmingSpeedDownLocal:
+    name: Dimming Speed Down (Local)
+    description: "0–127 (0=instant)"
+    default: 127
+    selector:
+      number:
+        min: 0
+        max: 127
+        step: 1
 
-    dimmingSpeedDownRemote:
-      name: Dimming Speed Down (Remote)
-      description: 0–127 (0=instant)
-      default: 127
-      selector: { number: { min: 0, max: 127, step: 1 } }
+  rampRateOnToOffRemote:
+    name: Ramp Rate – On → Off (Remote)
+    description: "0–127 (0=instant)"
+    default: 0
+    selector:
+      number:
+        min: 0
+        max: 127
+        step: 1
 
-    dimmingSpeedDownLocal:
-      name: Dimming Speed Down (Local)
-      description: 0–127 (0=instant)
-      default: 127
-      selector: { number: { min: 0, max: 127, step: 1 } }
+  rampRateOnToOffLocal:
+    name: Ramp Rate – On → Off (Local)
+    description: "0–127 (0=instant)"
+    default: 0
+    selector:
+      number:
+        min: 0
+        max: 127
+        step: 1
 
-    rampRateOnToOffRemote:
-      name: Ramp Rate – On → Off (Remote)
-      description: 0–127 (0=instant)
-      default: 0
-      selector: { number: { min: 0, max: 127, step: 1 } }
+  minimumLevel:
+    name: Minimum Dim Level
+    description: "1–254 (lowest brightness allowed)"
+    default: 1
+    selector:
+      number:
+        min: 1
+        max: 254
+        step: 1
 
-    rampRateOnToOffLocal:
-      name: Ramp Rate – On → Off (Local)
-      description: 0–127 (0=instant)
-      default: 0
-      selector: { number: { min: 0, max: 127, step: 1 } }
+  maximumLevel:
+    name: Maximum Dim Level
+    description: "2–255 (~100% at 255)"
+    default: 255
+    selector:
+      number:
+        min: 2
+        max: 255
+        step: 1
 
-    minimumLevel:
-      name: Minimum Dim Level
-      description: 1–254 (lowest brightness allowed)
-      default: 1
-      selector: { number: { min: 1, max: 254, step: 1 } }
+  invertSwitch:
+    name: Invert Switch
+    description: "Invert physical up/down."
+    default: "No"
+    selector:
+      select:
+        options: ["No","Yes"]
 
-    maximumLevel:
-      name: Maximum Dim Level
-      description: 2–255 (~100% at 255)
-      default: 255
-      selector: { number: { min: 2, max: 255, step: 1 } }
+  autoTimerOff:
+    name: Auto-Off Timer
+    description: "0–32767 (0=disabled). Units may vary by firmware."
+    default: 0
+    selector:
+      number:
+        min: 0
+        max: 32767
+        step: 1
 
-    invertSwitch:
-      name: Invert Switch
-      description: Invert physical up/down. (No/Yes)
-      default: "No"
-      selector: { select: { options: ["No","Yes"] } }
+  stateAfterPowerRestored:
+    name: Level After Power Restored
+    description: "0=Off, 1–254=fixed %, 255=Restore Last"
+    default: 255
+    selector:
+      number:
+        min: 0
+        max: 255
+        step: 1
 
-    autoTimerOff:
-      name: Auto-Off Timer
-      description: 0–32767 (0=disabled). Units may vary by firmware.
-      default: 0
-      selector: { number: { min: 0, max: 32767, step: 1 } }
+  loadLevelIndicatorTimeout:
+    name: LED Indicator Timeout
+    description: "0–10 (seconds), 11 means \"Stay On\""
+    default: 11
+    selector:
+      number:
+        min: 0
+        max: 11
+        step: 1
 
-    stateAfterPowerRestored:
-      name: Level After Power Restored
-      description: 0=Off, 1–254=fixed %, 255=Restore Last
-      default: 255
-      selector: { number: { min: 0, max: 255, step: 1 } }
+  # ----------- Power / Energy reporting -----------
+  activePowerReports:
+    name: Active Power Reports (ΔW×0.1)
+    description: "0–32767 (0=disabled; 1=0.1W, 10=1W, …)"
+    default: 0
+    selector:
+      number:
+        min: 0
+        max: 32767
+        step: 1
 
-    loadLevelIndicatorTimeout:
-      name: LED Indicator Timeout
-      description: 0–10 (seconds), 11 means "Stay On"
-      default: 11
-      selector: { number: { min: 0, max: 11, step: 1 } }
+  periodicPowerAndEnergyReports:
+    name: Periodic Power & Energy Reports
+    description: "0–32767 (0=disabled; often seconds)"
+    default: 0
+    selector:
+      number:
+        min: 0
+        max: 32767
+        step: 1
 
-    # ----------- Power / Energy reporting -----------
-    activePowerReports:
-      name: Active Power Reports (ΔW×0.1)
-      description: 0–32767 (0=disabled; 1=0.1W, 10=1W, …)
-      default: 0
-      selector: { number: { min: 0, max: 32767, step: 1 } }
+  activeEnergyReports:
+    name: Active Energy Reports (ΔkWh×0.01)
+    description: "0–32767 (0=disabled; 1=0.01kWh)"
+    default: 0
+    selector:
+      number:
+        min: 0
+        max: 32767
+        step: 1
 
-    periodicPowerAndEnergyReports:
-      name: Periodic Power & Energy Reports
-      description: 0–32767 (0=disabled; often seconds)
-      default: 0
-      selector: { number: { min: 0, max: 32767, step: 1 } }
+  # ----------- Smart bulb / tap features -----------
+  smartBulbMode:
+    name: Smart Bulb Mode
+    description: "Relay bypass for smart bulbs."
+    default: "Smart Bulb Mode"
+    selector:
+      select:
+        options: ["Disabled","Smart Bulb Mode"]
 
-    activeEnergyReports:
-      name: Active Energy Reports (ΔkWh×0.01)
-      description: 0–32767 (0=disabled; 1=0.01kWh)
-      default: 0
-      selector: { number: { min: 0, max: 32767, step: 1 } }
+  doubleTapUpToParam55:
+    name: Enable 2× Tap Up (to Param 55)
+    description: "Enable/disable double-tap up mapping."
+    default: "Disabled"
+    selector:
+      select:
+        options: ["Disabled","Enabled"]
 
-    # ----------- Smart bulb / tap features -----------
-    smartBulbMode:
-      name: Smart Bulb Mode
-      description: Relay bypass for smart bulbs.
-      default: "Smart Bulb Mode"
-      selector: { select: { options: ["Disabled","Smart Bulb Mode"] } }
+  doubleTapDownToParam56:
+    name: Enable 2× Tap Down (to Param 56)
+    description: "Enable/disable double-tap down mapping."
+    default: "Disabled"
+    selector:
+      select:
+        options: ["Disabled","Enabled"]
 
-    doubleTapUpToParam55:
-      name: Enable 2× Tap Up (to Param 55)
-      description: Enable/disable double-tap up mapping.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
+  brightnessLevelForDoubleTapUp:
+    name: 2× Tap Up Level (Param 55)
+    description: "2–254 (~1–100%)"
+    default: 254
+    selector:
+      number:
+        min: 2
+        max: 254
+        step: 1
 
-    doubleTapDownToParam56:
-      name: Enable 2× Tap Down (to Param 56)
-      description: Enable/disable double-tap down mapping.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
+  brightnessLevelForDoubleTapDown:
+    name: 2× Tap Down Level
+    description: "0–254 (0 often treated as Off)"
+    default: 2
+    selector:
+      number:
+        min: 0
+        max: 254
+        step: 1
 
-    brightnessLevelForDoubleTapUp:
-      name: 2× Tap Up Level (Param 55)
-      description: 2–254 (~1–100%)
-      default: 254
-      selector: { number: { min: 2, max: 254, step: 1 } }
+  doubleTapClearNotifications:
+    name: Double-Tap Clear Notifications
+    description: "Clear active notifications via double-tap."
+    default: "Disabled"
+    selector:
+      select:
+        options: ["Disabled","Enabled"]
 
-    brightnessLevelForDoubleTapDown:
-      name: 2× Tap Down Level
-      description: 0–254 (0 often treated as Off)
-      default: 2
-      selector: { number: { min: 0, max: 254, step: 1 } }
+  singleTapBehavior:
+    name: Single Tap Behavior
+    description: "Text label as exposed by Zigbee2MQTT (e.g., Old Behavior)."
+    default: "Old Behavior"
+    selector:
+      text: {}
 
-    doubleTapClearNotifications:
-      name: Double-Tap Clear Notifications
-      description: Clear active notifications via double-tap.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
+  # ----------- LED bar colors/intensities -----------
+  ledColorWhenOn:
+    name: LED Color When On
+    description: "0–255 (0=white, 1–254=color wheel, 255=sync)"
+    default: 170
+    selector:
+      number:
+        min: 0
+        max: 255
+        step: 1
 
-    singleTapBehavior:
-      name: Single Tap Behavior
-      description: Text label as exposed by Zigbee2MQTT (e.g., Old Behavior).
-      default: "Old Behavior"
-      selector: { text: {} }
+  ledColorWhenOff:
+    name: LED Color When Off
+    description: "0–255 (0=white, 1–254=color wheel, 255=sync)"
+    default: 170
+    selector:
+      number:
+        min: 0
+        max: 255
+        step: 1
 
-    # ----------- LED bar colors/intensities -----------
-    ledColorWhenOn:
-      name: LED Color When On
-      description: 0–255 (0=white, 1–254=color wheel, 255=sync)
-      default: 170
-      selector: { number: { min: 0, max: 255, step: 1 } }
+  ledIntensityWhenOn:
+    name: LED Intensity When On (%)
+    description: "0–100"
+    default: 33
+    selector:
+      number:
+        min: 0
+        max: 100
+        step: 1
 
-    ledColorWhenOff:
-      name: LED Color When Off
-      description: 0–255 (0=white, 1–254=color wheel, 255=sync)
-      default: 170
-      selector: { number: { min: 0, max: 255, step: 1 } }
+  ledIntensityWhenOff:
+    name: LED Intensity When Off (%)
+    description: "0–100"
+    default: 1
+    selector:
+      number:
+        min: 0
+        max: 100
+        step: 1
 
-    ledIntensityWhenOn:
-      name: LED Intensity When On (%)
-      description: 0–100
-      default: 33
-      selector: { number: { min: 0, max: 100, step: 1 } }
+  ledBarScaling:
+    name: LED Bar Scaling
+    description: "Choose: Gen3 method (VZM-style) or Match Gen 2 (LZWxx Scaling)"
+    default: "Gen3 method (VZM-style)"
+    selector:
+      select:
+        options:
+          - "Gen3 method (VZM-style)"
+          - "Match Gen 2 (LZWxx Scaling)"
 
-    ledIntensityWhenOff:
-      name: LED Intensity When Off (%)
-      description: 0–100
-      default: 1
-      selector: { number: { min: 0, max: 100, step: 1 } }
+  # ----------- Default level behavior -----------
+  defaultLevelLocal:
+    name: Default Level (Local)
+    description: "0=Off, 1–254=Fixed %, 255=Restore Last"
+    default: 255
+    selector:
+      number:
+        min: 0
+        max: 255
+        step: 1
 
-    ledBarScaling:
-      name: LED Bar Scaling
-      description: "Choose: Gen3 method (VZM-style) or Match Gen 2 (LZWxx Scaling)"
-      default: "Gen3 method (VZM-style)"
-      selector:
-        select:
-          options:
-            - "Gen3 method (VZM-style)"
-            - "Match Gen 2 (LZWxx Scaling)"
+  defaultLevelRemote:
+    name: Default Level (Remote)
+    description: "0=Off, 1–254=Fixed %, 255=Restore Last"
+    default: 255
+    selector:
+      number:
+        min: 0
+        max: 255
+        step: 1
 
-    # ----------- Default level behavior -----------
-    defaultLevelLocal:
-      name: Default Level (Local)
-      description: 0=Off, 1–254=Fixed %, 255=Restore Last
-      default: 255
-      selector: { number: { min: 0, max: 255, step: 1 } }
+  # ----------- Misc / protection / sound -----------
+  buttonDelay:
+    name: Button Delay
+    description: "Text exactly as Zigbee2MQTT expects (e.g., 0ms, 300ms, 500ms)"
+    default: "300ms"
+    selector:
+      text: {}
 
-    defaultLevelRemote:
-      name: Default Level (Remote)
-      description: 0=Off, 1–254=Fixed %, 255=Restore Last
-      default: 255
-      selector: { number: { min: 0, max: 255, step: 1 } }
+  localProtection:
+    name: Local Protection
+    description: "Disable/Enable local paddle control."
+    default: "Disabled"
+    selector:
+      select:
+        options: ["Disabled","Enabled"]
 
-    # ----------- Misc / protection / sound -----------
-    buttonDelay:
-      name: Button Delay
-      description: Text exactly as Zigbee2MQTT expects (e.g., 0ms, 300ms, 500ms)
-      default: "300ms"
-      selector: { text: {} }
+  remoteProtection:
+    name: Remote Protection
+    description: "Disable/Enable remote (network) control."
+    default: "Disabled"
+    selector:
+      select:
+        options: ["Disabled","Enabled"]
 
-    localProtection:
-      name: Local Protection
-      description: Disable/Enable local paddle control.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
+  relayClick:
+    name: Relay Click Sound
+    description: "Zigbee2MQTT label (e.g., Enabled (Click Sound Off), Audible Click On)"
+    default: "Enabled (Click Sound Off)"
+    selector:
+      text: {}
 
-    remoteProtection:
-      name: Remote Protection
-      description: Disable/Enable remote (network) control.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
+  firmwareUpdateInProgressIndicator:
+    name: Firmware Update Indicator
+    description: "Show indicator during firmware update."
+    default: "Enabled"
+    selector:
+      select:
+        options: ["Enabled","Disabled"]
 
-    relayClick:
-      name: Relay Click Sound
-      description: Zigbee2MQTT label (e.g., Enabled (Click Sound Off), Audible Click On)
-      default: "Enabled (Click Sound Off)"
-      selector: { text: {} }
+  # ----------- Binding / Aux / Non-neutral -----------
+  bindingOffToOnSyncLevel:
+    name: Binding Default Level
+    description: "Sync bound device to default level."
+    default: "Disabled"
+    selector:
+      select:
+        options: ["Disabled","Enabled"]
 
-    firmwareUpdateInProgressIndicator:
-      name: Firmware Update Indicator
-      description: Show indicator during firmware update.
-      default: "Enabled"
-      selector: { select: { options: ["Enabled","Disabled"] } }
+  auxSwitchUniqueScenes:
+    name: Aux Switch Unique Scenes
+    description: "Expose unique scenes for aux switch."
+    default: "Disabled"
+    selector:
+      select:
+        options: ["Disabled","Enabled"]
 
-    # ----------- Binding / Aux / Non-neutral -----------
-    bindingOffToOnSyncLevel:
-      name: Binding Default Level
-      description: Sync bound device to default level.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
+  higherOutputInNonNeutral:
+    name: Higher Output in Non-Neutral
+    description: "Label as shown in Zigbee2MQTT (e.g., Disabled (default) / Enabled)"
+    default: "Disabled (default)"
+    selector:
+      text: {}
 
-    auxSwitchUniqueScenes:
-      name: Aux Switch Unique Scenes
-      description: Expose unique scenes for aux switch.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
+  # ----------- On/Off LED mode & Output mode -----------
+  onOffLedMode:
+    name: On/Off LED Mode
+    description: "Text label as exposed by Zigbee2MQTT (e.g., All)"
+    default: "All"
+    selector:
+      text: {}
 
-    higherOutputInNonNeutral:
-      name: Higher Output in Non-Neutral
-      description: Label as shown in Zigbee2MQTT (e.g., Disabled (default) / Enabled)
-      default: "Disabled (default)"
-      selector: { text: {} }
+  outputMode:
+    name: Output Mode
+    description: "Text label as exposed by Zigbee2MQTT (e.g., Dimmer or On/Off)"
+    default: "Dimmer"
+    selector:
+      text: {}
 
-    # ----------- On/Off LED mode & Output mode -----------
-    onOffLedMode:
-      name: On/Off LED Mode
-      description: Text label as exposed by Zigbee2MQTT (e.g., All)
-      default: "All"
-      selector: { text: {} }
+  # ----------- Quick Start -----------
+  quickStartLevel:
+    name: Quick Start Level
+    description: "0–254 (0=disabled/firmware-specific)"
+    default: 254
+    selector:
+      number:
+        min: 0
+        max: 254
+        step: 1
 
-    outputMode:
-      name: Output Mode
-      description: Text label as exposed by Zigbee2MQTT (e.g., Dimmer or On/Off)
-      default: "Dimmer"
-      selector: { text: {} }
+  quickStartTime:
+    name: Quick Start Time
+    description: "0–60 typical (implementation-specific). Use 0 for disabled."
+    default: 0
+    selector:
+      number:
+        min: 0
+        max: 60
+        step: 1
 
-    # ----------- Quick Start -----------
-    quickStartLevel:
-      name: Quick Start Level
-      description: 0–254 (0=disabled/firmware-specific)
-      default: 254
-      selector: { number: { min: 0, max: 254, step: 1 } }
+  # ----------- Level config (object) -----------
+  level_config_execute_if_off:
+    name: level_config.execute_if_off
+    description: "Whether to execute level changes when the light is off (true/false)"
+    default: true
+    selector:
+      boolean: {}
 
-    quickStartTime:
-      name: Quick Start Time
-      description: 0–60 typical (implementation-specific). Use 0 for disabled.
-      default: 0
-      selector: { number: { min: 0, max: 255, step: 1 } }
+  # ----------- Per-LED segment defaults (0–101; blank allowed) -----------
+  defaultLed1ColorWhenOn:
+    name: defaultLed1ColorWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    # ----------- Level config (object) -----------
-    level_config_execute_if_off:
-      name: level_config.execute_if_off
-      description: Whether to execute level changes when the light is off (true/false)
-      default: true
-      selector: { boolean: {} }
+  defaultLed1ColorWhenOff:
+    name: defaultLed1ColorWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    # ----------- Per-LED segment defaults (0–101; blank allowed) -----------
-    defaultLed1ColorWhenOn:
-      name: defaultLed1ColorWhenOn
-      description: 0–101 (blank sends null)
-      default: ""
-      selector: { text: {} }
-    defaultLed1ColorWhenOff:
-      name: defaultLed1ColorWhenOff
-      description: 0–101 (blank sends null)
-      default: ""
-      selector: { text: {} }
-    defaultLed1IntensityWhenOn:
-      name: defaultLed1IntensityWhenOn
-      description: 0–101 (blank sends null)
-      default: ""
-      selector: { text: {} }
-    defaultLed1IntensityWhenOff:
-      name: defaultLed1IntensityWhenOff
-      description: 0–101 (blank sends null)
-      default: ""
-      selector: { text: {} }
+  defaultLed1IntensityWhenOn:
+    name: defaultLed1IntensityWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    defaultLed2ColorWhenOn:    { name: defaultLed2ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed2ColorWhenOff:   { name: defaultLed2ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed2IntensityWhenOn:{ name: defaultLed2IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed2IntensityWhenOff:{ name: defaultLed2IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+  defaultLed1IntensityWhenOff:
+    name: defaultLed1IntensityWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    defaultLed3ColorWhenOn:    { name: defaultLed3ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed3ColorWhenOff:   { name: defaultLed3ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed3IntensityWhenOn:{ name: defaultLed3IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed3IntensityWhenOff:{ name: defaultLed3IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+  defaultLed2ColorWhenOn:
+    name: defaultLed2ColorWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    defaultLed4ColorWhenOn:    { name: defaultLed4ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed4ColorWhenOff:   { name: defaultLed4ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed4IntensityWhenOn:{ name: defaultLed4IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed4IntensityWhenOff:{ name: defaultLed4IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+  defaultLed2ColorWhenOff:
+    name: defaultLed2ColorWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    defaultLed5ColorWhenOn:    { name: defaultLed5ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed5ColorWhenOff:   { name: defaultLed5ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed5IntensityWhenOn:{ name: defaultLed5IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed5IntensityWhenOff:{ name: defaultLed5IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+  defaultLed2IntensityWhenOn:
+    name: defaultLed2IntensityWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    defaultLed6ColorWhenOn:    { name: defaultLed6ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed6ColorWhenOff:   { name: defaultLed6ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed6IntensityWhenOn:{ name: defaultLed6IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed6IntensityWhenOff:{ name: defaultLed6IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+  defaultLed2IntensityWhenOff:
+    name: defaultLed2IntensityWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    defaultLed7ColorWhenOn:    { name: defaultLed7ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed7ColorWhenOff:   { name: defaultLed7ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed7IntensityWhenOn:{ name: defaultLed7IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
-    defaultLed7IntensityWhenOff:{ name: defaultLed7IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+  defaultLed3ColorWhenOn:
+    name: defaultLed3ColorWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    # ----------- Fan control -----------
-    fanControlMode:
-      name: Fan Control Mode
-      description: "Disabled" or firmware-specific labels (text)
-      default: "Disabled"
-      selector: { text: {} }
+  defaultLed3ColorWhenOff:
+    name: defaultLed3ColorWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    fanLedLevelType:
-      name: Fan LED Level Type
-      description: Numeric or label depending on firmware (e.g., 0/1) (text)
-      default: "0"
-      selector: { text: {} }
+  defaultLed3IntensityWhenOn:
+    name: defaultLed3IntensityWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    highLevelForFanControlMode:
-      name: High Level for Fan Control Mode
-      description: 2–254 (blank sends null)
-      default: ""
-      selector: { text: {} }
+  defaultLed3IntensityWhenOff:
+    name: defaultLed3IntensityWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    mediumLevelForFanControlMode:
-      name: Medium Level for Fan Control Mode
-      description: 2–254 (blank sends null)
-      default: ""
-      selector: { text: {} }
+  defaultLed4ColorWhenOn:
+    name: defaultLed4ColorWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    lowLevelForFanControlMode:
-      name: Low Level for Fan Control Mode
-      description: 2–254 (blank sends null)
-      default: ""
-      selector: { text: {} }
+  defaultLed4ColorWhenOff:
+    name: defaultLed4ColorWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
-    ledColorForFanControlMode:
-      name: LED Color for Fan Control Mode (mired)
-      description: 0–255 (blank sends null)
-      default: ""
-      selector: { text: {} }
+  defaultLed4IntensityWhenOn:
+    name: defaultLed4IntensityWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed4IntensityWhenOff:
+    name: defaultLed4IntensityWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed5ColorWhenOn:
+    name: defaultLed5ColorWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed5ColorWhenOff:
+    name: defaultLed5ColorWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed5IntensityWhenOn:
+    name: defaultLed5IntensityWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed5IntensityWhenOff:
+    name: defaultLed5IntensityWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed6ColorWhenOn:
+    name: defaultLed6ColorWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed6ColorWhenOff:
+    name: defaultLed6ColorWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed6IntensityWhenOn:
+    name: defaultLed6IntensityWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed6IntensityWhenOff:
+    name: defaultLed6IntensityWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed7ColorWhenOn:
+    name: defaultLed7ColorWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed7ColorWhenOff:
+    name: defaultLed7ColorWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed7IntensityWhenOn:
+    name: defaultLed7IntensityWhenOn
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  defaultLed7IntensityWhenOff:
+    name: defaultLed7IntensityWhenOff
+    description: "0–101 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  # ----------- Fan control -----------
+  fanControlMode:
+    name: Fan Control Mode
+    description: "\"Disabled\" or firmware-specific labels (text)"
+    default: "Disabled"
+    selector:
+      text: {}
+
+  fanLedLevelType:
+    name: Fan LED Level Type
+    description: "Numeric or label depending on firmware (e.g., 0/1) (text)"
+    default: "0"
+    selector:
+      text: {}
+
+  highLevelForFanControlMode:
+    name: High Level for Fan Control Mode
+    description: "2–254 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  mediumLevelForFanControlMode:
+    name: Medium Level for Fan Control Mode
+    description: "2–254 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  lowLevelForFanControlMode:
+    name: Low Level for Fan Control Mode
+    description: "2–254 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
+
+  ledColorForFanControlMode:
+    name: LED Color for Fan Control Mode (mired)
+    description: "0–255 (blank sends null)"
+    default: ""
+    selector:
+      text: {}
 
 mode: single
 
@@ -390,7 +670,6 @@ mode: single
 variables:
   devices_raw: !input devices_multiline
 
-  # Bind all inputs (strings allowed so we can send null for blanks)
   dimmingSpeedUpRemote: !input dimmingSpeedUpRemote
   dimmingSpeedUpLocal: !input dimmingSpeedUpLocal
   rampRateOffToOnRemote: !input rampRateOffToOnRemote
@@ -405,11 +684,9 @@ variables:
   autoTimerOff: !input autoTimerOff
   stateAfterPowerRestored: !input stateAfterPowerRestored
   loadLevelIndicatorTimeout: !input loadLevelIndicatorTimeout
-
   activePowerReports: !input activePowerReports
   periodicPowerAndEnergyReports: !input periodicPowerAndEnergyReports
   activeEnergyReports: !input activeEnergyReports
-
   smartBulbMode: !input smartBulbMode
   doubleTapUpToParam55: !input doubleTapUpToParam55
   doubleTapDownToParam56: !input doubleTapDownToParam56
@@ -417,197 +694,172 @@ variables:
   brightnessLevelForDoubleTapDown: !input brightnessLevelForDoubleTapDown
   doubleTapClearNotifications: !input doubleTapClearNotifications
   singleTapBehavior: !input singleTapBehavior
-
   ledColorWhenOn: !input ledColorWhenOn
   ledColorWhenOff: !input ledColorWhenOff
   ledIntensityWhenOn: !input ledIntensityWhenOn
   ledIntensityWhenOff: !input ledIntensityWhenOff
   ledBarScaling: !input ledBarScaling
-
   defaultLevelLocal: !input defaultLevelLocal
   defaultLevelRemote: !input defaultLevelRemote
-
   buttonDelay: !input buttonDelay
   localProtection: !input localProtection
   remoteProtection: !input remoteProtection
   relayClick: !input relayClick
   firmwareUpdateInProgressIndicator: !input firmwareUpdateInProgressIndicator
-
   bindingOffToOnSyncLevel: !input bindingOffToOnSyncLevel
   auxSwitchUniqueScenes: !input auxSwitchUniqueScenes
   higherOutputInNonNeutral: !input higherOutputInNonNeutral
-
   onOffLedMode: !input onOffLedMode
   outputMode: !input outputMode
-
   quickStartLevel: !input quickStartLevel
   quickStartTime: !input quickStartTime
-
   level_config_execute_if_off: !input level_config_execute_if_off
 
   defaultLed1ColorWhenOn: !input defaultLed1ColorWhenOn
   defaultLed1ColorWhenOff: !input defaultLed1ColorWhenOff
   defaultLed1IntensityWhenOn: !input defaultLed1IntensityWhenOn
   defaultLed1IntensityWhenOff: !input defaultLed1IntensityWhenOff
+
   defaultLed2ColorWhenOn: !input defaultLed2ColorWhenOn
   defaultLed2ColorWhenOff: !input defaultLed2ColorWhenOff
   defaultLed2IntensityWhenOn: !input defaultLed2IntensityWhenOn
   defaultLed2IntensityWhenOff: !input defaultLed2IntensityWhenOff
+
   defaultLed3ColorWhenOn: !input defaultLed3ColorWhenOn
   defaultLed3ColorWhenOff: !input defaultLed3ColorWhenOff
   defaultLed3IntensityWhenOn: !input defaultLed3IntensityWhenOn
   defaultLed3IntensityWhenOff: !input defaultLed3IntensityWhenOff
+
   defaultLed4ColorWhenOn: !input defaultLed4ColorWhenOn
   defaultLed4ColorWhenOff: !input defaultLed4ColorWhenOff
   defaultLed4IntensityWhenOn: !input defaultLed4IntensityWhenOn
   defaultLed4IntensityWhenOff: !input defaultLed4IntensityWhenOff
+
   defaultLed5ColorWhenOn: !input defaultLed5ColorWhenOn
   defaultLed5ColorWhenOff: !input defaultLed5ColorWhenOff
   defaultLed5IntensityWhenOn: !input defaultLed5IntensityWhenOn
   defaultLed5IntensityWhenOff: !input defaultLed5IntensityWhenOff
+
   defaultLed6ColorWhenOn: !input defaultLed6ColorWhenOn
   defaultLed6ColorWhenOff: !input defaultLed6ColorWhenOff
   defaultLed6IntensityWhenOn: !input defaultLed6IntensityWhenOn
   defaultLed6IntensityWhenOff: !input defaultLed6IntensityWhenOff
+
   defaultLed7ColorWhenOn: !input defaultLed7ColorWhenOn
   defaultLed7ColorWhenOff: !input defaultLed7ColorWhenOff
   defaultLed7IntensityWhenOn: !input defaultLed7IntensityWhenOn
   defaultLed7IntensityWhenOff: !input defaultLed7IntensityWhenOff
 
-  fanControlMode: !input fanControlMode
-  fanLedLevelType: !input fanLedLevelType
-  highLevelForFanControlMode: !input highLevelForFanControlMode
-  mediumLevelForFanControlMode: !input mediumLevelForFanControlMode
-  lowLevelForFanControlMode: !input lowLevelForFanControlMode
-  ledColorForFanControlMode: !input ledColorForFanControlMode
-
-  # Device list -> array
-  device_names: >
+# Device list -> array
+  device_names: >-
     {{ devices_raw.splitlines() | map('trim') | reject('equalto','') | list | unique | list }}
-  device_names_limited: >
+  device_names_limited: >-
     {{ device_names[:20] }}
 
-  # Build the payload dict (ALWAYS include every key; blanks -> null, numeric strings cast)
-  desired_common: >
+# Build the payload dict (ALWAYS include every key; blanks -> null, numeric strings cast)
+  desired_common: >-
     {% macro num(x) -%}
-      {%- if x is string and x|length == 0 -%}{{ none }}
-      {%- elif x is string and x|regex_match('^-?\\d+$') -%}{{ x|int }}
-      {%- else -%}{{ x }}
+      {%- if x is string and x|length == 0 -%}
+        {{ none }}
+      {%- elif x is string and x|regex_match('^-?\\d+$') -%}
+        {{ x|int }}
+      {%- else -%}
+        {{ x }}
       {%- endif -%}
     {%- endmacro %}
-    {{
-      dict(
-        dimmingSpeedUpRemote = dimmingSpeedUpRemote,
-        dimmingSpeedUpLocal = dimmingSpeedUpLocal,
-        rampRateOffToOnRemote = rampRateOffToOnRemote,
-        rampRateOffToOnLocal = rampRateOffToOnLocal,
-        dimmingSpeedDownRemote = dimmingSpeedDownRemote,
-        dimmingSpeedDownLocal = dimmingSpeedDownLocal,
-        rampRateOnToOffRemote = rampRateOnToOffRemote,
-        rampRateOnToOffLocal = rampRateOnToOffLocal,
-
-        minimumLevel = minimumLevel,
-        maximumLevel = maximumLevel,
-        invertSwitch = invertSwitch,
-        autoTimerOff = autoTimerOff,
-
-        stateAfterPowerRestored = stateAfterPowerRestored,
-        loadLevelIndicatorTimeout = loadLevelIndicatorTimeout,
-
-        activePowerReports = activePowerReports,
-        periodicPowerAndEnergyReports = periodicPowerAndEnergyReports,
-        activeEnergyReports = activeEnergyReports,
-
-        smartBulbMode = smartBulbMode,
-        doubleTapUpToParam55 = doubleTapUpToParam55,
-        doubleTapDownToParam56 = doubleTapDownToParam56,
-        brightnessLevelForDoubleTapUp = brightnessLevelForDoubleTapUp,
-        brightnessLevelForDoubleTapDown = brightnessLevelForDoubleTapDown,
-        doubleTapClearNotifications = doubleTapClearNotifications,
-        singleTapBehavior = singleTapBehavior,
-
-        ledColorWhenOn = ledColorWhenOn,
-        ledColorWhenOff = ledColorWhenOff,
-        ledIntensityWhenOn = ledIntensityWhenOn,
-        ledIntensityWhenOff = ledIntensityWhenOff,
-        ledBarScaling = ledBarScaling,
-
-        defaultLevelLocal = defaultLevelLocal,
-        defaultLevelRemote = defaultLevelRemote,
-
-        buttonDelay = buttonDelay,
-        localProtection = localProtection,
-        remoteProtection = remoteProtection,
-        relayClick = relayClick,
-        firmwareUpdateInProgressIndicator = firmwareUpdateInProgressIndicator,
-
-        bindingOffToOnSyncLevel = bindingOffToOnSyncLevel,
-        auxSwitchUniqueScenes = auxSwitchUniqueScenes,
-        higherOutputInNonNeutral = higherOutputInNonNeutral,
-
-        onOffLedMode = onOffLedMode,
-        outputMode = outputMode,
-
-        quickStartLevel = quickStartLevel,
-        quickStartTime = quickStartTime,
-
-        level_config = dict(execute_if_off=level_config_execute_if_off),
-
-        # per-LED (convert '' -> null, digits -> int)
-        defaultLed1ColorWhenOn = num(defaultLed1ColorWhenOn),
-        defaultLed1ColorWhenOff = num(defaultLed1ColorWhenOff),
-        defaultLed1IntensityWhenOn = num(defaultLed1IntensityWhenOn),
-        defaultLed1IntensityWhenOff = num(defaultLed1IntensityWhenOff),
-
-        defaultLed2ColorWhenOn = num(defaultLed2ColorWhenOn),
-        defaultLed2ColorWhenOff = num(defaultLed2ColorWhenOff),
-        defaultLed2IntensityWhenOn = num(defaultLed2IntensityWhenOn),
-        defaultLed2IntensityWhenOff = num(defaultLed2IntensityWhenOff),
-
-        defaultLed3ColorWhenOn = num(defaultLed3ColorWhenOn),
-        defaultLed3ColorWhenOff = num(defaultLed3ColorWhenOff),
-        defaultLed3IntensityWhenOn = num(defaultLed3IntensityWhenOn),
-        defaultLed3IntensityWhenOff = num(defaultLed3IntensityWhenOff),
-
-        defaultLed4ColorWhenOn = num(defaultLed4ColorWhenOn),
-        defaultLed4ColorWhenOff = num(defaultLed4ColorWhenOff),
-        defaultLed4IntensityWhenOn = num(defaultLed4IntensityWhenOn),
-        defaultLed4IntensityWhenOff = num(defaultLed4IntensityWhenOff),
-
-        defaultLed5ColorWhenOn = num(defaultLed5ColorWhenOn),
-        defaultLed5ColorWhenOff = num(defaultLed5ColorWhenOff),
-        defaultLed5IntensityWhenOn = num(defaultLed5IntensityWhenOn),
-        defaultLed5IntensityWhenOff = num(defaultLed5IntensityWhenOff),
-
-        defaultLed6ColorWhenOn = num(defaultLed6ColorWhenOn),
-        defaultLed6ColorWhenOff = num(defaultLed6ColorWhenOff),
-        defaultLed6IntensityWhenOn = num(defaultLed6IntensityWhenOn),
-        defaultLed6IntensityWhenOff = num(defaultLed6IntensityWhenOff),
-
-        defaultLed7ColorWhenOn = num(defaultLed7ColorWhenOn),
-        defaultLed7ColorWhenOff = num(defaultLed7ColorWhenOff),
-        defaultLed7IntensityWhenOn = num(defaultLed7IntensityWhenOn),
-        defaultLed7IntensityWhenOff = num(defaultLed7IntensityWhenOff),
-
-        # fan control
-        fanControlMode = fanControlMode,
-        fanLedLevelType = fanLedLevelType,
-        highLevelForFanControlMode = num(highLevelForFanControlMode),
-        mediumLevelForFanControlMode = num(mediumLevelForFanControlMode),
-        lowLevelForFanControlMode = num(lowLevelForFanControlMode),
-        ledColorForFanControlMode = num(ledColorForFanControlMode)
-      )
-    }}
+    {{ dict(
+       dimmingSpeedUpRemote = dimmingSpeedUpRemote,
+       dimmingSpeedUpLocal = dimmingSpeedUpLocal,
+       rampRateOffToOnRemote = rampRateOffToOnRemote,
+       rampRateOffToOnLocal = rampRateOffToOnLocal,
+       dimmingSpeedDownRemote = dimmingSpeedDownRemote,
+       dimmingSpeedDownLocal = dimmingSpeedDownLocal,
+       rampRateOnToOffRemote = rampRateOnToOffRemote,
+       rampRateOnToOffLocal = rampRateOnToOffLocal,
+       minimumLevel = minimumLevel,
+       maximumLevel = maximumLevel,
+       invertSwitch = invertSwitch,
+       autoTimerOff = autoTimerOff,
+       stateAfterPowerRestored = stateAfterPowerRestored,
+       loadLevelIndicatorTimeout = loadLevelIndicatorTimeout,
+       activePowerReports = activePowerReports,
+       periodicPowerAndEnergyReports = periodicPowerAndEnergyReports,
+       activeEnergyReports = activeEnergyReports,
+       smartBulbMode = smartBulbMode,
+       doubleTapUpToParam55 = doubleTapUpToParam55,
+       doubleTapDownToParam56 = doubleTapDownToParam56,
+       brightnessLevelForDoubleTapUp = brightnessLevelForDoubleTapUp,
+       brightnessLevelForDoubleTapDown = brightnessLevelForDoubleTapDown,
+       doubleTapClearNotifications = doubleTapClearNotifications,
+       singleTapBehavior = singleTapBehavior,
+       ledColorWhenOn = ledColorWhenOn,
+       ledColorWhenOff = ledColorWhenOff,
+       ledIntensityWhenOn = ledIntensityWhenOn,
+       ledIntensityWhenOff = ledIntensityWhenOff,
+       ledBarScaling = ledBarScaling,
+       defaultLevelLocal = defaultLevelLocal,
+       defaultLevelRemote = defaultLevelRemote,
+       buttonDelay = buttonDelay,
+       localProtection = localProtection,
+       remoteProtection = remoteProtection,
+       relayClick = relayClick,
+       firmwareUpdateInProgressIndicator = firmwareUpdateInProgressIndicator,
+       bindingOffToOnSyncLevel = bindingOffToOnSyncLevel,
+       auxSwitchUniqueScenes = auxSwitchUniqueScenes,
+       higherOutputInNonNeutral = higherOutputInNonNeutral,
+       onOffLedMode = onOffLedMode,
+       outputMode = outputMode,
+       quickStartLevel = quickStartLevel,
+       quickStartTime = quickStartTime,
+       level_config = dict(
+         execute_if_off = level_config_execute_if_off
+       ),
+       # per-LED segments
+       defaultLed1ColorWhenOn = num(defaultLed1ColorWhenOn),
+       defaultLed1ColorWhenOff = num(defaultLed1ColorWhenOff),
+       defaultLed1IntensityWhenOn = num(defaultLed1IntensityWhenOn),
+       defaultLed1IntensityWhenOff = num(defaultLed1IntensityWhenOff),
+       defaultLed2ColorWhenOn = num(defaultLed2ColorWhenOn),
+       defaultLed2ColorWhenOff = num(defaultLed2ColorWhenOff),
+       defaultLed2IntensityWhenOn = num(defaultLed2IntensityWhenOn),
+       defaultLed2IntensityWhenOff = num(defaultLed2IntensityWhenOff),
+       defaultLed3ColorWhenOn = num(defaultLed3ColorWhenOn),
+       defaultLed3ColorWhenOff = num(defaultLed3ColorWhenOff),
+       defaultLed3IntensityWhenOn = num(defaultLed3IntensityWhenOn),
+       defaultLed3IntensityWhenOff = num(defaultLed3IntensityWhenOff),
+       defaultLed4ColorWhenOn = num(defaultLed4ColorWhenOn),
+       defaultLed4ColorWhenOff = num(defaultLed4ColorWhenOff),
+       defaultLed4IntensityWhenOn = num(defaultLed4IntensityWhenOn),
+       defaultLed4IntensityWhenOff = num(defaultLed4IntensityWhenOff),
+       defaultLed5ColorWhenOn = num(defaultLed5ColorWhenOn),
+       defaultLed5ColorWhenOff = num(defaultLed5ColorWhenOff),
+       defaultLed5IntensityWhenOn = num(defaultLed5IntensityWhenOn),
+       defaultLed5IntensityWhenOff = num(defaultLed5IntensityWhenOff),
+       defaultLed6ColorWhenOn = num(defaultLed6ColorWhenOn),
+       defaultLed6ColorWhenOff = num(defaultLed6ColorWhenOff),
+       defaultLed6IntensityWhenOn = num(defaultLed6IntensityWhenOn),
+       defaultLed6IntensityWhenOff = num(defaultLed6IntensityWhenOff),
+       defaultLed7ColorWhenOn = num(defaultLed7ColorWhenOn),
+       defaultLed7ColorWhenOff = num(defaultLed7ColorWhenOff),
+       defaultLed7IntensityWhenOn = num(defaultLed7IntensityWhenOn),
+       defaultLed7IntensityWhenOff = num(defaultLed7IntensityWhenOff),
+       # fan control mode stuff
+       fanControlMode = fanControlMode,
+       fanLedLevelType = fanLedLevelType,
+       highLevelForFanControlMode = num(highLevelForFanControlMode),
+       mediumLevelForFanControlMode = num(mediumLevelForFanControlMode),
+       lowLevelForFanControlMode = num(lowLevelForFanControlMode),
+       ledColorForFanControlMode = num(ledColorForFanControlMode)
+    ) }}
 
 sequence:
   - variables:
-      report: >
+      report: >-
         {% if device_names_limited|length == 0 %}
-        No device names provided.
+          No device names provided.
         {% else %}
-        Starting updates for {{ device_names_limited|length }} device(s)...
+          Starting updates for {{ device_names_limited|length }} device(s)...
         {% endif %}
-
   - repeat:
       for_each: "{{ device_names_limited }}"
       sequence:
@@ -615,88 +867,145 @@ sequence:
             dev_name: "{{ repeat.item }}"
             desired: "{{ desired_common }}"
             txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
-
         # ----- Reset existing reporting (disable via max=65535) -----
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >
-              {{ dict(id=dev_name, endpoint=1, cluster='genOnOff', attribute='onOff',
-                      minimum_report_interval=0, maximum_report_interval=65535,
-                      reportable_change=0, transaction=txn_base ~ '_onoff_disable') | tojson }}
-
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >
-              {{ dict(id=dev_name, endpoint=1, cluster='genLevelCtrl', attribute='currentLevel',
-                      minimum_report_interval=0, maximum_report_interval=65535,
-                      reportable_change=1, transaction=txn_base ~ '_level_disable') | tojson }}
-
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >
-              {{ dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelLocal',
-                      minimum_report_interval=0, maximum_report_interval=65535,
-                      reportable_change=1, transaction=txn_base ~ '_dll_disable') | tojson }}
-
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >
-              {{ dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelRemote',
-                      minimum_report_interval=0, maximum_report_interval=65535,
-                      reportable_change=1, transaction=txn_base ~ '_dlr_disable') | tojson }}
-
+        - action:
+            mqtt.publish:
+              data:
+                topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                payload: >-
+                  {{ dict(
+                       id=dev_name,
+                       endpoint=1,
+                       cluster='genOnOff',
+                       attribute='onOff',
+                       minimum_report_interval=0,
+                       maximum_report_interval=65535,
+                       reportable_change=0,
+                       transaction=txn_base ~ '_onoff_disable'
+                  ) | tojson }}
+        - action:
+            mqtt.publish:
+              data:
+                topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                payload: >-
+                  {{ dict(
+                       id=dev_name,
+                       endpoint=1,
+                       cluster='genLevelCtrl',
+                       attribute='currentLevel',
+                       minimum_report_interval=0,
+                       maximum_report_interval=65535,
+                       reportable_change=1,
+                       transaction=txn_base ~ '_level_disable'
+                  ) | tojson }}
+        - action:
+            mqtt.publish:
+              data:
+                topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                payload: >-
+                  {{ dict(
+                       id=dev_name,
+                       endpoint=1,
+                       cluster='manuSpecificInovelli',
+                       attribute='defaultLevelLocal',
+                       minimum_report_interval=0,
+                       maximum_report_interval=65535,
+                       reportable_change=1,
+                       transaction=txn_base ~ '_dll_disable'
+                  ) | tojson }}
+        - action:
+            mqtt.publish:
+              data:
+                topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                payload: >-
+                  {{ dict(
+                       id=dev_name,
+                       endpoint=1,
+                       cluster='manuSpecificInovelli',
+                       attribute='defaultLevelRemote',
+                       minimum_report_interval=0,
+                       maximum_report_interval=65535,
+                       reportable_change=1,
+                       transaction=txn_base ~ '_dlr_disable'
+                  ) | tojson }}
         # ----- Apply desired reporting -----
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >
-              {{ dict(id=dev_name, endpoint=1, cluster='genOnOff', attribute='onOff',
-                      minimum_report_interval=0, maximum_report_interval=10800,
-                      reportable_change=0, transaction=txn_base ~ '_onoff_set') | tojson }}
-
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >
-              {{ dict(id=dev_name, endpoint=1, cluster='genLevelCtrl', attribute='currentLevel',
-                      minimum_report_interval=5, maximum_report_interval=10800,
-                      reportable_change=1, transaction=txn_base ~ '_level_set') | tojson }}
-
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >
-              {{ dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelLocal',
-                      minimum_report_interval=0, maximum_report_interval=10800,
-                      reportable_change=1, transaction=txn_base ~ '_dll_set') | tojson }}
-
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >
-              {{ dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelRemote',
-                      minimum_report_interval=0, maximum_report_interval=10800,
-                      reportable_change=1, transaction=txn_base ~ '_dlr_set') | tojson }}
-
+        - action:
+            mqtt.publish:
+              data:
+                topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                payload: >-
+                  {{ dict(
+                       id=dev_name,
+                       endpoint=1,
+                       cluster='genOnOff',
+                       attribute='onOff',
+                       minimum_report_interval=0,
+                       maximum_report_interval=10800,
+                       reportable_change=0,
+                       transaction=txn_base ~ '_onoff_set'
+                  ) | tojson }}
+        - action:
+            mqtt.publish:
+              data:
+                topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                payload: >-
+                  {{ dict(
+                       id=dev_name,
+                       endpoint=1,
+                       cluster='genLevelCtrl',
+                       attribute='currentLevel',
+                       minimum_report_interval=5,
+                       maximum_report_interval=10800,
+                       reportable_change=1,
+                       transaction=txn_base ~ '_level_set'
+                  ) | tojson }}
+        - action:
+            mqtt.publish:
+              data:
+                topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                payload: >-
+                  {{ dict(
+                       id=dev_name,
+                       endpoint=1,
+                       cluster='manuSpecificInovelli',
+                       attribute='defaultLevelLocal',
+                       minimum_report_interval=0,
+                       maximum_report_interval=10800,
+                       reportable_change=1,
+                       transaction=txn_base ~ '_dll_set'
+                  ) | tojson }}
+        - action:
+            mqtt.publish:
+              data:
+                topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                payload: >-
+                  {{ dict(
+                       id=dev_name,
+                       endpoint=1,
+                       cluster='manuSpecificInovelli',
+                       attribute='defaultLevelRemote',
+                       minimum_report_interval=0,
+                       maximum_report_interval=10800,
+                       reportable_change=1,
+                       transaction=txn_base ~ '_dlr_set'
+                  ) | tojson }}
         # ----- Send full parameter dict (including nulls) -----
-        - action: mqtt.publish
-          data:
-            topic: "zigbee2mqtt/{{ dev_name }}/set"
-            qos: 0
-            retain: false
-            payload: "{{ desired | tojson }}"
+        - action:
+            mqtt.publish:
+              data:
+                topic: "zigbee2mqtt/{{ dev_name }}/set"
+                qos: 0
+                retain: false
+                payload: "{{ desired | tojson }}"
+        - action:
+            logbook.log:
+              data:
+                name: "Inovelli Params"
+                message: "{{ dev_name }}: full parameter set pushed ({{ desired|length }} keys)."
+        - action:
+            persistent_notification.create:
+              data:
+                title: "Inovelli Blue – Results"
+                message: >-
+                  Finished processing {{ device_names_limited|length }} device(s).
 
-        - action: logbook.log
-          data:
-            name: "Inovelli Params"
-            message: "{{ dev_name }}: full parameter set pushed ({{ desired|length }} keys)."
-
-  - action: persistent_notification.create
-    data:
-      title: "Inovelli Blue – Results"
-      message: >
-        Finished processing {{ device_names_limited|length }} device(s). See Logbook for details.
