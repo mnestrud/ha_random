@@ -1,14 +1,31 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.6.2)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.6.3)
   description: >
     Push all non-telemetry parameters for Inovelli Blue dimmers via Zigbee2MQTT.
     One input per parameter with descriptions/ranges. Blank inputs are sent as null.
     Removed read-only/problematic keys: powerType, switchType, dimmingMode.
-    Also resets & applies Zigbee reporting (OnOff.onOff, LevelCtrl.currentLevel,
-    manuSpecificInovelli.defaultLevelLocal/Remote). Requires Home Assistant 2024.8+.
+    Also (optionally) resets & applies Zigbee reporting (OnOff.onOff, LevelCtrl.currentLevel,
+    manuSpecificInovelli.defaultLevelLocal/Remote).
+    Requires Home Assistant 2024.8+ (service calls are actions).
   domain: script
 
   input:
+    # --- master toggles ---
+    send_reporting:
+      name: Send Reporting (On/Off)
+      description: "If enabled, reset and re-apply Zigbee reporting to sane defaults."
+      default: true
+      selector:
+        boolean: {}
+
+    send_parameters:
+      name: Send Switch Parameters (On/Off)
+      description: "If enabled, push all device parameters (including nulls for blanks)."
+      default: true
+      selector:
+        boolean: {}
+
+    # --- devices list ---
     devices_multiline:
       name: Zigbee2MQTT device names (one per line)
       description: Exact friendly names as they appear in zigbee2mqtt//set. First 20 used.
@@ -22,100 +39,70 @@ blueprint:
       description: "0–127 (0=instant; special values may sync to other params depending on firmware)"
       default: 50
       selector:
-        number:
-          min: 0
-          max: 127
-          step: 1
+        number: {min: 0, max: 127, step: 1}
 
     dimmingSpeedUpLocal:
       name: Dimming Speed Up (Local)
       description: "0–127 (127 often means \"sync\" behavior)"
       default: 127
       selector:
-        number:
-          min: 0
-          max: 127
-          step: 1
+        number: {min: 0, max: 127, step: 1}
 
     rampRateOffToOnRemote:
       name: Ramp Rate – Off → On (Remote)
       description: "0–127 (0=instant)"
       default: 0
       selector:
-        number:
-          min: 0
-          max: 127
-          step: 1
+        number: {min: 0, max: 127, step: 1}
 
     rampRateOffToOnLocal:
       name: Ramp Rate – Off → On (Local)
       description: "0–127 (0=instant)"
       default: 0
       selector:
-        number:
-          min: 0
-          max: 127
-          step: 1
+        number: {min: 0, max: 127, step: 1}
 
     dimmingSpeedDownRemote:
       name: Dimming Speed Down (Remote)
       description: "0–127 (0=instant)"
       default: 127
       selector:
-        number:
-          min: 0
-          max: 127
-          step: 1
+        number: {min: 0, max: 127, step: 1}
 
     dimmingSpeedDownLocal:
       name: Dimming Speed Down (Local)
       description: "0–127 (0=instant)"
       default: 127
       selector:
-        number:
-          min: 0
-          max: 127
-          step: 1
+        number: {min: 0, max: 127, step: 1}
 
     rampRateOnToOffRemote:
       name: Ramp Rate – On → Off (Remote)
       description: "0–127 (0=instant)"
       default: 0
       selector:
-        number:
-          min: 0
-          max: 127
-          step: 1
+        number: {min: 0, max: 127, step: 1}
 
     rampRateOnToOffLocal:
       name: Ramp Rate – On → Off (Local)
       description: "0–127 (0=instant)"
       default: 0
       selector:
-        number:
-          min: 0
-          max: 127
-          step: 1
+        number: {min: 0, max: 127, step: 1}
 
     minimumLevel:
       name: Minimum Dim Level
       description: "1–254 (lowest brightness allowed)"
       default: 1
       selector:
-        number:
-          min: 1
-          max: 254
-          step: 1
+        number: {min: 1, max: 254, step: 1}
 
     maximumLevel:
       name: Maximum Dim Level
       description: "2–255 (~100% at 255)"
       default: 255
       selector:
-        number:
-          min: 2
-          max: 255
-          step: 1
+        number: {min: 2, max: 255, step: 1}
 
     invertSwitch:
       name: Invert Switch
@@ -130,30 +117,21 @@ blueprint:
       description: "0–32767 (0=disabled). Units may vary by firmware."
       default: 0
       selector:
-        number:
-          min: 0
-          max: 32767
-          step: 1
+        number: {min: 0, max: 32767, step: 1}
 
     stateAfterPowerRestored:
       name: Level After Power Restored
       description: "0=Off, 1–254=fixed %, 255=Restore Last"
       default: 255
       selector:
-        number:
-          min: 0
-          max: 255
-          step: 1
+        number: {min: 0, max: 255, step: 1}
 
     loadLevelIndicatorTimeout:
       name: LED Indicator Timeout
       description: "0–10 (seconds), 11 means \"Stay On\""
       default: 11
       selector:
-        number:
-          min: 0
-          max: 11
-          step: 1
+        number: {min: 0, max: 11, step: 1}
 
     # ----------- Power / Energy reporting -----------
     activePowerReports:
@@ -161,32 +139,23 @@ blueprint:
       description: "0–32767 (0=disabled; 1=0.1W, 10=1W, …)"
       default: 0
       selector:
-        number:
-          min: 0
-          max: 32767
-          step: 1
+        number: {min: 0, max: 32767, step: 1}
 
     periodicPowerAndEnergyReports:
       name: Periodic Power & Energy Reports
       description: "0–32767 (0=disabled; often seconds)"
       default: 0
       selector:
-        number:
-          min: 0
-          max: 32767
-          step: 1
+        number: {min: 0, max: 32767, step: 1}
 
     activeEnergyReports:
       name: Active Energy Reports (ΔkWh×0.01)
       description: "0–32767 (0=disabled; 1=0.01kWh)"
       default: 0
       selector:
-        number:
-          min: 0
-          max: 32767
-          step: 1
+        number: {min: 0, max: 32767, step: 1}
 
-    # ----------- Smart bulb / tap features -----------
+    # ----------- Smart bulb / taps -----------
     smartBulbMode:
       name: Smart Bulb Mode
       description: "Relay bypass for smart bulbs."
@@ -216,20 +185,14 @@ blueprint:
       description: "2–254 (~1–100%)"
       default: 254
       selector:
-        number:
-          min: 2
-          max: 254
-          step: 1
+        number: {min: 2, max: 254, step: 1}
 
     brightnessLevelForDoubleTapDown:
       name: 2× Tap Down Level
       description: "0–254 (0 often treated as Off)"
       default: 2
       selector:
-        number:
-          min: 0
-          max: 254
-          step: 1
+        number: {min: 0, max: 254, step: 1}
 
     doubleTapClearNotifications:
       name: Double-Tap Clear Notifications
@@ -252,40 +215,28 @@ blueprint:
       description: "0–255 (0=white, 1–254=color wheel, 255=sync)"
       default: 170
       selector:
-        number:
-          min: 0
-          max: 255
-          step: 1
+        number: {min: 0, max: 255, step: 1}
 
     ledColorWhenOff:
       name: LED Color When Off
       description: "0–255 (0=white, 1–254=color wheel, 255=sync)"
       default: 170
       selector:
-        number:
-          min: 0
-          max: 255
-          step: 1
+        number: {min: 0, max: 255, step: 1}
 
     ledIntensityWhenOn:
       name: LED Intensity When On (%)
       description: "0–100"
       default: 33
       selector:
-        number:
-          min: 0
-          max: 100
-          step: 1
+        number: {min: 0, max: 100, step: 1}
 
     ledIntensityWhenOff:
       name: LED Intensity When Off (%)
       description: "0–100"
       default: 1
       selector:
-        number:
-          min: 0
-          max: 100
-          step: 1
+        number: {min: 0, max: 100, step: 1}
 
     ledBarScaling:
       name: LED Bar Scaling
@@ -303,20 +254,14 @@ blueprint:
       description: "0=Off, 1–254=Fixed %, 255=Restore Last"
       default: 255
       selector:
-        number:
-          min: 0
-          max: 255
-          step: 1
+        number: {min: 0, max: 255, step: 1}
 
     defaultLevelRemote:
       name: Default Level (Remote)
       description: "0=Off, 1–254=Fixed %, 255=Restore Last"
       default: 255
       selector:
-        number:
-          min: 0
-          max: 255
-          step: 1
+        number: {min: 0, max: 255, step: 1}
 
     # ----------- Misc / protection / sound -----------
     buttonDelay:
@@ -329,14 +274,6 @@ blueprint:
     localProtection:
       name: Local Protection
       description: "Disable/Enable local paddle control."
-      default: "Disabled"
-      selector:
-        select:
-          options: ["Disabled","Enabled"]
-
-    remoteProtection:
-      name: Remote Protection
-      description: "Disable/Enable remote (network) control."
       default: "Disabled"
       selector:
         select:
@@ -402,20 +339,14 @@ blueprint:
       description: "0–254 (0=disabled/firmware-specific)"
       default: 254
       selector:
-        number:
-          min: 0
-          max: 254
-          step: 1
+        number: {min: 0, max: 254, step: 1}
 
     quickStartTime:
       name: Quick Start Time
       description: "0–60 typical (implementation-specific). Use 0 for disabled."
       default: 0
       selector:
-        number:
-          min: 0
-          max: 60
-          step: 1
+        number: {min: 0, max: 60, step: 1}
 
     # ----------- Level config (object) -----------
     level_config_execute_if_off:
@@ -426,201 +357,40 @@ blueprint:
         boolean: {}
 
     # ----------- Per-LED segment defaults (0–101; blank allowed) -----------
-    defaultLed1ColorWhenOn:
-      name: defaultLed1ColorWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
+    defaultLed1ColorWhenOn: {name: defaultLed1ColorWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed1ColorWhenOff: {name: defaultLed1ColorWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed1IntensityWhenOn: {name: defaultLed1IntensityWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed1IntensityWhenOff: {name: defaultLed1IntensityWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
 
-    defaultLed1ColorWhenOff:
-      name: defaultLed1ColorWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
+    defaultLed2ColorWhenOn: {name: defaultLed2ColorWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed2ColorWhenOff: {name: defaultLed2ColorWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed2IntensityWhenOn: {name: defaultLed2IntensityWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed2IntensityWhenOff: {name: defaultLed2IntensityWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
 
-    defaultLed1IntensityWhenOn:
-      name: defaultLed1IntensityWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
+    defaultLed3ColorWhenOn: {name: defaultLed3ColorWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed3ColorWhenOff: {name: defaultLed3ColorWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed3IntensityWhenOn: {name: defaultLed3IntensityWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed3IntensityWhenOff: {name: defaultLed3IntensityWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
 
-    defaultLed1IntensityWhenOff:
-      name: defaultLed1IntensityWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
+    defaultLed4ColorWhenOn: {name: defaultLed4ColorWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed4ColorWhenOff: {name: defaultLed4ColorWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed4IntensityWhenOn: {name: defaultLed4IntensityWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed4IntensityWhenOff: {name: defaultLed4IntensityWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
 
-    defaultLed2ColorWhenOn:
-      name: defaultLed2ColorWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
+    defaultLed5ColorWhenOn: {name: defaultLed5ColorWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed5ColorWhenOff: {name: defaultLed5ColorWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed5IntensityWhenOn: {name: defaultLed5IntensityWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed5IntensityWhenOff: {name: defaultLed5IntensityWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
 
-    defaultLed2ColorWhenOff:
-      name: defaultLed2ColorWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
+    defaultLed6ColorWhenOn: {name: defaultLed6ColorWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed6ColorWhenOff: {name: defaultLed6ColorWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed6IntensityWhenOn: {name: defaultLed6IntensityWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed6IntensityWhenOff: {name: defaultLed6IntensityWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
 
-    defaultLed2IntensityWhenOn:
-      name: defaultLed2IntensityWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed2IntensityWhenOff:
-      name: defaultLed2IntensityWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed3ColorWhenOn:
-      name: defaultLed3ColorWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed3ColorWhenOff:
-      name: defaultLed3ColorWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed3IntensityWhenOn:
-      name: defaultLed3IntensityWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed3IntensityWhenOff:
-      name: defaultLed3IntensityWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed4ColorWhenOn:
-      name: defaultLed4ColorWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed4ColorWhenOff:
-      name: defaultLed4ColorWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed4IntensityWhenOn:
-      name: defaultLed4IntensityWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed4IntensityWhenOff:
-      name: defaultLed4IntensityWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed5ColorWhenOn:
-      name: defaultLed5ColorWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed5ColorWhenOff:
-      name: defaultLed5ColorWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed5IntensityWhenOn:
-      name: defaultLed5IntensityWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed5IntensityWhenOff:
-      name: defaultLed5IntensityWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed6ColorWhenOn:
-      name: defaultLed6ColorWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed6ColorWhenOff:
-      name: defaultLed6ColorWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed6IntensityWhenOn:
-      name: defaultLed6IntensityWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed6IntensityWhenOff:
-      name: defaultLed6IntensityWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed7ColorWhenOn:
-      name: defaultLed7ColorWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed7ColorWhenOff:
-      name: defaultLed7ColorWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed7IntensityWhenOn:
-      name: defaultLed7IntensityWhenOn
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
-
-    defaultLed7IntensityWhenOff:
-      name: defaultLed7IntensityWhenOff
-      description: "0–101 (blank sends null)"
-      default: ""
-      selector:
-        text: {}
+    defaultLed7ColorWhenOn: {name: defaultLed7ColorWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed7ColorWhenOff: {name: defaultLed7ColorWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed7IntensityWhenOn: {name: defaultLed7IntensityWhenOn, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
+    defaultLed7IntensityWhenOff: {name: defaultLed7IntensityWhenOff, description: "0–101 (blank sends null)", default: "", selector: {text: {}}}
 
     # ----------- Fan control -----------
     fanControlMode:
@@ -669,6 +439,8 @@ mode: single
 
 # ------------- Variables -------------
 variables:
+  send_reporting: !input send_reporting
+  send_parameters: !input send_parameters
   devices_raw: !input devices_multiline
 
   dimmingSpeedUpRemote: !input dimmingSpeedUpRemote
@@ -704,7 +476,6 @@ variables:
   defaultLevelRemote: !input defaultLevelRemote
   buttonDelay: !input buttonDelay
   localProtection: !input localProtection
-  remoteProtection: !input remoteProtection
   relayClick: !input relayClick
   firmwareUpdateInProgressIndicator: !input firmwareUpdateInProgressIndicator
   bindingOffToOnSyncLevel: !input bindingOffToOnSyncLevel
@@ -765,8 +536,7 @@ variables:
   device_names_limited: >-
     {{ device_names[:20] }}
 
-  # Build the payload dict (ALWAYS include every key; blanks -> null, numeric strings cast)
-
+  # Build the parameter dict (blanks -> null, numeric strings -> int)
   desired_common: >-
     {% macro num(x) -%}
       {%- if x is string and x|length == 0 -%}
@@ -811,7 +581,6 @@ variables:
       "defaultLevelRemote": defaultLevelRemote,
       "buttonDelay": buttonDelay,
       "localProtection": localProtection,
-      "remoteProtection": remoteProtection,
       "relayClick": relayClick,
       "firmwareUpdateInProgressIndicator": firmwareUpdateInProgressIndicator,
       "bindingOffToOnSyncLevel": bindingOffToOnSyncLevel,
@@ -882,143 +651,148 @@ sequence:
             dev_name: "{{ repeat.item }}"
             txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
 
-        # ----- Reset existing reporting (disable via max=65535) -----
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{ {
-                   "id": dev_name,
-                   "endpoint": 1,
-                   "cluster": "genOnOff",
-                   "attribute": "onOff",
-                   "minimum_report_interval": 0,
-                   "maximum_report_interval": 65535,
-                   "reportable_change": 0,
-                   "transaction": txn_base ~ "_onoff_disable"
-                 } | tojson }}
+        # ----- (optional) Reset & disable existing reporting -----
+        - choose:
+            - conditions: "{{ send_reporting }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                           "id": dev_name,
+                           "endpoint": 1,
+                           "cluster": "genOnOff",
+                           "attribute": "onOff",
+                           "minimum_report_interval": 0,
+                           "maximum_report_interval": 65535,
+                           "reportable_change": 0,
+                           "transaction": txn_base ~ "_onoff_disable"
+                         } | tojson }}
 
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{ {
-                   "id": dev_name,
-                   "endpoint": 1,
-                   "cluster": "genLevelCtrl",
-                   "attribute": "currentLevel",
-                   "minimum_report_interval": 0,
-                   "maximum_report_interval": 65535,
-                   "reportable_change": 1,
-                   "transaction": txn_base ~ "_level_disable"
-                 } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                           "id": dev_name,
+                           "endpoint": 1,
+                           "cluster": "genLevelCtrl",
+                           "attribute": "currentLevel",
+                           "minimum_report_interval": 0,
+                           "maximum_report_interval": 65535,
+                           "reportable_change": 1,
+                           "transaction": txn_base ~ "_level_disable"
+                         } | tojson }}
 
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{ {
-                   "id": dev_name,
-                   "endpoint": 1,
-                   "cluster": "manuSpecificInovelli",
-                   "attribute": "defaultLevelLocal",
-                   "minimum_report_interval": 0,
-                   "maximum_report_interval": 65535,
-                   "reportable_change": 1,
-                   "transaction": txn_base ~ "_dll_disable"
-                 } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                           "id": dev_name,
+                           "endpoint": 1,
+                           "cluster": "manuSpecificInovelli",
+                           "attribute": "defaultLevelLocal",
+                           "minimum_report_interval": 0,
+                           "maximum_report_interval": 65535,
+                           "reportable_change": 1,
+                           "transaction": txn_base ~ "_dll_disable"
+                         } | tojson }}
 
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{ {
-                   "id": dev_name,
-                   "endpoint": 1,
-                   "cluster": "manuSpecificInovelli",
-                   "attribute": "defaultLevelRemote",
-                   "minimum_report_interval": 0,
-                   "maximum_report_interval": 65535,
-                   "reportable_change": 1,
-                   "transaction": txn_base ~ "_dlr_disable"
-                 } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                           "id": dev_name,
+                           "endpoint": 1,
+                           "cluster": "manuSpecificInovelli",
+                           "attribute": "defaultLevelRemote",
+                           "minimum_report_interval": 0,
+                           "maximum_report_interval": 65535,
+                           "reportable_change": 1,
+                           "transaction": txn_base ~ "_dlr_disable"
+                         } | tojson }}
 
-        # ----- Apply desired reporting -----
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{ {
-                   "id": dev_name,
-                   "endpoint": 1,
-                   "cluster": "genOnOff",
-                   "attribute": "onOff",
-                   "minimum_report_interval": 0,
-                   "maximum_report_interval": 10800,
-                   "reportable_change": 0,
-                   "transaction": txn_base ~ "_onoff_set"
-                 } | tojson }}
+        # ----- (optional) Apply desired reporting -----
+        - choose:
+            - conditions: "{{ send_reporting }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                           "id": dev_name,
+                           "endpoint": 1,
+                           "cluster": "genOnOff",
+                           "attribute": "onOff",
+                           "minimum_report_interval": 0,
+                           "maximum_report_interval": 10800,
+                           "reportable_change": 0,
+                           "transaction": txn_base ~ "_onoff_set"
+                         } | tojson }}
 
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{ {
-                   "id": dev_name,
-                   "endpoint": 1,
-                   "cluster": "genLevelCtrl",
-                   "attribute": "currentLevel",
-                   "minimum_report_interval": 5,
-                   "maximum_report_interval": 10800,
-                   "reportable_change": 1,
-                   "transaction": txn_base ~ "_level_set"
-                 } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                           "id": dev_name,
+                           "endpoint": 1,
+                           "cluster": "genLevelCtrl",
+                           "attribute": "currentLevel",
+                           "minimum_report_interval": 5,
+                           "maximum_report_interval": 10800,
+                           "reportable_change": 1,
+                           "transaction": txn_base ~ "_level_set"
+                         } | tojson }}
 
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{ {
-                   "id": dev_name,
-                   "endpoint": 1,
-                   "cluster": "manuSpecificInovelli",
-                   "attribute": "defaultLevelLocal",
-                   "minimum_report_interval": 0,
-                   "maximum_report_interval": 10800,
-                   "reportable_change": 1,
-                   "transaction": txn_base ~ "_dll_set"
-                 } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                           "id": dev_name,
+                           "endpoint": 1,
+                           "cluster": "manuSpecificInovelli",
+                           "attribute": "defaultLevelLocal",
+                           "minimum_report_interval": 0,
+                           "maximum_report_interval": 10800,
+                           "reportable_change": 1,
+                           "transaction": txn_base ~ "_dll_set"
+                         } | tojson }}
 
-        - action: mqtt.publish
-          data:
-            topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{ {
-                   "id": dev_name,
-                   "endpoint": 1,
-                   "cluster": "manuSpecificInovelli",
-                   "attribute": "defaultLevelRemote",
-                   "minimum_report_interval": 0,
-                   "maximum_report_interval": 10800,
-                   "reportable_change": 1,
-                   "transaction": txn_base ~ "_dlr_set"
-                 } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                           "id": dev_name,
+                           "endpoint": 1,
+                           "cluster": "manuSpecificInovelli",
+                           "attribute": "defaultLevelRemote",
+                           "minimum_report_interval": 0,
+                           "maximum_report_interval": 10800,
+                           "reportable_change": 1,
+                           "transaction": txn_base ~ "_dlr_set"
+                         } | tojson }}
 
-        # ----- Send full parameter dict (including nulls) -----
-        - action: mqtt.publish
-          data:
-            topic: "zigbee2mqtt/{{ dev_name }}/set"
-            qos: 0
-            retain: false
-            payload: "{{ desired_common | tojson }}"
+        # ----- (optional) Send full parameter dict (including nulls) -----
+        - choose:
+            - conditions: "{{ send_parameters }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    topic: "zigbee2mqtt/{{ dev_name }}/set"
+                    qos: 0
+                    retain: false
+                    payload: "{{ desired_common | tojson }}"
 
+        # ----- Log results (simple) -----
         - action: logbook.log
           data:
             name: "Inovelli Params"
-            message: "{{ dev_name }}: full parameter set pushed."
-
-        - action: persistent_notification.create
-          data:
-            title: "Inovelli Blue – Results"
             message: >-
-              Finished processing {{ device_names_limited|length }} device(s).
+              {{ dev_name }}: reporting={{ send_reporting }}, parameters={{ send_parameters }} actions completed.
