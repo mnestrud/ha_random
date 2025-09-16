@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.6.0)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.6.1)
   description: >
     Push all non-telemetry parameters for Inovelli Blue dimmers via Zigbee2MQTT.
     One input per parameter with descriptions/ranges. Blank inputs are sent as null.
@@ -876,6 +876,7 @@ sequence:
         {% else %}
           Starting updates for {{ device_names_limited|length }} device(s)...
         {% endif %}
+
   - repeat:
       for_each: "{{ device_names_limited }}"
       sequence:
@@ -883,144 +884,144 @@ sequence:
             dev_name: "{{ repeat.item }}"
             desired: "{{ desired_common }}"
             txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
+
         # ----- Reset existing reporting (disable via max=65535) -----
-        - action:
-            mqtt.publish:
-              data:
-                topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                payload: >-
-                  {{ dict(
-                       id=dev_name,
-                       endpoint=1,
-                       cluster='genOnOff',
-                       attribute='onOff',
-                       minimum_report_interval=0,
-                       maximum_report_interval=65535,
-                       reportable_change=0,
-                       transaction=txn_base ~ '_onoff_disable'
-                  ) | tojson }}
-        - action:
-            mqtt.publish:
-              data:
-                topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                payload: >-
-                  {{ dict(
-                       id=dev_name,
-                       endpoint=1,
-                       cluster='genLevelCtrl',
-                       attribute='currentLevel',
-                       minimum_report_interval=0,
-                       maximum_report_interval=65535,
-                       reportable_change=1,
-                       transaction=txn_base ~ '_level_disable'
-                  ) | tojson }}
-        - action:
-            mqtt.publish:
-              data:
-                topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                payload: >-
-                  {{ dict(
-                       id=dev_name,
-                       endpoint=1,
-                       cluster='manuSpecificInovelli',
-                       attribute='defaultLevelLocal',
-                       minimum_report_interval=0,
-                       maximum_report_interval=65535,
-                       reportable_change=1,
-                       transaction=txn_base ~ '_dll_disable'
-                  ) | tojson }}
-        - action:
-            mqtt.publish:
-              data:
-                topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                payload: >-
-                  {{ dict(
-                       id=dev_name,
-                       endpoint=1,
-                       cluster='manuSpecificInovelli',
-                       attribute='defaultLevelRemote',
-                       minimum_report_interval=0,
-                       maximum_report_interval=65535,
-                       reportable_change=1,
-                       transaction=txn_base ~ '_dlr_disable'
-                  ) | tojson }}
+        - action: mqtt.publish
+          data:
+            topic: zigbee2mqtt/bridge/request/device/configure_reporting
+            payload: >-
+              {{ {
+                   "id": dev_name,
+                   "endpoint": 1,
+                   "cluster": "genOnOff",
+                   "attribute": "onOff",
+                   "minimum_report_interval": 0,
+                   "maximum_report_interval": 65535,
+                   "reportable_change": 0,
+                   "transaction": txn_base ~ "_onoff_disable"
+                 } | tojson }}
+
+        - action: mqtt.publish
+          data:
+            topic: zigbee2mqtt/bridge/request/device/configure_reporting
+            payload: >-
+              {{ {
+                   "id": dev_name,
+                   "endpoint": 1,
+                   "cluster": "genLevelCtrl",
+                   "attribute": "currentLevel",
+                   "minimum_report_interval": 0,
+                   "maximum_report_interval": 65535,
+                   "reportable_change": 1,
+                   "transaction": txn_base ~ "_level_disable"
+                 } | tojson }}
+
+        - action: mqtt.publish
+          data:
+            topic: zigbee2mqtt/bridge/request/device/configure_reporting
+            payload: >-
+              {{ {
+                   "id": dev_name,
+                   "endpoint": 1,
+                   "cluster": "manuSpecificInovelli",
+                   "attribute": "defaultLevelLocal",
+                   "minimum_report_interval": 0,
+                   "maximum_report_interval": 65535,
+                   "reportable_change": 1,
+                   "transaction": txn_base ~ "_dll_disable"
+                 } | tojson }}
+
+        - action: mqtt.publish
+          data:
+            topic: zigbee2mqtt/bridge/request/device/configure_reporting
+            payload: >-
+              {{ {
+                   "id": dev_name,
+                   "endpoint": 1,
+                   "cluster": "manuSpecificInovelli",
+                   "attribute": "defaultLevelRemote",
+                   "minimum_report_interval": 0,
+                   "maximum_report_interval": 65535,
+                   "reportable_change": 1,
+                   "transaction": txn_base ~ "_dlr_disable"
+                 } | tojson }}
+
         # ----- Apply desired reporting -----
-        - action:
-            mqtt.publish:
-              data:
-                topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                payload: >-
-                  {{ dict(
-                       id=dev_name,
-                       endpoint=1,
-                       cluster='genOnOff',
-                       attribute='onOff',
-                       minimum_report_interval=0,
-                       maximum_report_interval=10800,
-                       reportable_change=0,
-                       transaction=txn_base ~ '_onoff_set'
-                  ) | tojson }}
-        - action:
-            mqtt.publish:
-              data:
-                topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                payload: >-
-                  {{ dict(
-                       id=dev_name,
-                       endpoint=1,
-                       cluster='genLevelCtrl',
-                       attribute='currentLevel',
-                       minimum_report_interval=5,
-                       maximum_report_interval=10800,
-                       reportable_change=1,
-                       transaction=txn_base ~ '_level_set'
-                  ) | tojson }}
-        - action:
-            mqtt.publish:
-              data:
-                topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                payload: >-
-                  {{ dict(
-                       id=dev_name,
-                       endpoint=1,
-                       cluster='manuSpecificInovelli',
-                       attribute='defaultLevelLocal',
-                       minimum_report_interval=0,
-                       maximum_report_interval=10800,
-                       reportable_change=1,
-                       transaction=txn_base ~ '_dll_set'
-                  ) | tojson }}
-        - action:
-            mqtt.publish:
-              data:
-                topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                payload: >-
-                  {{ dict(
-                       id=dev_name,
-                       endpoint=1,
-                       cluster='manuSpecificInovelli',
-                       attribute='defaultLevelRemote',
-                       minimum_report_interval=0,
-                       maximum_report_interval=10800,
-                       reportable_change=1,
-                       transaction=txn_base ~ '_dlr_set'
-                  ) | tojson }}
+        - action: mqtt.publish
+          data:
+            topic: zigbee2mqtt/bridge/request/device/configure_reporting
+            payload: >-
+              {{ {
+                   "id": dev_name,
+                   "endpoint": 1,
+                   "cluster": "genOnOff",
+                   "attribute": "onOff",
+                   "minimum_report_interval": 0,
+                   "maximum_report_interval": 10800,
+                   "reportable_change": 0,
+                   "transaction": txn_base ~ "_onoff_set"
+                 } | tojson }}
+
+        - action: mqtt.publish
+          data:
+            topic: zigbee2mqtt/bridge/request/device/configure_reporting
+            payload: >-
+              {{ {
+                   "id": dev_name,
+                   "endpoint": 1,
+                   "cluster": "genLevelCtrl",
+                   "attribute": "currentLevel",
+                   "minimum_report_interval": 5,
+                   "maximum_report_interval": 10800,
+                   "reportable_change": 1,
+                   "transaction": txn_base ~ "_level_set"
+                 } | tojson }}
+
+        - action: mqtt.publish
+          data:
+            topic: zigbee2mqtt/bridge/request/device/configure_reporting
+            payload: >-
+              {{ {
+                   "id": dev_name,
+                   "endpoint": 1,
+                   "cluster": "manuSpecificInovelli",
+                   "attribute": "defaultLevelLocal",
+                   "minimum_report_interval": 0,
+                   "maximum_report_interval": 10800,
+                   "reportable_change": 1,
+                   "transaction": txn_base ~ "_dll_set"
+                 } | tojson }}
+
+        - action: mqtt.publish
+          data:
+            topic: zigbee2mqtt/bridge/request/device/configure_reporting
+            payload: >-
+              {{ {
+                   "id": dev_name,
+                   "endpoint": 1,
+                   "cluster": "manuSpecificInovelli",
+                   "attribute": "defaultLevelRemote",
+                   "minimum_report_interval": 0,
+                   "maximum_report_interval": 10800,
+                   "reportable_change": 1,
+                   "transaction": txn_base ~ "_dlr_set"
+                 } | tojson }}
+
         # ----- Send full parameter dict (including nulls) -----
-        - action:
-            mqtt.publish:
-              data:
-                topic: "zigbee2mqtt/{{ dev_name }}/set"
-                qos: 0
-                retain: false
-                payload: "{{ desired | tojson }}"
-        - action:
-            logbook.log:
-              data:
-                name: "Inovelli Params"
-                message: "{{ dev_name }}: full parameter set pushed ({{ desired|length }} keys)."
-        - action:
-            persistent_notification.create:
-              data:
-                title: "Inovelli Blue – Results"
-                message: >-
-                  Finished processing {{ device_names_limited|length }} device(s).
+        - action: mqtt.publish
+          data:
+            topic: "zigbee2mqtt/{{ dev_name }}/set"
+            qos: 0
+            retain: false
+            payload: "{{ desired | tojson }}"
+
+        - action: logbook.log
+          data:
+            name: "Inovelli Params"
+            message: "{{ dev_name }}: full parameter set pushed ({{ desired|length }} keys)."
+
+        - action: persistent_notification.create
+          data:
+            title: "Inovelli Blue – Results"
+            message: >-
+              Finished processing {{ device_names_limited|length }} device(s).
