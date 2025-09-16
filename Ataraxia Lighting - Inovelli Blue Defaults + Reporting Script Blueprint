@@ -1,11 +1,11 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.55)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.61)
   description: >
     Sets Inovelli Blue parameters using Home Assistant config entities
     (number/select) with actions (HA 2024.8+). Only reporting is configured via MQTT.
     Provide up to 20 devices; one shared set of config values applied to all.
     Defaults are read live from a reference device's current entity states,
-    OR, if you set use_hardcoded_defaults: true in overrides_yaml, from hard-coded defaults.
+    OR from hard-coded defaults when the toggle is enabled.
   domain: script
 
   # 2024.8+: service calls are actions (number.set_value / select.select_option)
@@ -43,17 +43,12 @@ blueprint:
       selector:
         boolean: {}
 
-    overrides_yaml:
-      name: Overrides (YAML mapping)
-      description: >
-        Optional; provide key: value pairs to override defaults.
-        To use hard-coded defaults, include: use_hardcoded_defaults: true
-        For selects, use the option label (e.g., invertSwitch: "No").
-      default: |
-        use_hardcoded_defaults: false
+    use_hardcoded_defaults:
+      name: Use hard-coded defaults
+      description: "Enable to ignore the reference device and apply the hard-coded defaults below."
+      default: false
       selector:
-        text:
-          multiline: true
+        boolean: {}
 
 mode: parallel
 max: 50
@@ -63,7 +58,7 @@ variables:
   tgt_devs: !input target_devices
   send_reporting: !input send_reporting
   push_parameters: !input push_parameters
-  overrides_yaml: !input overrides_yaml
+  use_hardcoded_defaults: !input use_hardcoded_defaults
 
   # fixed reporting intervals
   rpt_min: 5
@@ -141,7 +136,7 @@ variables:
       {% set ent = ents[0] if ents|length > 0 else none %}
       {% if ent %}
         {% set raw = states(ent) %}
-        {% if domain == 'number' and raw not in ['unknown','unavailable',''] %}
+        {% if domain == 'number' and raw not in ['unknown', 'unavailable', ''] %}
           {% set val = (raw | float) if ('.' in raw) else (raw | int) %}
         {% else %}
           {% set val = raw %}
@@ -151,34 +146,7 @@ variables:
     {% endfor %}
     {{ d }}
 
-  # Parse overrides YAML (string) safely
-  overrides_parsed: >-
-    {% set o = {} %}
-    {% if overrides_yaml|trim %}
-      {% set parsed = overrides_yaml | from_yaml %}
-      {% if parsed is mapping %}
-        {% set o = parsed %}
-      {% endif %}
-    {% endif %}
-    {{ o }}
-
-  # Toggle: use hardcoded defaults?
-  use_hardcoded_defaults: >-
-    {{ (overrides_parsed.use_hardcoded_defaults | default(false)) | bool }}
-
-  # Remove the toggle flag WITHOUT calling .pop (unsafe). Rebuild the dict.
-  overrides_clean: >-
-    {% set o = overrides_parsed | default({}) %}
-    {% set keys = o.keys() | list %}
-    {% set clean = {} %}
-    {% for k in keys %}
-      {% if k != 'use_hardcoded_defaults' %}
-        {% set clean = clean | combine({k: o[k]}) %}
-      {% endif %}
-    {% endfor %}
-    {{ clean }}
-
-  # Hard-coded defaults (no dict(), no inline comments inside {{ ... }})
+  # Hard-coded defaults
   hardcoded_defaults: >-
     {{ {
       'dimmingSpeedUpRemote': 0,
@@ -215,12 +183,12 @@ variables:
       'outputMode': 'Dimmer'
     } }}
 
-  # Final desired map
+  # Final desired map (toggle selects which source to use)
   desired_common: >-
     {% if use_hardcoded_defaults %}
-      {{ hardcoded_defaults | combine(overrides_clean, recursive=True) }}
+      {{ hardcoded_defaults }}
     {% else %}
-      {{ defaults_from_reference | combine(overrides_clean, recursive=True) }}
+      {{ defaults_from_reference }}
     {% endif %}
 
 sequence:
@@ -255,7 +223,7 @@ sequence:
                 - action: mqtt.publish
                   data:
                     topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                    payload: >-
+                  payload: >-
                       {{ {
                         "id": dev_name, "endpoint": 1, "cluster": "genLevelCtrl",
                         "attribute": "currentLevel", "minimum_report_interval": 0,
@@ -324,7 +292,6 @@ sequence:
                         "maximum_report_interval": rpt_max, "reportable_change": 1,
                         "transaction": txn_base ~ "_dlr_set"
                       } | tojson }}
-
 
         # Push config via entities (actions)
         - choose:
