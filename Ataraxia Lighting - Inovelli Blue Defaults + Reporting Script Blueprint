@@ -191,7 +191,7 @@ blueprint:
 
     ledBarScaling:
       name: LED Bar Scaling
-      description: Choose: Gen3 method (VZM-style) or Match Gen 2 (LZWxx Scaling)
+      description: "Choose: Gen3 method (VZM-style) or Match Gen 2 (LZWxx Scaling)"
       default: "Gen3 method (VZM-style)"
       selector:
         select:
