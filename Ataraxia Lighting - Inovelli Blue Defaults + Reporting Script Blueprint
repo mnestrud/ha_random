@@ -185,8 +185,8 @@ variables:
         lowLevelForFanControlMode=63,
         onOffLedMode="All",
         outputMode="Dimmer"
-        # medium/high/ledColorForFanControlMode and LED segment defaults omitted (unknown)
-        # quickStart* omitted (not present in attached)       
+        {# medium/high/ledColorForFanControlMode and LED segment defaults omitted (unknown) #}
+        {# quickStart* omitted (not present in attached) #}      
       )
     }}
 
