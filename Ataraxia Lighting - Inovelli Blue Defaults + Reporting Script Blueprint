@@ -1,12 +1,12 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.5.6)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.5.5)
   description: >
     Push all non-telemetry parameters for Inovelli Blue dimmers via Zigbee2MQTT.
     One input per parameter with descriptions/ranges. Blank inputs are sent as null.
     Removed read-only/problematic keys: powerType, switchType, dimmingMode.
     Also resets & applies Zigbee reporting (OnOff.onOff, LevelCtrl.currentLevel,
     manuSpecificInovelli.defaultLevelLocal/Remote). Requires Home Assistant 2024.8+.
-domain: script
+  domain: script
 input:
   devices_multiline:
     name: Zigbee2MQTT device names (one per line)
