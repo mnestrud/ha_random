@@ -317,35 +317,35 @@ blueprint:
       default: ""
       selector: { text: {} }
 
-    defaultLed2ColorWhenOn:    { name: defaultLed2ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed2ColorWhenOff:   { name: defaultLed2ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed2IntensityWhenOn:{ name: defaultLed2IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed2IntensityWhenOff:{ name: defaultLed2IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed2ColorWhenOn:    { name: defaultLed2ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed2ColorWhenOff:   { name: defaultLed2ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed2IntensityWhenOn:{ name: defaultLed2IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed2IntensityWhenOff:{ name: defaultLed2IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
 
-    defaultLed3ColorWhenOn:    { name: defaultLed3ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed3ColorWhenOff:   { name: defaultLed3ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed3IntensityWhenOn:{ name: defaultLed3IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed3IntensityWhenOff:{ name: defaultLed3IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed3ColorWhenOn:    { name: defaultLed3ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed3ColorWhenOff:   { name: defaultLed3ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed3IntensityWhenOn:{ name: defaultLed3IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed3IntensityWhenOff:{ name: defaultLed3IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
 
-    defaultLed4ColorWhenOn:    { name: defaultLed4ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed4ColorWhenOff:   { name: defaultLed4ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed4IntensityWhenOn:{ name: defaultLed4IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed4IntensityWhenOff:{ name: defaultLed4IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed4ColorWhenOn:    { name: defaultLed4ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed4ColorWhenOff:   { name: defaultLed4ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed4IntensityWhenOn:{ name: defaultLed4IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed4IntensityWhenOff:{ name: defaultLed4IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
 
-    defaultLed5ColorWhenOn:    { name: defaultLed5ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed5ColorWhenOff:   { name: defaultLed5ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed5IntensityWhenOn:{ name: defaultLed5IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed5IntensityWhenOff:{ name: defaultLed5IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed5ColorWhenOn:    { name: defaultLed5ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed5ColorWhenOff:   { name: defaultLed5ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed5IntensityWhenOn:{ name: defaultLed5IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed5IntensityWhenOff:{ name: defaultLed5IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
 
-    defaultLed6ColorWhenOn:    { name: defaultLed6ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed6ColorWhenOff:   { name: defaultLed6ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed6IntensityWhenOn:{ name: defaultLed6IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed6IntensityWhenOff:{ name: defaultLed6IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed6ColorWhenOn:    { name: defaultLed6ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed6ColorWhenOff:   { name: defaultLed6ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed6IntensityWhenOn:{ name: defaultLed6IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed6IntensityWhenOff:{ name: defaultLed6IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
 
-    defaultLed7ColorWhenOn:    { name: defaultLed7ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed7ColorWhenOff:   { name: defaultLed7ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed7IntensityWhenOn:{ name: defaultLed7IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
-    defaultLed7IntensityWhenOff:{ name: defaultLed7IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed7ColorWhenOn:    { name: defaultLed7ColorWhenOn,    description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed7ColorWhenOff:   { name: defaultLed7ColorWhenOff,   description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed7IntensityWhenOn:{ name: defaultLed7IntensityWhenOn,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
+    defaultLed7IntensityWhenOff:{ name: defaultLed7IntensityWhenOff,description: "0–101 (blank sends null)", default: "", selector: { text: {} } }
 
     # ----------- Fan control -----------
     fanControlMode:
