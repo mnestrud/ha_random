@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.5.8)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.5.9)
   description: >
     Push all non-telemetry parameters for Inovelli Blue dimmers via Zigbee2MQTT.
     One input per parameter with descriptions/ranges. Blank inputs are sent as null.
