@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.5.7)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.5.8)
   description: >
     Push all non-telemetry parameters for Inovelli Blue dimmers via Zigbee2MQTT.
     One input per parameter with descriptions/ranges. Blank inputs are sent as null.
@@ -8,662 +8,662 @@ blueprint:
     manuSpecificInovelli.defaultLevelLocal/Remote). Requires Home Assistant 2024.8+.
   domain: script
 
-input:
-  devices_multiline:
-    name: Zigbee2MQTT device names (one per line)
-    description: Exact friendly names as they appear in zigbee2mqtt//set. First 20 used.
-    selector:
-      text:
-        multiline: true
-
-  # ----------- Time & Level behavior -----------
-  dimmingSpeedUpRemote:
-    name: Dimming Speed Up (Remote)
-    description: "0–127 (0=instant; special values may sync to other params depending on firmware)"
-    default: 50
-    selector:
-      number:
-        min: 0
-        max: 127
-        step: 1
-
-  dimmingSpeedUpLocal:
-    name: Dimming Speed Up (Local)
-    description: "0–127 (127 often means \"sync\" behavior)"
-    default: 127
-    selector:
-      number:
-        min: 0
-        max: 127
-        step: 1
-
-  rampRateOffToOnRemote:
-    name: Ramp Rate – Off → On (Remote)
-    description: "0–127 (0=instant)"
-    default: 0
-    selector:
-      number:
-        min: 0
-        max: 127
-        step: 1
-
-  rampRateOffToOnLocal:
-    name: Ramp Rate – Off → On (Local)
-    description: "0–127 (0=instant)"
-    default: 0
-    selector:
-      number:
-        min: 0
-        max: 127
-        step: 1
-
-  dimmingSpeedDownRemote:
-    name: Dimming Speed Down (Remote)
-    description: "0–127 (0=instant)"
-    default: 127
-    selector:
-      number:
-        min: 0
-        max: 127
-        step: 1
-
-  dimmingSpeedDownLocal:
-    name: Dimming Speed Down (Local)
-    description: "0–127 (0=instant)"
-    default: 127
-    selector:
-      number:
-        min: 0
-        max: 127
-        step: 1
-
-  rampRateOnToOffRemote:
-    name: Ramp Rate – On → Off (Remote)
-    description: "0–127 (0=instant)"
-    default: 0
-    selector:
-      number:
-        min: 0
-        max: 127
-        step: 1
-
-  rampRateOnToOffLocal:
-    name: Ramp Rate – On → Off (Local)
-    description: "0–127 (0=instant)"
-    default: 0
-    selector:
-      number:
-        min: 0
-        max: 127
-        step: 1
-
-  minimumLevel:
-    name: Minimum Dim Level
-    description: "1–254 (lowest brightness allowed)"
-    default: 1
-    selector:
-      number:
-        min: 1
-        max: 254
-        step: 1
-
-  maximumLevel:
-    name: Maximum Dim Level
-    description: "2–255 (~100% at 255)"
-    default: 255
-    selector:
-      number:
-        min: 2
-        max: 255
-        step: 1
-
-  invertSwitch:
-    name: Invert Switch
-    description: "Invert physical up/down."
-    default: "No"
-    selector:
-      select:
-        options: ["No","Yes"]
-
-  autoTimerOff:
-    name: Auto-Off Timer
-    description: "0–32767 (0=disabled). Units may vary by firmware."
-    default: 0
-    selector:
-      number:
-        min: 0
-        max: 32767
-        step: 1
-
-  stateAfterPowerRestored:
-    name: Level After Power Restored
-    description: "0=Off, 1–254=fixed %, 255=Restore Last"
-    default: 255
-    selector:
-      number:
-        min: 0
-        max: 255
-        step: 1
-
-  loadLevelIndicatorTimeout:
-    name: LED Indicator Timeout
-    description: "0–10 (seconds), 11 means \"Stay On\""
-    default: 11
-    selector:
-      number:
-        min: 0
-        max: 11
-        step: 1
-
-  # ----------- Power / Energy reporting -----------
-  activePowerReports:
-    name: Active Power Reports (ΔW×0.1)
-    description: "0–32767 (0=disabled; 1=0.1W, 10=1W, …)"
-    default: 0
-    selector:
-      number:
-        min: 0
-        max: 32767
-        step: 1
-
-  periodicPowerAndEnergyReports:
-    name: Periodic Power & Energy Reports
-    description: "0–32767 (0=disabled; often seconds)"
-    default: 0
-    selector:
-      number:
-        min: 0
-        max: 32767
-        step: 1
-
-  activeEnergyReports:
-    name: Active Energy Reports (ΔkWh×0.01)
-    description: "0–32767 (0=disabled; 1=0.01kWh)"
-    default: 0
-    selector:
-      number:
-        min: 0
-        max: 32767
-        step: 1
-
-  # ----------- Smart bulb / tap features -----------
-  smartBulbMode:
-    name: Smart Bulb Mode
-    description: "Relay bypass for smart bulbs."
-    default: "Smart Bulb Mode"
-    selector:
-      select:
-        options: ["Disabled","Smart Bulb Mode"]
-
-  doubleTapUpToParam55:
-    name: Enable 2× Tap Up (to Param 55)
-    description: "Enable/disable double-tap up mapping."
-    default: "Disabled"
-    selector:
-      select:
-        options: ["Disabled","Enabled"]
-
-  doubleTapDownToParam56:
-    name: Enable 2× Tap Down (to Param 56)
-    description: "Enable/disable double-tap down mapping."
-    default: "Disabled"
-    selector:
-      select:
-        options: ["Disabled","Enabled"]
-
-  brightnessLevelForDoubleTapUp:
-    name: 2× Tap Up Level (Param 55)
-    description: "2–254 (~1–100%)"
-    default: 254
-    selector:
-      number:
-        min: 2
-        max: 254
-        step: 1
-
-  brightnessLevelForDoubleTapDown:
-    name: 2× Tap Down Level
-    description: "0–254 (0 often treated as Off)"
-    default: 2
-    selector:
-      number:
-        min: 0
-        max: 254
-        step: 1
-
-  doubleTapClearNotifications:
-    name: Double-Tap Clear Notifications
-    description: "Clear active notifications via double-tap."
-    default: "Disabled"
-    selector:
-      select:
-        options: ["Disabled","Enabled"]
-
-  singleTapBehavior:
-    name: Single Tap Behavior
-    description: "Text label as exposed by Zigbee2MQTT (e.g., Old Behavior)."
-    default: "Old Behavior"
-    selector:
-      text: {}
-
-  # ----------- LED bar colors/intensities -----------
-  ledColorWhenOn:
-    name: LED Color When On
-    description: "0–255 (0=white, 1–254=color wheel, 255=sync)"
-    default: 170
-    selector:
-      number:
-        min: 0
-        max: 255
-        step: 1
-
-  ledColorWhenOff:
-    name: LED Color When Off
-    description: "0–255 (0=white, 1–254=color wheel, 255=sync)"
-    default: 170
-    selector:
-      number:
-        min: 0
-        max: 255
-        step: 1
-
-  ledIntensityWhenOn:
-    name: LED Intensity When On (%)
-    description: "0–100"
-    default: 33
-    selector:
-      number:
-        min: 0
-        max: 100
-        step: 1
-
-  ledIntensityWhenOff:
-    name: LED Intensity When Off (%)
-    description: "0–100"
-    default: 1
-    selector:
-      number:
-        min: 0
-        max: 100
-        step: 1
-
-  ledBarScaling:
-    name: LED Bar Scaling
-    description: "Choose: Gen3 method (VZM-style) or Match Gen 2 (LZWxx Scaling)"
-    default: "Gen3 method (VZM-style)"
-    selector:
-      select:
-        options:
-          - "Gen3 method (VZM-style)"
-          - "Match Gen 2 (LZWxx Scaling)"
-
-  # ----------- Default level behavior -----------
-  defaultLevelLocal:
-    name: Default Level (Local)
-    description: "0=Off, 1–254=Fixed %, 255=Restore Last"
-    default: 255
-    selector:
-      number:
-        min: 0
-        max: 255
-        step: 1
-
-  defaultLevelRemote:
-    name: Default Level (Remote)
-    description: "0=Off, 1–254=Fixed %, 255=Restore Last"
-    default: 255
-    selector:
-      number:
-        min: 0
-        max: 255
-        step: 1
-
-  # ----------- Misc / protection / sound -----------
-  buttonDelay:
-    name: Button Delay
-    description: "Text exactly as Zigbee2MQTT expects (e.g., 0ms, 300ms, 500ms)"
-    default: "300ms"
-    selector:
-      text: {}
-
-  localProtection:
-    name: Local Protection
-    description: "Disable/Enable local paddle control."
-    default: "Disabled"
-    selector:
-      select:
-        options: ["Disabled","Enabled"]
-
-  remoteProtection:
-    name: Remote Protection
-    description: "Disable/Enable remote (network) control."
-    default: "Disabled"
-    selector:
-      select:
-        options: ["Disabled","Enabled"]
-
-  relayClick:
-    name: Relay Click Sound
-    description: "Zigbee2MQTT label (e.g., Enabled (Click Sound Off), Audible Click On)"
-    default: "Enabled (Click Sound Off)"
-    selector:
-      text: {}
-
-  firmwareUpdateInProgressIndicator:
-    name: Firmware Update Indicator
-    description: "Show indicator during firmware update."
-    default: "Enabled"
-    selector:
-      select:
-        options: ["Enabled","Disabled"]
-
-  # ----------- Binding / Aux / Non-neutral -----------
-  bindingOffToOnSyncLevel:
-    name: Binding Default Level
-    description: "Sync bound device to default level."
-    default: "Disabled"
-    selector:
-      select:
-        options: ["Disabled","Enabled"]
-
-  auxSwitchUniqueScenes:
-    name: Aux Switch Unique Scenes
-    description: "Expose unique scenes for aux switch."
-    default: "Disabled"
-    selector:
-      select:
-        options: ["Disabled","Enabled"]
-
-  higherOutputInNonNeutral:
-    name: Higher Output in Non-Neutral
-    description: "Label as shown in Zigbee2MQTT (e.g., Disabled (default) / Enabled)"
-    default: "Disabled (default)"
-    selector:
-      text: {}
-
-  # ----------- On/Off LED mode & Output mode -----------
-  onOffLedMode:
-    name: On/Off LED Mode
-    description: "Text label as exposed by Zigbee2MQTT (e.g., All)"
-    default: "All"
-    selector:
-      text: {}
-
-  outputMode:
-    name: Output Mode
-    description: "Text label as exposed by Zigbee2MQTT (e.g., Dimmer or On/Off)"
-    default: "Dimmer"
-    selector:
-      text: {}
-
-  # ----------- Quick Start -----------
-  quickStartLevel:
-    name: Quick Start Level
-    description: "0–254 (0=disabled/firmware-specific)"
-    default: 254
-    selector:
-      number:
-        min: 0
-        max: 254
-        step: 1
-
-  quickStartTime:
-    name: Quick Start Time
-    description: "0–60 typical (implementation-specific). Use 0 for disabled."
-    default: 0
-    selector:
-      number:
-        min: 0
-        max: 60
-        step: 1
-
-  # ----------- Level config (object) -----------
-  level_config_execute_if_off:
-    name: level_config.execute_if_off
-    description: "Whether to execute level changes when the light is off (true/false)"
-    default: true
-    selector:
-      boolean: {}
-
-  # ----------- Per-LED segment defaults (0–101; blank allowed) -----------
-  defaultLed1ColorWhenOn:
-    name: defaultLed1ColorWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed1ColorWhenOff:
-    name: defaultLed1ColorWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed1IntensityWhenOn:
-    name: defaultLed1IntensityWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed1IntensityWhenOff:
-    name: defaultLed1IntensityWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed2ColorWhenOn:
-    name: defaultLed2ColorWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed2ColorWhenOff:
-    name: defaultLed2ColorWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed2IntensityWhenOn:
-    name: defaultLed2IntensityWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed2IntensityWhenOff:
-    name: defaultLed2IntensityWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed3ColorWhenOn:
-    name: defaultLed3ColorWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed3ColorWhenOff:
-    name: defaultLed3ColorWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed3IntensityWhenOn:
-    name: defaultLed3IntensityWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed3IntensityWhenOff:
-    name: defaultLed3IntensityWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed4ColorWhenOn:
-    name: defaultLed4ColorWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed4ColorWhenOff:
-    name: defaultLed4ColorWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed4IntensityWhenOn:
-    name: defaultLed4IntensityWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed4IntensityWhenOff:
-    name: defaultLed4IntensityWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed5ColorWhenOn:
-    name: defaultLed5ColorWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed5ColorWhenOff:
-    name: defaultLed5ColorWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed5IntensityWhenOn:
-    name: defaultLed5IntensityWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed5IntensityWhenOff:
-    name: defaultLed5IntensityWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed6ColorWhenOn:
-    name: defaultLed6ColorWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed6ColorWhenOff:
-    name: defaultLed6ColorWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed6IntensityWhenOn:
-    name: defaultLed6IntensityWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed6IntensityWhenOff:
-    name: defaultLed6IntensityWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed7ColorWhenOn:
-    name: defaultLed7ColorWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed7ColorWhenOff:
-    name: defaultLed7ColorWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed7IntensityWhenOn:
-    name: defaultLed7IntensityWhenOn
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  defaultLed7IntensityWhenOff:
-    name: defaultLed7IntensityWhenOff
-    description: "0–101 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  # ----------- Fan control -----------
-  fanControlMode:
-    name: Fan Control Mode
-    description: "\"Disabled\" or firmware-specific labels (text)"
-    default: "Disabled"
-    selector:
-      text: {}
-
-  fanLedLevelType:
-    name: Fan LED Level Type
-    description: "Numeric or label depending on firmware (e.g., 0/1) (text)"
-    default: "0"
-    selector:
-      text: {}
-
-  highLevelForFanControlMode:
-    name: High Level for Fan Control Mode
-    description: "2–254 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  mediumLevelForFanControlMode:
-    name: Medium Level for Fan Control Mode
-    description: "2–254 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  lowLevelForFanControlMode:
-    name: Low Level for Fan Control Mode
-    description: "2–254 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
-
-  ledColorForFanControlMode:
-    name: LED Color for Fan Control Mode (mired)
-    description: "0–255 (blank sends null)"
-    default: ""
-    selector:
-      text: {}
+  input:
+    devices_multiline:
+      name: Zigbee2MQTT device names (one per line)
+      description: Exact friendly names as they appear in zigbee2mqtt//set. First 20 used.
+      selector:
+        text:
+          multiline: true
+
+    # ----------- Time & Level behavior -----------
+    dimmingSpeedUpRemote:
+      name: Dimming Speed Up (Remote)
+      description: "0–127 (0=instant; special values may sync to other params depending on firmware)"
+      default: 50
+      selector:
+        number:
+          min: 0
+          max: 127
+          step: 1
+
+    dimmingSpeedUpLocal:
+      name: Dimming Speed Up (Local)
+      description: "0–127 (127 often means \"sync\" behavior)"
+      default: 127
+      selector:
+        number:
+          min: 0
+          max: 127
+          step: 1
+
+    rampRateOffToOnRemote:
+      name: Ramp Rate – Off → On (Remote)
+      description: "0–127 (0=instant)"
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 127
+          step: 1
+
+    rampRateOffToOnLocal:
+      name: Ramp Rate – Off → On (Local)
+      description: "0–127 (0=instant)"
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 127
+          step: 1
+
+    dimmingSpeedDownRemote:
+      name: Dimming Speed Down (Remote)
+      description: "0–127 (0=instant)"
+      default: 127
+      selector:
+        number:
+          min: 0
+          max: 127
+          step: 1
+
+    dimmingSpeedDownLocal:
+      name: Dimming Speed Down (Local)
+      description: "0–127 (0=instant)"
+      default: 127
+      selector:
+        number:
+          min: 0
+          max: 127
+          step: 1
+
+    rampRateOnToOffRemote:
+      name: Ramp Rate – On → Off (Remote)
+      description: "0–127 (0=instant)"
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 127
+          step: 1
+
+    rampRateOnToOffLocal:
+      name: Ramp Rate – On → Off (Local)
+      description: "0–127 (0=instant)"
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 127
+          step: 1
+
+    minimumLevel:
+      name: Minimum Dim Level
+      description: "1–254 (lowest brightness allowed)"
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 254
+          step: 1
+
+    maximumLevel:
+      name: Maximum Dim Level
+      description: "2–255 (~100% at 255)"
+      default: 255
+      selector:
+        number:
+          min: 2
+          max: 255
+          step: 1
+
+    invertSwitch:
+      name: Invert Switch
+      description: "Invert physical up/down."
+      default: "No"
+      selector:
+        select:
+          options: ["No","Yes"]
+
+    autoTimerOff:
+      name: Auto-Off Timer
+      description: "0–32767 (0=disabled). Units may vary by firmware."
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 32767
+          step: 1
+
+    stateAfterPowerRestored:
+      name: Level After Power Restored
+      description: "0=Off, 1–254=fixed %, 255=Restore Last"
+      default: 255
+      selector:
+        number:
+          min: 0
+          max: 255
+          step: 1
+
+    loadLevelIndicatorTimeout:
+      name: LED Indicator Timeout
+      description: "0–10 (seconds), 11 means \"Stay On\""
+      default: 11
+      selector:
+        number:
+          min: 0
+          max: 11
+          step: 1
+
+    # ----------- Power / Energy reporting -----------
+    activePowerReports:
+      name: Active Power Reports (ΔW×0.1)
+      description: "0–32767 (0=disabled; 1=0.1W, 10=1W, …)"
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 32767
+          step: 1
+
+    periodicPowerAndEnergyReports:
+      name: Periodic Power & Energy Reports
+      description: "0–32767 (0=disabled; often seconds)"
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 32767
+          step: 1
+
+    activeEnergyReports:
+      name: Active Energy Reports (ΔkWh×0.01)
+      description: "0–32767 (0=disabled; 1=0.01kWh)"
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 32767
+          step: 1
+
+    # ----------- Smart bulb / tap features -----------
+    smartBulbMode:
+      name: Smart Bulb Mode
+      description: "Relay bypass for smart bulbs."
+      default: "Smart Bulb Mode"
+      selector:
+        select:
+          options: ["Disabled","Smart Bulb Mode"]
+
+    doubleTapUpToParam55:
+      name: Enable 2× Tap Up (to Param 55)
+      description: "Enable/disable double-tap up mapping."
+      default: "Disabled"
+      selector:
+        select:
+          options: ["Disabled","Enabled"]
+
+    doubleTapDownToParam56:
+      name: Enable 2× Tap Down (to Param 56)
+      description: "Enable/disable double-tap down mapping."
+      default: "Disabled"
+      selector:
+        select:
+          options: ["Disabled","Enabled"]
+
+    brightnessLevelForDoubleTapUp:
+      name: 2× Tap Up Level (Param 55)
+      description: "2–254 (~1–100%)"
+      default: 254
+      selector:
+        number:
+          min: 2
+          max: 254
+          step: 1
+
+    brightnessLevelForDoubleTapDown:
+      name: 2× Tap Down Level
+      description: "0–254 (0 often treated as Off)"
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 254
+          step: 1
+
+    doubleTapClearNotifications:
+      name: Double-Tap Clear Notifications
+      description: "Clear active notifications via double-tap."
+      default: "Disabled"
+      selector:
+        select:
+          options: ["Disabled","Enabled"]
+
+    singleTapBehavior:
+      name: Single Tap Behavior
+      description: "Text label as exposed by Zigbee2MQTT (e.g., Old Behavior)."
+      default: "Old Behavior"
+      selector:
+        text: {}
+
+    # ----------- LED bar colors/intensities -----------
+    ledColorWhenOn:
+      name: LED Color When On
+      description: "0–255 (0=white, 1–254=color wheel, 255=sync)"
+      default: 170
+      selector:
+        number:
+          min: 0
+          max: 255
+          step: 1
+
+    ledColorWhenOff:
+      name: LED Color When Off
+      description: "0–255 (0=white, 1–254=color wheel, 255=sync)"
+      default: 170
+      selector:
+        number:
+          min: 0
+          max: 255
+          step: 1
+
+    ledIntensityWhenOn:
+      name: LED Intensity When On (%)
+      description: "0–100"
+      default: 33
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+
+    ledIntensityWhenOff:
+      name: LED Intensity When Off (%)
+      description: "0–100"
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+
+    ledBarScaling:
+      name: LED Bar Scaling
+      description: "Choose: Gen3 method (VZM-style) or Match Gen 2 (LZWxx Scaling)"
+      default: "Gen3 method (VZM-style)"
+      selector:
+        select:
+          options:
+            - "Gen3 method (VZM-style)"
+            - "Match Gen 2 (LZWxx Scaling)"
+
+    # ----------- Default level behavior -----------
+    defaultLevelLocal:
+      name: Default Level (Local)
+      description: "0=Off, 1–254=Fixed %, 255=Restore Last"
+      default: 255
+      selector:
+        number:
+          min: 0
+          max: 255
+          step: 1
+
+    defaultLevelRemote:
+      name: Default Level (Remote)
+      description: "0=Off, 1–254=Fixed %, 255=Restore Last"
+      default: 255
+      selector:
+        number:
+          min: 0
+          max: 255
+          step: 1
+
+    # ----------- Misc / protection / sound -----------
+    buttonDelay:
+      name: Button Delay
+      description: "Text exactly as Zigbee2MQTT expects (e.g., 0ms, 300ms, 500ms)"
+      default: "300ms"
+      selector:
+        text: {}
+
+    localProtection:
+      name: Local Protection
+      description: "Disable/Enable local paddle control."
+      default: "Disabled"
+      selector:
+        select:
+          options: ["Disabled","Enabled"]
+
+    remoteProtection:
+      name: Remote Protection
+      description: "Disable/Enable remote (network) control."
+      default: "Disabled"
+      selector:
+        select:
+          options: ["Disabled","Enabled"]
+
+    relayClick:
+      name: Relay Click Sound
+      description: "Zigbee2MQTT label (e.g., Enabled (Click Sound Off), Audible Click On)"
+      default: "Enabled (Click Sound Off)"
+      selector:
+        text: {}
+
+    firmwareUpdateInProgressIndicator:
+      name: Firmware Update Indicator
+      description: "Show indicator during firmware update."
+      default: "Enabled"
+      selector:
+        select:
+          options: ["Enabled","Disabled"]
+
+    # ----------- Binding / Aux / Non-neutral -----------
+    bindingOffToOnSyncLevel:
+      name: Binding Default Level
+      description: "Sync bound device to default level."
+      default: "Disabled"
+      selector:
+        select:
+          options: ["Disabled","Enabled"]
+
+    auxSwitchUniqueScenes:
+      name: Aux Switch Unique Scenes
+      description: "Expose unique scenes for aux switch."
+      default: "Disabled"
+      selector:
+        select:
+          options: ["Disabled","Enabled"]
+
+    higherOutputInNonNeutral:
+      name: Higher Output in Non-Neutral
+      description: "Label as shown in Zigbee2MQTT (e.g., Disabled (default) / Enabled)"
+      default: "Disabled (default)"
+      selector:
+        text: {}
+
+    # ----------- On/Off LED mode & Output mode -----------
+    onOffLedMode:
+      name: On/Off LED Mode
+      description: "Text label as exposed by Zigbee2MQTT (e.g., All)"
+      default: "All"
+      selector:
+        text: {}
+
+    outputMode:
+      name: Output Mode
+      description: "Text label as exposed by Zigbee2MQTT (e.g., Dimmer or On/Off)"
+      default: "Dimmer"
+      selector:
+        text: {}
+
+    # ----------- Quick Start -----------
+    quickStartLevel:
+      name: Quick Start Level
+      description: "0–254 (0=disabled/firmware-specific)"
+      default: 254
+      selector:
+        number:
+          min: 0
+          max: 254
+          step: 1
+
+    quickStartTime:
+      name: Quick Start Time
+      description: "0–60 typical (implementation-specific). Use 0 for disabled."
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 60
+          step: 1
+
+    # ----------- Level config (object) -----------
+    level_config_execute_if_off:
+      name: level_config.execute_if_off
+      description: "Whether to execute level changes when the light is off (true/false)"
+      default: true
+      selector:
+        boolean: {}
+
+    # ----------- Per-LED segment defaults (0–101; blank allowed) -----------
+    defaultLed1ColorWhenOn:
+      name: defaultLed1ColorWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed1ColorWhenOff:
+      name: defaultLed1ColorWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed1IntensityWhenOn:
+      name: defaultLed1IntensityWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed1IntensityWhenOff:
+      name: defaultLed1IntensityWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed2ColorWhenOn:
+      name: defaultLed2ColorWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed2ColorWhenOff:
+      name: defaultLed2ColorWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed2IntensityWhenOn:
+      name: defaultLed2IntensityWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed2IntensityWhenOff:
+      name: defaultLed2IntensityWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed3ColorWhenOn:
+      name: defaultLed3ColorWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed3ColorWhenOff:
+      name: defaultLed3ColorWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed3IntensityWhenOn:
+      name: defaultLed3IntensityWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed3IntensityWhenOff:
+      name: defaultLed3IntensityWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed4ColorWhenOn:
+      name: defaultLed4ColorWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed4ColorWhenOff:
+      name: defaultLed4ColorWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed4IntensityWhenOn:
+      name: defaultLed4IntensityWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed4IntensityWhenOff:
+      name: defaultLed4IntensityWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed5ColorWhenOn:
+      name: defaultLed5ColorWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed5ColorWhenOff:
+      name: defaultLed5ColorWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed5IntensityWhenOn:
+      name: defaultLed5IntensityWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed5IntensityWhenOff:
+      name: defaultLed5IntensityWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed6ColorWhenOn:
+      name: defaultLed6ColorWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed6ColorWhenOff:
+      name: defaultLed6ColorWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed6IntensityWhenOn:
+      name: defaultLed6IntensityWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed6IntensityWhenOff:
+      name: defaultLed6IntensityWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed7ColorWhenOn:
+      name: defaultLed7ColorWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed7ColorWhenOff:
+      name: defaultLed7ColorWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed7IntensityWhenOn:
+      name: defaultLed7IntensityWhenOn
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    defaultLed7IntensityWhenOff:
+      name: defaultLed7IntensityWhenOff
+      description: "0–101 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    # ----------- Fan control -----------
+    fanControlMode:
+      name: Fan Control Mode
+      description: "\"Disabled\" or firmware-specific labels (text)"
+      default: "Disabled"
+      selector:
+        text: {}
+
+    fanLedLevelType:
+      name: Fan LED Level Type
+      description: "Numeric or label depending on firmware (e.g., 0/1) (text)"
+      default: "0"
+      selector:
+        text: {}
+
+    highLevelForFanControlMode:
+      name: High Level for Fan Control Mode
+      description: "2–254 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    mediumLevelForFanControlMode:
+      name: Medium Level for Fan Control Mode
+      description: "2–254 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    lowLevelForFanControlMode:
+      name: Low Level for Fan Control Mode
+      description: "2–254 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
+
+    ledColorForFanControlMode:
+      name: LED Color for Fan Control Mode (mired)
+      description: "0–255 (blank sends null)"
+      default: ""
+      selector:
+        text: {}
 
 mode: single
 
