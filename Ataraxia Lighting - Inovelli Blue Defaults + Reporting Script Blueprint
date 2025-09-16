@@ -7,6 +7,7 @@ blueprint:
     Also resets & applies Zigbee reporting (OnOff.onOff, LevelCtrl.currentLevel,
     manuSpecificInovelli.defaultLevelLocal/Remote). Requires Home Assistant 2024.8+.
   domain: script
+
 input:
   devices_multiline:
     name: Zigbee2MQTT device names (one per line)
@@ -750,13 +751,21 @@ variables:
   defaultLed7IntensityWhenOn: !input defaultLed7IntensityWhenOn
   defaultLed7IntensityWhenOff: !input defaultLed7IntensityWhenOff
 
-# Device list -> array
+  # Fan control
+  fanControlMode: !input fanControlMode
+  fanLedLevelType: !input fanLedLevelType
+  highLevelForFanControlMode: !input highLevelForFanControlMode
+  mediumLevelForFanControlMode: !input mediumLevelForFanControlMode
+  lowLevelForFanControlMode: !input lowLevelForFanControlMode
+  ledColorForFanControlMode: !input ledColorForFanControlMode
+
+  # Device list -> array
   device_names: >-
     {{ devices_raw.splitlines() | map('trim') | reject('equalto','') | list | unique | list }}
   device_names_limited: >-
     {{ device_names[:20] }}
 
-# Build the payload dict (ALWAYS include every key; blanks -> null, numeric strings cast)
+  # Build the payload dict (ALWAYS include every key; blanks -> null, numeric strings cast)
   desired_common: >-
     {% macro num(x) -%}
       {%- if x is string and x|length == 0 -%}
@@ -1008,4 +1017,3 @@ sequence:
                 title: "Inovelli Blue – Results"
                 message: >-
                   Finished processing {{ device_names_limited|length }} device(s).
-
