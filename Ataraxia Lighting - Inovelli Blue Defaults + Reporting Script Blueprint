@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.5)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.55)
   description: >
     Sets Inovelli Blue parameters using Home Assistant config entities
     (number/select) with actions (HA 2024.8+). Only reporting is configured via MQTT.
@@ -241,6 +241,7 @@ sequence:
         - choose:
             - conditions: "{{ send_reporting }}"
               sequence:
+                # disable reporting
                 - action: mqtt.publish
                   data:
                     topic: zigbee2mqtt/bridge/request/device/configure_reporting
@@ -274,13 +275,15 @@ sequence:
                 - action: mqtt.publish
                   data:
                     topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                  payload: >-
+                    payload: >-
                       {{ {
                         "id": dev_name, "endpoint": 1, "cluster": "manuSpecificInovelli",
                         "attribute": "defaultLevelRemote", "minimum_report_interval": 0,
                         "maximum_report_interval": 65535, "reportable_change": 1,
                         "transaction": txn_base ~ "_dlr_disable"
                       } | tojson }}
+
+                # set reporting with fixed intervals
                 - action: mqtt.publish
                   data:
                     topic: zigbee2mqtt/bridge/request/device/configure_reporting
@@ -321,6 +324,7 @@ sequence:
                         "maximum_report_interval": rpt_max, "reportable_change": 1,
                         "transaction": txn_base ~ "_dlr_set"
                       } | tojson }}
+
 
         # Push config via entities (actions)
         - choose:
