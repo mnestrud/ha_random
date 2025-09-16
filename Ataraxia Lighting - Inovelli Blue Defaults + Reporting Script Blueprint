@@ -1,17 +1,16 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.2)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.3)
   description: >
     Sets Inovelli Blue parameters using Home Assistant config entities
     (number/select) with actions (HA 2024.8+). Only reporting is configured via MQTT.
     Provide up to 20 devices; one shared set of config values applied to all.
-    Defaults are read live from a reference device's current entity states.
-    Optionally override any value using a single YAML mapping.
+    Defaults are read live from a reference device's current entity states,
+    OR, if you set use_hardcoded_defaults: true in overrides_yaml, from hard-coded defaults.
   domain: script
 
   # 2024.8+: service calls are actions (number.set_value / select.select_option)
 
   input:
-    # --- Devices ---
     reference_device:
       name: Reference device (for defaults)
       description: "We'll read this device's current config entity values as defaults."
@@ -30,7 +29,6 @@ blueprint:
             - integration: mqtt
       default: []
 
-    # --- Master toggles ---
     send_reporting:
       name: Configure Zigbee reporting (MQTT)
       description: "If enabled, reset and re-apply reporting (OnOff, LevelCtrl, defaultLevelLocal/Remote) via MQTT."
@@ -45,14 +43,14 @@ blueprint:
       selector:
         boolean: {}
 
-    # --- Optional overrides (shared for all devices) ---
     overrides_yaml:
       name: Overrides (YAML mapping)
       description: >
-        Optional; provide key: value pairs to override defaults read from the reference device.
-        Keys are the parameter names listed below (e.g., dimmingSpeedUpRemote: 0).
+        Optional; provide key: value pairs to override defaults.
+        To use hard-coded defaults, include: use_hardcoded_defaults: true
         For selects, use the option label (e.g., invertSwitch: "No").
-      default: ""
+      default: |
+        use_hardcoded_defaults: false
       selector:
         text:
           multiline: true
@@ -60,7 +58,6 @@ blueprint:
 mode: parallel
 max: 50
 
-# ---------------- Variables: build desired config dict ----------------
 variables:
   ref_dev: !input reference_device
   tgt_devs: !input target_devices
@@ -68,7 +65,7 @@ variables:
   push_parameters: !input push_parameters
   overrides_yaml: !input overrides_yaml
 
-  # fixed “sane defaults” for reporting (min/max)
+  # fixed reporting intervals
   rpt_min: 5
   rpt_max: 10800
 
@@ -129,7 +126,6 @@ variables:
     {% endfor %}
     {{ out }}
 
-  # Merge base + LED params
   all_params: >-
     {{ base_params + led_params }}
 
@@ -154,8 +150,48 @@ variables:
     {% endfor %}
     {{ d }}
 
-  # Parse overrides YAML (if any), then merge (overrides win)
-  overrides: >-
+  # Hard-coded defaults (derived from attached device data where present).
+  # Missing keys will fall back to reference values.
+  hardcoded_defaults: >-
+    {{
+      dict(
+        dimmingSpeedUpRemote=0,
+        dimmingSpeedUpLocal=20,
+        rampRateOffToOnRemote=0,
+        rampRateOffToOnLocal=0,
+        dimmingSpeedDownRemote=127,
+        dimmingSpeedDownLocal=127,
+        invertSwitch="No",
+        autoTimerOff=0,
+        stateAfterPowerRestored=0,
+        loadLevelIndicatorTimeout="Stay On",
+        smartBulbMode="Smart Bulb Mode",
+        doubleTapUpToParam55="Disabled",
+        doubleTapDownToParam56="Disabled",
+        brightnessLevelForDoubleTapUp=254,
+        brightnessLevelForDoubleTapDown=1,
+        singleTapBehavior="Old Behavior",
+        buttonDelay="300ms",
+        ledColorWhenOn=170,
+        ledColorWhenOff=170,
+        ledIntensityWhenOn=33,
+        ledIntensityWhenOff=1,
+        defaultLevelLocal=251,
+        defaultLevelRemote=251,
+        localProtection="Disabled",
+        bindingOffToOnSyncLevel="Disabled",
+        firmwareUpdateInProgressIndicator="Enabled",
+        fanControlMode="Disabled",
+        lowLevelForFanControlMode=63,
+        onOffLedMode="All",
+        outputMode="Dimmer"
+        # medium/high/ledColorForFanControlMode and LED segment defaults omitted (unknown)
+        # quickStart* omitted (not present in attached)       
+      )
+    }}
+
+  # Parse overrides YAML (if any)
+  overrides_parsed: >-
     {% set o = {} %}
     {% if overrides_yaml|trim %}
       {% set parsed = overrides_yaml | from_yaml %}
@@ -165,196 +201,160 @@ variables:
     {% endif %}
     {{ o }}
 
+  # Toggle: if overrides contain use_hardcoded_defaults: true, use those defaults
+  use_hardcoded_defaults: >-
+    {{ (overrides_parsed.use_hardcoded_defaults | default(false)) | bool }}
+
+  # Remove the toggle flag from overrides before merging to entities
+  overrides_clean: >-
+    {% set o = overrides_parsed | default({}) %}
+    {% if 'use_hardcoded_defaults' in o %}
+      {% set o = dict(o) %}
+      {% do o.pop('use_hardcoded_defaults') %}
+    {% endif %}
+    {{ o }}
+
+  # Final desired map
   desired_common: >-
-    {{ defaults_from_reference | combine(overrides, recursive=True) }}
+    {% if use_hardcoded_defaults %}
+      {{ hardcoded_defaults | combine(overrides_clean, recursive=True) }}
+    {% else %}
+      {{ defaults_from_reference | combine(overrides_clean, recursive=True) }}
+    {% endif %}
 
 sequence:
   - variables:
       devices_20: >-
         {{ (tgt_devs or [])[:20] }}
 
-  - choose:
-      - conditions: "{{ devices_20|length == 0 }}"
-        sequence:
-          - action: logbook.log
-            data:
-              name: "Ataraxia Lighting - Inovelli Blue Defaults (v0.8.1)"
-              message: "No target devices selected; nothing to do."
-    default:
-      - repeat:
-          for_each: "{{ devices_20 }}"
-          sequence:
-            - variables:
-                dev_id: "{{ repeat.item }}"
-                dev_name: >-
-                  {{ device_attr(dev_id, 'name') or device_attr(dev_id, 'name_by_user') or dev_id }}
-                txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
+  - repeat:
+      for_each: "{{ devices_20 }}"
+      sequence:
+        - variables:
+            dev_id: "{{ repeat.item }}"
+            dev_name: >-
+              {{ device_attr(dev_id, 'name') or device_attr(dev_id, 'name_by_user') or dev_id }}
+            txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
 
-            # Build per-switch change list
-            - variables:
-                changes_list: >-
-                  {% set changes = [] %}
-                  {% for key, domain, suffix in all_params %}
-                    {% set ent = (
-                      device_entities(dev_id)
-                      | select('match', '^' ~ domain ~ '\\.')
-                      | select('search', '_' ~ suffix ~ '$')
-                      | list
-                    ) | first %}
-                    {% if ent %}
-                      {% set desired = desired_common[key] if key in desired_common else none %}
-                      {% if desired is not none %}
-                        {% set raw = states(ent) %}
-                        {% if domain == 'number' %}
-                          {% set cur = (raw | float) if raw not in ['unknown','unavailable',''] else none %}
-                          {% set new = desired | float %}
-                          {% if cur is not none and cur != new %}
-                            {% set changes = changes + [ key ~ ': ' ~ (cur|string) ~ '→' ~ (new|string) ] %}
-                          {% endif %}
-                        {% else %}
-                          {% set cur = raw %}
-                          {% set new = desired %}
-                          {% if cur != new %}
-                            {% set changes = changes + [ key ~ ': ' ~ cur ~ '→' ~ new ] %}
-                          {% endif %}
-                        {% endif %}
-                      {% endif %}
-                    {% endif %}
-                  {% endfor %}
-                  {{ changes }}
+        # Reporting via MQTT (only)
+        - choose:
+            - conditions: "{{ send_reporting }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                        "id": dev_name, "endpoint": 1, "cluster": "genOnOff",
+                        "attribute": "onOff", "minimum_report_interval": 0,
+                        "maximum_report_interval": 65535, "reportable_change": 0,
+                        "transaction": txn_base ~ "_onoff_disable"
+                      } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                        "id": dev_name, "endpoint": 1, "cluster": "genLevelCtrl",
+                        "attribute": "currentLevel", "minimum_report_interval": 0,
+                        "maximum_report_interval": 65535, "reportable_change": 1,
+                        "transaction": txn_base ~ "_level_disable"
+                      } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                        "id": dev_name, "endpoint": 1, "cluster": "manuSpecificInovelli",
+                        "attribute": "defaultLevelLocal", "minimum_report_interval": 0,
+                        "maximum_report_interval": 65535, "reportable_change": 1,
+                        "transaction": txn_base ~ "_dll_disable"
+                      } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                  payload: >-
+                      {{ {
+                        "id": dev_name, "endpoint": 1, "cluster": "manuSpecificInovelli",
+                        "attribute": "defaultLevelRemote", "minimum_report_interval": 0,
+                        "maximum_report_interval": 65535, "reportable_change": 1,
+                        "transaction": txn_base ~ "_dlr_disable"
+                      } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                        "id": dev_name, "endpoint": 1, "cluster": "genOnOff",
+                        "attribute": "onOff", "minimum_report_interval": 0,
+                        "maximum_report_interval": rpt_max, "reportable_change": 0,
+                        "transaction": txn_base ~ "_onoff_set"
+                      } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                        "id": dev_name, "endpoint": 1, "cluster": "genLevelCtrl",
+                        "attribute": "currentLevel", "minimum_report_interval": rpt_min,
+                        "maximum_report_interval": rpt_max, "reportable_change": 1,
+                        "transaction": txn_base ~ "_level_set"
+                      } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                        "id": dev_name, "endpoint": 1, "cluster": "manuSpecificInovelli",
+                        "attribute": "defaultLevelLocal", "minimum_report_interval": 0,
+                        "maximum_report_interval": rpt_max, "reportable_change": 1,
+                        "transaction": txn_base ~ "_dll_set"
+                      } | tojson }}
+                - action: mqtt.publish
+                  data:
+                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    payload: >-
+                      {{ {
+                        "id": dev_name, "endpoint": 1, "cluster": "manuSpecificInovelli",
+                        "attribute": "defaultLevelRemote", "minimum_report_interval": 0,
+                        "maximum_report_interval": rpt_max, "reportable_change": 1,
+                        "transaction": txn_base ~ "_dlr_set"
+                      } | tojson }}
 
-                changes_text: >-
-                  {% set c = changes_list %}
-                  {{ 'none' if (c is iterable and c|length == 0) else c|join(', ') }}
-
-            # ---------------- Reporting via MQTT ----------------
-            - choose:
-                - conditions: "{{ send_reporting }}"
-                  sequence:
-                    - action: mqtt.publish
-                      data:
-                        topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                        payload: >-
-                          {{ {
-                            "id": dev_name, "endpoint": 1, "cluster": "genOnOff",
-                            "attribute": "onOff", "minimum_report_interval": 0,
-                            "maximum_report_interval": 65535, "reportable_change": 0,
-                            "transaction": txn_base ~ "_onoff_disable"
-                          } | tojson }}
-                    - action: mqtt.publish
-                      data:
-                        topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                        payload: >-
-                          {{ {
-                            "id": dev_name, "endpoint": 1, "cluster": "genLevelCtrl",
-                            "attribute": "currentLevel", "minimum_report_interval": 0,
-                            "maximum_report_interval": 65535, "reportable_change": 1,
-                            "transaction": txn_base ~ "_level_disable"
-                          } | tojson }}
-                    - action: mqtt.publish
-                      data:
-                        topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                        payload: >-
-                          {{ {
-                            "id": dev_name, "endpoint": 1, "cluster": "manuSpecificInovelli",
-                            "attribute": "defaultLevelLocal", "minimum_report_interval": 0,
-                            "maximum_report_interval": 65535, "reportable_change": 1,
-                            "transaction": txn_base ~ "_dll_disable"
-                          } | tojson }}
-                    - action: mqtt.publish
-                      data:
-                        topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                        payload: >-
-                          {{ {
-                            "id": dev_name, "endpoint": 1, "cluster": "manuSpecificInovelli",
-                            "attribute": "defaultLevelRemote", "minimum_report_interval": 0,
-                            "maximum_report_interval": 65535, "reportable_change": 1,
-                            "transaction": txn_base ~ "_dlr_disable"
-                          } | tojson }}
-                    # set reporting with fixed intervals
-                    - action: mqtt.publish
-                      data:
-                        topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                        payload: >-
-                          {{ {
-                            "id": dev_name, "endpoint": 1, "cluster": "genOnOff",
-                            "attribute": "onOff", "minimum_report_interval": 0,
-                            "maximum_report_interval": 10800, "reportable_change": 0,
-                            "transaction": txn_base ~ "_onoff_set"
-                          } | tojson }}
-                    - action: mqtt.publish
-                      data:
-                        topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                        payload: >-
-                          {{ {
-                            "id": dev_name, "endpoint": 1, "cluster": "genLevelCtrl",
-                            "attribute": "currentLevel", "minimum_report_interval": 5,
-                            "maximum_report_interval": 10800, "reportable_change": 1,
-                            "transaction": txn_base ~ "_level_set"
-                          } | tojson }}
-                    - action: mqtt.publish
-                      data:
-                        topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                        payload: >-
-                          {{ {
-                            "id": dev_name, "endpoint": 1, "cluster": "manuSpecificInovelli",
-                            "attribute": "defaultLevelLocal", "minimum_report_interval": 0,
-                            "maximum_report_interval": 10800, "reportable_change": 1,
-                            "transaction": txn_base ~ "_dll_set"
-                          } | tojson }}
-                    - action: mqtt.publish
-                      data:
-                        topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                        payload: >-
-                          {{ {
-                            "id": dev_name, "endpoint": 1, "cluster": "manuSpecificInovelli",
-                            "attribute": "defaultLevelRemote", "minimum_report_interval": 0,
-                            "maximum_report_interval": 10800, "reportable_change": 1,
-                            "transaction": txn_base ~ "_dlr_set"
-                          } | tojson }}
-
-            # ---------------- Push config via entities ----------------
-            - choose:
-                - conditions: "{{ push_parameters }}"
-                  sequence:
-                    - repeat:
-                        for_each: "{{ all_params }}"
-                        sequence:
-                          - variables:
-                              key: "{{ repeat.item[0] }}"
-                              domain: "{{ repeat.item[1] }}"
-                              suffix: "{{ repeat.item[2] }}"
-                              ent: >-
-                                {{
-                                  (device_entities(dev_id)
-                                   | select('match', '^' ~ domain ~ '\\.')
-                                   | select('search', '_' ~ suffix ~ '$')
-                                   | list
-                                  ) | first
-                                }}
-                              desired: "{{ desired_common[key] if key in desired_common else none }}"
-                          - choose:
-                              - conditions: >-
-                                  {{ ent is not none and desired is not none and domain == 'number' }}
-                                sequence:
-                                  - action: number.set_value
-                                    target:
-                                      entity_id: "{{ ent }}"
-                                    data:
-                                      value: "{{ desired }}"
-                              - conditions: >-
-                                  {{ ent is not none and desired is not none and domain == 'select' }}
-                                sequence:
-                                  - action: select.select_option
-                                    target:
-                                      entity_id: "{{ ent }}"
-                                    data:
-                                      option: "{{ desired }}"
-
-            # ---------------- Log summary ----------------
-            - action: logbook.log
-              data:
-                name: "Ataraxia Lighting - Inovelli Blue Defaults (v0.8.1)"
-                message: >-
-                  {{ dev_name }} — reporting={{ send_reporting }}, parameters={{ push_parameters }}.
-                  Changes: {{ changes_text }}.
+        # Push config via entities (actions)
+        - choose:
+            - conditions: "{{ push_parameters }}"
+              sequence:
+                - repeat:
+                    for_each: "{{ all_params }}"
+                    sequence:
+                      - variables:
+                          key: "{{ repeat.item[0] }}"
+                          domain: "{{ repeat.item[1] }}"
+                          suffix: "{{ repeat.item[2] }}"
+                          ent: >-
+                            {{
+                              (device_entities(dev_id)
+                               | select('match', '^' ~ domain ~ '\\.')
+                               | select('search', '_' ~ suffix ~ '$')
+                               | list
+                              ) | first
+                            }}
+                          desired: "{{ desired_common[key] if key in desired_common else none }}"
+                      - choose:
+                          - conditions: >-
+                              {{ ent is not none and desired is not none and domain == 'number' }}
+                            sequence:
+                              - action: number.set_value
+                                target:
+                                  entity_id: "{{ ent }}"
+                                data:
+                                  value: "{{ desired }}"
+                          - conditions: >-
+                              {{ ent is not none and desired is not none and domain == 'select' }}
+                            sequence:
+                              - action: select.select_option
+                                target:
+                                  entity_id: "{{ ent }}"
+                                data:
+                                  option: "{{ desired }}"
