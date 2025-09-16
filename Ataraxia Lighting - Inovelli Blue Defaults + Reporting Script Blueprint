@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.6.1)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.6.2)
   description: >
     Push all non-telemetry parameters for Inovelli Blue dimmers via Zigbee2MQTT.
     One input per parameter with descriptions/ranges. Blank inputs are sent as null.
@@ -777,7 +777,7 @@ variables:
         {{ x }}
       {%- endif -%}
     {%- endmacro %}
-    {
+    {{ {
       "dimmingSpeedUpRemote": dimmingSpeedUpRemote,
       "dimmingSpeedUpLocal": dimmingSpeedUpLocal,
       "rampRateOffToOnRemote": rampRateOffToOnRemote,
@@ -821,9 +821,7 @@ variables:
       "outputMode": outputMode,
       "quickStartLevel": quickStartLevel,
       "quickStartTime": quickStartTime,
-      "level_config": {
-        "execute_if_off": level_config_execute_if_off
-      },
+      "level_config": { "execute_if_off": level_config_execute_if_off },
 
       "defaultLed1ColorWhenOn": num(defaultLed1ColorWhenOn),
       "defaultLed1ColorWhenOff": num(defaultLed1ColorWhenOff),
@@ -866,7 +864,7 @@ variables:
       "mediumLevelForFanControlMode": num(mediumLevelForFanControlMode),
       "lowLevelForFanControlMode": num(lowLevelForFanControlMode),
       "ledColorForFanControlMode": num(ledColorForFanControlMode)
-    }
+    } }}
 
 sequence:
   - variables:
@@ -882,7 +880,6 @@ sequence:
       sequence:
         - variables:
             dev_name: "{{ repeat.item }}"
-            desired: "{{ desired_common }}"
             txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
 
         # ----- Reset existing reporting (disable via max=65535) -----
@@ -1013,7 +1010,7 @@ sequence:
             topic: "zigbee2mqtt/{{ dev_name }}/set"
             qos: 0
             retain: false
-            payload: "{{ desired | tojson }}"
+            payload: "{{ desired_common | tojson }}"
 
         - action: logbook.log
           data:
