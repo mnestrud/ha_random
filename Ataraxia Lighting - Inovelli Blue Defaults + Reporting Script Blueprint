@@ -3,7 +3,7 @@ blueprint:
   description: >
     Push all non-telemetry parameters for Inovelli Blue dimmers via Zigbee2MQTT.
     One input per parameter with descriptions/ranges. Blank inputs are sent as null.
-    Removes read-only/problematic keys: powerType, switchType, dimmingMode.
+    Removed read-only/problematic keys: powerType, switchType, dimmingMode.
     Also resets & applies Zigbee reporting (OnOff.onOff, LevelCtrl.currentLevel,
     manuSpecificInovelli.defaultLevelLocal/Remote). Requires Home Assistant 2024.8+.
 
@@ -13,12 +13,14 @@ blueprint:
     devices_multiline:
       name: Zigbee2MQTT device names (one per line)
       description: Exact friendly names as they appear in zigbee2mqtt/<name>/set. First 20 used.
-      selector: { text: { multiline: true } }
+      selector:
+        text:
+          multiline: true
 
     # ----------- Time & Level behavior -----------
     dimmingSpeedUpRemote:
       name: Dimming Speed Up (Remote)
-      description: 0–127 (0=instant; special values may sync to other params depending on FW)
+      description: 0–127 (0=instant; special values may sync to other params depending on firmware)
       default: 50
       selector: { number: { min: 0, max: 127, step: 1 } }
 
@@ -84,7 +86,7 @@ blueprint:
 
     autoTimerOff:
       name: Auto-Off Timer
-      description: 0–32767 (0=disabled). Unit depends on FW; commonly seconds.
+      description: 0–32767 (0=disabled). Units may vary by firmware.
       default: 0
       selector: { number: { min: 0, max: 32767, step: 1 } }
 
@@ -96,7 +98,7 @@ blueprint:
 
     loadLevelIndicatorTimeout:
       name: LED Indicator Timeout
-      description: 0–10 (seconds), 11=Stay On
+      description: 0–10 (seconds), 11 means "Stay On"
       default: 11
       selector: { number: { min: 0, max: 11, step: 1 } }
 
@@ -109,7 +111,7 @@ blueprint:
 
     periodicPowerAndEnergyReports:
       name: Periodic Power & Energy Reports
-      description: 0–32767 (0=disabled; seconds on many firmwares)
+      description: 0–32767 (0=disabled; often seconds)
       default: 0
       selector: { number: { min: 0, max: 32767, step: 1 } }
 
@@ -122,7 +124,7 @@ blueprint:
     # ----------- Smart bulb / tap features -----------
     smartBulbMode:
       name: Smart Bulb Mode
-      description: Relay bypass for smart bulbs. (Disabled / Smart Bulb Mode)
+      description: Relay bypass for smart bulbs.
       default: "Smart Bulb Mode"
       selector: { select: { options: ["Disabled","Smart Bulb Mode"] } }
 
@@ -152,13 +154,13 @@ blueprint:
 
     doubleTapClearNotifications:
       name: Double-Tap Clear Notifications
-      description: Clear active notifications via double-tap. (Disabled/Enabled)
+      description: Clear active notifications via double-tap.
       default: "Disabled"
       selector: { select: { options: ["Disabled","Enabled"] } }
 
     singleTapBehavior:
       name: Single Tap Behavior
-      description: Text label as exposed by Z2M (e.g., "Old Behavior").
+      description: Text label as exposed by Zigbee2MQTT (e.g., Old Behavior).
       default: "Old Behavior"
       selector: { text: {} }
 
@@ -189,9 +191,13 @@ blueprint:
 
     ledBarScaling:
       name: LED Bar Scaling
-      description: "Gen3 method (VZM-style)" or "Match Gen 2 (LZWxx Scaling)"
+      description: Choose: Gen3 method (VZM-style) or Match Gen 2 (LZWxx Scaling)
       default: "Gen3 method (VZM-style)"
-      selector: { select: { options: ["Gen3 method (VZM-style)","Match Gen 2 (LZWxx Scaling)"] } }
+      selector:
+        select:
+          options:
+            - "Gen3 method (VZM-style)"
+            - "Match Gen 2 (LZWxx Scaling)"
 
     # ----------- Default level behavior -----------
     defaultLevelLocal:
@@ -209,7 +215,7 @@ blueprint:
     # ----------- Misc / protection / sound -----------
     buttonDelay:
       name: Button Delay
-      description: Text exactly as Z2M expects (e.g., "0ms", "300ms", "500ms")
+      description: Text exactly as Zigbee2MQTT expects (e.g., 0ms, 300ms, 500ms)
       default: "300ms"
       selector: { text: {} }
 
@@ -227,45 +233,45 @@ blueprint:
 
     relayClick:
       name: Relay Click Sound
-      description: Z2M label (e.g., "Enabled (Click Sound Off)", "Audible Click On")
+      description: Zigbee2MQTT label (e.g., Enabled (Click Sound Off), Audible Click On)
       default: "Enabled (Click Sound Off)"
       selector: { text: {} }
 
     firmwareUpdateInProgressIndicator:
       name: Firmware Update Indicator
-      description: Show indicator during update. (Enabled/Disabled)
+      description: Show indicator during firmware update.
       default: "Enabled"
       selector: { select: { options: ["Enabled","Disabled"] } }
 
     # ----------- Binding / Aux / Non-neutral -----------
     bindingOffToOnSyncLevel:
       name: Binding Default Level
-      description: Sync bound device to default level. (Disabled/Enabled)
+      description: Sync bound device to default level.
       default: "Disabled"
       selector: { select: { options: ["Disabled","Enabled"] } }
 
     auxSwitchUniqueScenes:
       name: Aux Switch Unique Scenes
-      description: Expose unique scenes for aux switch. (Disabled/Enabled)
+      description: Expose unique scenes for aux switch.
       default: "Disabled"
       selector: { select: { options: ["Disabled","Enabled"] } }
 
     higherOutputInNonNeutral:
       name: Higher Output in Non-Neutral
-      description: Label as shown in Z2M (e.g., "Disabled (default)" / "Enabled")
+      description: Label as shown in Zigbee2MQTT (e.g., Disabled (default) / Enabled)
       default: "Disabled (default)"
       selector: { text: {} }
 
     # ----------- On/Off LED mode & Output mode -----------
     onOffLedMode:
       name: On/Off LED Mode
-      description: Text label as exposed by Z2M (e.g., "All")
+      description: Text label as exposed by Zigbee2MQTT (e.g., All)
       default: "All"
       selector: { text: {} }
 
     outputMode:
       name: Output Mode
-      description: Text label as exposed by Z2M (e.g., "Dimmer" or "On/Off")
+      description: Text label as exposed by Zigbee2MQTT (e.g., Dimmer or On/Off)
       default: "Dimmer"
       selector: { text: {} }
 
@@ -290,51 +296,67 @@ blueprint:
       selector: { boolean: {} }
 
     # ----------- Per-LED segment defaults (0–101; blank allowed) -----------
-    defaultLed1ColorWhenOn:  { name: defaultLed1ColorWhenOn,  description: 0–101 (blank sends null), selector: { text: {} }, default: "" }
-    defaultLed1ColorWhenOff: { name: defaultLed1ColorWhenOff, description: 0–101 (blank sends null), selector: { text: {} }, default: "" }
-    defaultLed1IntensityWhenOn:  { name: defaultLed1IntensityWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed1IntensityWhenOff: { name: defaultLed1IntensityWhenOff, description: 0–101, selector: { text: {} }, default: "" }
+    defaultLed1ColorWhenOn:
+      name: defaultLed1ColorWhenOn
+      description: 0–101 (blank sends null)
+      default: ""
+      selector: { text: {} }
+    defaultLed1ColorWhenOff:
+      name: defaultLed1ColorWhenOff
+      description: 0–101 (blank sends null)
+      default: ""
+      selector: { text: {} }
+    defaultLed1IntensityWhenOn:
+      name: defaultLed1IntensityWhenOn
+      description: 0–101 (blank sends null)
+      default: ""
+      selector: { text: {} }
+    defaultLed1IntensityWhenOff:
+      name: defaultLed1IntensityWhenOff
+      description: 0–101 (blank sends null)
+      default: ""
+      selector: { text: {} }
 
-    defaultLed2ColorWhenOn:  { name: defaultLed2ColorWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed2ColorWhenOff: { name: defaultLed2ColorWhenOff, description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed2IntensityWhenOn:  { name: defaultLed2IntensityWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed2IntensityWhenOff: { name: defaultLed2IntensityWhenOff, description: 0–101, selector: { text: {} }, default: "" }
+    defaultLed2ColorWhenOn:    { name: defaultLed2ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed2ColorWhenOff:   { name: defaultLed2ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed2IntensityWhenOn:{ name: defaultLed2IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed2IntensityWhenOff:{ name: defaultLed2IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
 
-    defaultLed3ColorWhenOn:  { name: defaultLed3ColorWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed3ColorWhenOff: { name: defaultLed3ColorWhenOff, description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed3IntensityWhenOn:  { name: defaultLed3IntensityWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed3IntensityWhenOff: { name: defaultLed3IntensityWhenOff, description: 0–101, selector: { text: {} }, default: "" }
+    defaultLed3ColorWhenOn:    { name: defaultLed3ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed3ColorWhenOff:   { name: defaultLed3ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed3IntensityWhenOn:{ name: defaultLed3IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed3IntensityWhenOff:{ name: defaultLed3IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
 
-    defaultLed4ColorWhenOn:  { name: defaultLed4ColorWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed4ColorWhenOff: { name: defaultLed4ColorWhenOff, description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed4IntensityWhenOn:  { name: defaultLed4IntensityWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed4IntensityWhenOff: { name: defaultLed4IntensityWhenOff, description: 0–101, selector: { text: {} }, default: "" }
+    defaultLed4ColorWhenOn:    { name: defaultLed4ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed4ColorWhenOff:   { name: defaultLed4ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed4IntensityWhenOn:{ name: defaultLed4IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed4IntensityWhenOff:{ name: defaultLed4IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
 
-    defaultLed5ColorWhenOn:  { name: defaultLed5ColorWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed5ColorWhenOff: { name: defaultLed5ColorWhenOff, description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed5IntensityWhenOn:  { name: defaultLed5IntensityWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed5IntensityWhenOff: { name: defaultLed5IntensityWhenOff, description: 0–101, selector: { text: {} }, default: "" }
+    defaultLed5ColorWhenOn:    { name: defaultLed5ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed5ColorWhenOff:   { name: defaultLed5ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed5IntensityWhenOn:{ name: defaultLed5IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed5IntensityWhenOff:{ name: defaultLed5IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
 
-    defaultLed6ColorWhenOn:  { name: defaultLed6ColorWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed6ColorWhenOff: { name: defaultLed6ColorWhenOff, description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed6IntensityWhenOn:  { name: defaultLed6IntensityWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed6IntensityWhenOff: { name: defaultLed6IntensityWhenOff, description: 0–101, selector: { text: {} }, default: "" }
+    defaultLed6ColorWhenOn:    { name: defaultLed6ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed6ColorWhenOff:   { name: defaultLed6ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed6IntensityWhenOn:{ name: defaultLed6IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed6IntensityWhenOff:{ name: defaultLed6IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
 
-    defaultLed7ColorWhenOn:  { name: defaultLed7ColorWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed7ColorWhenOff: { name: defaultLed7ColorWhenOff, description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed7IntensityWhenOn:  { name: defaultLed7IntensityWhenOn,  description: 0–101, selector: { text: {} }, default: "" }
-    defaultLed7IntensityWhenOff: { name: defaultLed7IntensityWhenOff, description: 0–101, selector: { text: {} }, default: "" }
+    defaultLed7ColorWhenOn:    { name: defaultLed7ColorWhenOn,    description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed7ColorWhenOff:   { name: defaultLed7ColorWhenOff,   description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed7IntensityWhenOn:{ name: defaultLed7IntensityWhenOn,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
+    defaultLed7IntensityWhenOff:{ name: defaultLed7IntensityWhenOff,description: 0–101 (blank sends null), default: "", selector: { text: {} } }
 
     # ----------- Fan control -----------
     fanControlMode:
       name: Fan Control Mode
-      description: "Disabled" or firmware-specific labels. (text)
+      description: "Disabled" or firmware-specific labels (text)
       default: "Disabled"
       selector: { text: {} }
 
     fanLedLevelType:
       name: Fan LED Level Type
-      description: Numeric or label depending on FW (e.g., 0/1). (text)
+      description: Numeric or label depending on firmware (e.g., 0/1) (text)
       default: "0"
       selector: { text: {} }
 
@@ -465,20 +487,14 @@ variables:
   device_names_limited: >
     {{ device_names[:20] }}
 
-  # Helper to coerce text->number when possible, else null for blanks
-  _num: >
+  # Build the payload dict (ALWAYS include every key; blanks -> null, numeric strings cast)
+  desired_common: >
     {% macro num(x) -%}
       {%- if x is string and x|length == 0 -%}{{ none }}
-      {%- elif x is number -%}{{ x }}
       {%- elif x is string and x|regex_match('^-?\\d+$') -%}{{ x|int }}
       {%- else -%}{{ x }}
       {%- endif -%}
     {%- endmacro %}
-    {{- '' -}}
-
-  # Build the payload dict (ALWAYS include every key; blanks -> null)
-  desired_common: >
-    {%- from _num import num -%}
     {{
       dict(
         dimmingSpeedUpRemote = dimmingSpeedUpRemote,
@@ -573,7 +589,7 @@ variables:
         defaultLed7IntensityWhenOn = num(defaultLed7IntensityWhenOn),
         defaultLed7IntensityWhenOff = num(defaultLed7IntensityWhenOff),
 
-        # fan control (text inputs that may be numbers or blank)
+        # fan control
         fanControlMode = fanControlMode,
         fanLedLevelType = fanLedLevelType,
         highLevelForFanControlMode = num(highLevelForFanControlMode),
