@@ -113,7 +113,7 @@ variables:
       ('quickStartTime',               'number', 'quickstarttime')
     ] }}
 
-  # LED segment params (1..7) auto-generated without .append
+  # LED segment params (1..7) without using .append (sandbox-safe)
   led_params: >-
     {% set out = [] %}
     {% for i in range(1,8) %}
@@ -126,6 +126,7 @@ variables:
     {% endfor %}
     {{ out }}
 
+  # Merge base + LED params
   all_params: >-
     {{ base_params + led_params }}
 
@@ -140,7 +141,7 @@ variables:
       {% set ent = ents[0] if ents|length > 0 else none %}
       {% if ent %}
         {% set raw = states(ent) %}
-        {% if domain == 'number' and raw not in ['unknown', 'unavailable', ''] %}
+        {% if domain == 'number' and raw not in ['unknown','unavailable',''] %}
           {% set val = (raw | float) if ('.' in raw) else (raw | int) %}
         {% else %}
           {% set val = raw %}
@@ -150,9 +151,35 @@ variables:
     {% endfor %}
     {{ d }}
 
-  # Hard-coded defaults (derived from attached device data where present).
-  # Missing keys will fall back to reference values.
-    hardcoded_defaults: >-
+  # Parse overrides YAML (string) safely
+  overrides_parsed: >-
+    {% set o = {} %}
+    {% if overrides_yaml|trim %}
+      {% set parsed = overrides_yaml | from_yaml %}
+      {% if parsed is mapping %}
+        {% set o = parsed %}
+      {% endif %}
+    {% endif %}
+    {{ o }}
+
+  # Toggle: use hardcoded defaults?
+  use_hardcoded_defaults: >-
+    {{ (overrides_parsed.use_hardcoded_defaults | default(false)) | bool }}
+
+  # Remove the toggle flag WITHOUT calling .pop (unsafe). Rebuild the dict.
+  overrides_clean: >-
+    {% set o = overrides_parsed | default({}) %}
+    {% set keys = o.keys() | list %}
+    {% set clean = {} %}
+    {% for k in keys %}
+      {% if k != 'use_hardcoded_defaults' %}
+        {% set clean = clean | combine({k: o[k]}) %}
+      {% endif %}
+    {% endfor %}
+    {{ clean }}
+
+  # Hard-coded defaults (no dict(), no inline comments inside {{ ... }})
+  hardcoded_defaults: >-
     {{ {
       'dimmingSpeedUpRemote': 0,
       'dimmingSpeedUpLocal': 20,
@@ -187,30 +214,6 @@ variables:
       'onOffLedMode': 'All',
       'outputMode': 'Dimmer'
     } }}
-
-  # Parse overrides YAML (if any)
-  overrides_parsed: >-
-    {% set o = {} %}
-    {% if overrides_yaml|trim %}
-      {% set parsed = overrides_yaml | from_yaml %}
-      {% if parsed is mapping %}
-        {% set o = parsed %}
-      {% endif %}
-    {% endif %}
-    {{ o }}
-
-  # Toggle: if overrides contain use_hardcoded_defaults: true, use those defaults
-  use_hardcoded_defaults: >-
-    {{ (overrides_parsed.use_hardcoded_defaults | default(false)) | bool }}
-
-  # Remove the toggle flag from overrides before merging to entities
-  overrides_clean: >-
-    {% set o = overrides_parsed | default({}) %}
-    {% if 'use_hardcoded_defaults' in o %}
-      {% set o = dict(o) %}
-      {% do o.pop('use_hardcoded_defaults') %}
-    {% endif %}
-    {{ o }}
 
   # Final desired map
   desired_common: >-
