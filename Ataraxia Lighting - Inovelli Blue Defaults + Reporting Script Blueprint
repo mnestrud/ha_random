@@ -1015,7 +1015,7 @@ sequence:
         - action: logbook.log
           data:
             name: "Inovelli Params"
-            message: "{{ dev_name }}: full parameter set pushed ({{ desired|length }} keys)."
+            message: "{{ dev_name }}: full parameter set pushed."
 
         - action: persistent_notification.create
           data:
