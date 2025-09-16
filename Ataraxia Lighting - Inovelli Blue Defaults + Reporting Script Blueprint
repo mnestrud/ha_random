@@ -223,7 +223,7 @@ sequence:
                 - action: mqtt.publish
                   data:
                     topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                  payload: >-
+                    payload: >-
                       {{ {
                         "id": dev_name, "endpoint": 1, "cluster": "genLevelCtrl",
                         "attribute": "currentLevel", "minimum_report_interval": 0,
@@ -292,6 +292,7 @@ sequence:
                         "maximum_report_interval": rpt_max, "reportable_change": 1,
                         "transaction": txn_base ~ "_dlr_set"
                       } | tojson }}
+
 
         # Push config via entities (actions)
         - choose:
