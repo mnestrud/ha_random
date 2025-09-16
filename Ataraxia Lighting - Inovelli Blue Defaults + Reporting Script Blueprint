@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.1)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.2)
   description: >
     Sets Inovelli Blue parameters using Home Assistant config entities
     (number/select) with actions (HA 2024.8+). Only reporting is configured via MQTT.
@@ -116,14 +116,16 @@ variables:
       ('quickStartTime',               'number', 'quickstarttime')
     ] }}
 
-  # LED segment params (1..7) auto-generated
+  # LED segment params (1..7) auto-generated without .append
   led_params: >-
     {% set out = [] %}
     {% for i in range(1,8) %}
-      {% set _ = out.append(('defaultLed' ~ i ~ 'ColorWhenOn',  'number', 'defaultled' ~ i ~ 'colorwhenon')) %}
-      {% set _ = out.append(('defaultLed' ~ i ~ 'ColorWhenOff', 'number', 'defaultled' ~ i ~ 'colorwhenoff')) %}
-      {% set _ = out.append(('defaultLed' ~ i ~ 'IntensityWhenOn',  'number', 'defaultled' ~ i ~ 'intensitywhenon')) %}
-      {% set _ = out.append(('defaultLed' ~ i ~ 'IntensityWhenOff', 'number', 'defaultled' ~ i ~ 'intensitywhenoff')) %}
+      {% set out = out
+        + [('defaultLed' ~ i ~ 'ColorWhenOn',      'number', 'defaultled' ~ i ~ 'colorwhenon')]
+        + [('defaultLed' ~ i ~ 'ColorWhenOff',     'number', 'defaultled' ~ i ~ 'colorwhenoff')]
+        + [('defaultLed' ~ i ~ 'IntensityWhenOn',  'number', 'defaultled' ~ i ~ 'intensitywhenon')]
+        + [('defaultLed' ~ i ~ 'IntensityWhenOff', 'number', 'defaultled' ~ i ~ 'intensitywhenoff')]
+      %}
     {% endfor %}
     {{ out }}
 
@@ -168,7 +170,6 @@ variables:
 
 sequence:
   - variables:
-      # Cut to first 20 devices
       devices_20: >-
         {{ (tgt_devs or [])[:20] }}
 
@@ -177,7 +178,7 @@ sequence:
         sequence:
           - action: logbook.log
             data:
-              name: "Inovelli Config"
+              name: "Ataraxia Lighting - Inovelli Blue Defaults (v0.8.1)"
               message: "No target devices selected; nothing to do."
     default:
       - repeat:
@@ -189,11 +190,47 @@ sequence:
                   {{ device_attr(dev_id, 'name') or device_attr(dev_id, 'name_by_user') or dev_id }}
                 txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
 
-            # ---------------- Reporting via MQTT (only here) ----------------
+            # Build per-switch change list
+            - variables:
+                changes_list: >-
+                  {% set changes = [] %}
+                  {% for key, domain, suffix in all_params %}
+                    {% set ent = (
+                      device_entities(dev_id)
+                      | select('match', '^' ~ domain ~ '\\.')
+                      | select('search', '_' ~ suffix ~ '$')
+                      | list
+                    ) | first %}
+                    {% if ent %}
+                      {% set desired = desired_common[key] if key in desired_common else none %}
+                      {% if desired is not none %}
+                        {% set raw = states(ent) %}
+                        {% if domain == 'number' %}
+                          {% set cur = (raw | float) if raw not in ['unknown','unavailable',''] else none %}
+                          {% set new = desired | float %}
+                          {% if cur is not none and cur != new %}
+                            {% set changes = changes + [ key ~ ': ' ~ (cur|string) ~ '→' ~ (new|string) ] %}
+                          {% endif %}
+                        {% else %}
+                          {% set cur = raw %}
+                          {% set new = desired %}
+                          {% if cur != new %}
+                            {% set changes = changes + [ key ~ ': ' ~ cur ~ '→' ~ new ] %}
+                          {% endif %}
+                        {% endif %}
+                      {% endif %}
+                    {% endif %}
+                  {% endfor %}
+                  {{ changes }}
+
+                changes_text: >-
+                  {% set c = changes_list %}
+                  {{ 'none' if (c is iterable and c|length == 0) else c|join(', ') }}
+
+            # ---------------- Reporting via MQTT ----------------
             - choose:
                 - conditions: "{{ send_reporting }}"
                   sequence:
-                    # disable reporting
                     - action: mqtt.publish
                       data:
                         topic: zigbee2mqtt/bridge/request/device/configure_reporting
@@ -234,8 +271,7 @@ sequence:
                             "maximum_report_interval": 65535, "reportable_change": 1,
                             "transaction": txn_base ~ "_dlr_disable"
                           } | tojson }}
-
-                    # set reporting with fixed intervals (min=5s, max=10800s)
+                    # set reporting with fixed intervals
                     - action: mqtt.publish
                       data:
                         topic: zigbee2mqtt/bridge/request/device/configure_reporting
@@ -277,7 +313,7 @@ sequence:
                             "transaction": txn_base ~ "_dlr_set"
                           } | tojson }}
 
-            # ---------------- Push config via entities (actions) -------------
+            # ---------------- Push config via entities ----------------
             - choose:
                 - conditions: "{{ push_parameters }}"
                   sequence:
@@ -315,9 +351,10 @@ sequence:
                                     data:
                                       option: "{{ desired }}"
 
-            # ---------------- Log summary -----------------------------------
+            # ---------------- Log summary ----------------
             - action: logbook.log
               data:
-                name: "Inovelli Config"
+                name: "Ataraxia Lighting - Inovelli Blue Defaults (v0.8.1)"
                 message: >-
-                  {{ dev_name }}: reporting={{ send_reporting }}, parameters={{ push_parameters }} applied.
+                  {{ dev_name }} — reporting={{ send_reporting }}, parameters={{ push_parameters }}.
+                  Changes: {{ changes_text }}.
