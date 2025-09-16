@@ -1,309 +1,152 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults + Reporting (v0.5.0)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.5.5)
   description: >
-    Push defaults to Inovelli Blue dimmers via Zigbee2MQTT using a newline-
-    separated list of MQTT device names (friendly names). For each device:
-    1) disable reporting on 4 attrs, 2) apply desired reporting config,
-    3) send parameters diff-only if we can map the device name to a HA light entity,
-       otherwise send full set unverified. Base topic fixed: zigbee2mqtt.
-    Requires Home Assistant 2024.8+ (service calls are now actions).
+    Sets all parameters exposed in Z2M JSON for Inovelli Blue dimmers.
+    Uses a key=value list with defaults prefilled from Inovelli docs and
+    your JSON. Sends blanks as null (does not skip). Removes read-only
+    powerType, switchType, and dimmingMode.
+    Also resets and reapplies reporting for OnOff/LevelCtrl/defaultLevelLocal/defaultLevelRemote.
+    Requires Home Assistant 2024.8+ (actions syntax).
 
   domain: script
 
   input:
     devices_multiline:
       name: Zigbee2MQTT device names (one per line)
-      description: >
-        Paste MQTT device names exactly as they appear under zigbee2mqtt/<name>/set.
-        Blank lines are ignored. First 20 will be used.
+      description: Exact friendly names as in zigbee2mqtt/<name>/set.
       selector:
         text:
           multiline: true
 
-    # -------- Dimming / Ramp (Params 1-8) --------
-    p1_dimming_speed_up_remote:
-      name: 1. Dimming Speed Up (Remote)
-      description: Range 0–126 (0=instant, 5≈500ms). Default 25.
-      default: 50
-      selector: { number: { min: 0, max: 126, step: 1 } }
-    p2_dimming_speed_up_local:
-      name: 2. Dimming Speed Up (Local)
-      description: Range 0–127 (127=sync to P1). Default 127.
-      default: 127
-      selector: { number: { min: 0, max: 127, step: 1 } }
-    p3_ramp_off_on_remote:
-      name: 3. Ramp Rate – Off → On (Remote)
-      description: Range 0–127 (0=instant, 127=sync to P1). Default 127.
-      default: 0
-      selector: { number: { min: 0, max: 127, step: 1 } }
-    p4_ramp_off_on_local:
-      name: 4. Ramp Rate – Off → On (Local)
-      description: Range 0–127 (0=instant, 127=sync to P3). Default 127.
-      default: 0
-      selector: { number: { min: 0, max: 127, step: 1 } }
-    p5_dimming_speed_down_remote:
-      name: 5. Dimming Speed Down (Remote)
-      description: Range 0–127 (0=instant, 127=sync to P1). Default 127.
-      default: 127
-      selector: { number: { min: 0, max: 127, step: 1 } }
-    p6_dimming_speed_down_local:
-      name: 6. Dimming Speed Down (Local)
-      description: Range 0–127 (0=instant, 127=sync to P2). Default 127.
-      default: 127
-      selector: { number: { min: 0, max: 127, step: 1 } }
-    p7_ramp_on_off_remote:
-      name: 7. Ramp Rate – On → Off (Remote)
-      description: Range 0–127 (0=instant, 127=sync to P3). Default 127.
-      default: 0
-      selector: { number: { min: 0, max: 127, step: 1 } }
-    p8_ramp_on_off_local:
-      name: 8. Ramp Rate – On → Off (Local)
-      description: Range 0–127 (0=instant, 127=sync to P4). Default 127.
-      default: 0
-      selector: { number: { min: 0, max: 127, step: 1 } }
+    all_params_text:
+      name: All parameters (key = value) – edit as needed
+      description: >
+        One parameter per line as `key = value`. Blank values are sent as null.
+        Unknown keys are ignored. Read-only removed: powerType, switchType, dimmingMode.
+      default: |
+        dimmingSpeedUpRemote = 50
+        dimmingSpeedUpLocal = 127
+        rampRateOffToOnRemote = 0
+        rampRateOffToOnLocal = 0
+        dimmingSpeedDownRemote = 127
+        dimmingSpeedDownLocal = 127
+        rampRateOnToOffRemote = 0
+        rampRateOnToOffLocal = 0
 
-    # -------- Min/Max/Invert/Auto-Off --------
-    p9_min_level:
-      name: 9. Minimum Dim Level
-      description: Range 1–254. Default 1.
-      default: 1
-      selector: { number: { min: 1, max: 254, step: 1 } }
-    p10_max_level:
-      name: 10. Maximum Dim Level
-      description: Range 2–255 (255≈100%). Default 255.
-      default: 255
-      selector: { number: { min: 2, max: 255, step: 1 } }
-    p11_invert_switch:
-      name: 11. Invert Switch
-      description: 0=No, 1=Yes.
-      default: "No"
-      selector: { select: { options: ["No","Yes"] } }
-    p12_auto_off:
-      name: 12. Auto-Off Timer (seconds)
-      description: Range 0–32767 (0=disabled). Default 0.
-      default: 0
-      selector: { number: { min: 0, max: 32767, step: 1 } }
+        minimumLevel = 1
+        maximumLevel = 255
+        invertSwitch = No
+        autoTimerOff = 0
+        stateAfterPowerRestored = 255
+        loadLevelIndicatorTimeout = 11
 
-    # -------- Defaults & Indicator Timeout --------
-    p15_level_after_power:
-      name: 15. Level After Power Restored
-      description: 0=off, 1–254≈1–100%, 255=restore last. Default 255.
-      default: 0
-      selector: { number: { min: 0, max: 255, step: 1 } }
-    p17_led_indicator_timeout:
-      name: 17. LED Indicator Timeout (seconds)
-      description: 0–11 (0=always off, 11=always on). Default 11.
-      default: 11
-      selector: { number: { min: 0, max: 11, step: 1 } }
+        activePowerReports = 0
+        periodicPowerAndEnergyReports = 0
+        activeEnergyReports = 0
 
-    # -------- Power / Energy --------
-    p18_active_power_reports:
-      name: 18. Active Power Reports (ΔW ×0.1)
-      description: 0–32767 (0=disabled, 1=0.1W…). Default 10.
-      default: 0
-      selector: { number: { min: 0, max: 32767, step: 1 } }
-    p19_periodic_reports:
-      name: 19. Periodic Power & Energy Reports (seconds)
-      description: 0–32767 (0=disabled). Default 3600.
-      default: 0
-      selector: { number: { min: 0, max: 32767, step: 1 } }
-    p20_active_energy_reports:
-      name: 20. Active Energy Reports (ΔkWh ×0.01)
-      description: 0–32767 (0=disabled, 1=0.01kWh…). Default 10.
-      default: 0
-      selector: { number: { min: 0, max: 32767, step: 1 } }
+        smartBulbMode = Smart Bulb Mode
+        doubleTapUpToParam55 = Disabled
+        doubleTapDownToParam56 = Disabled
+        brightnessLevelForDoubleTapUp = 254
+        brightnessLevelForDoubleTapDown = 2
+        doubleTapClearNotifications = Disabled
+        singleTapBehavior = Old Behavior
 
-    # -------- Switch Type (Param 26 removed) --------
-    p22_switch_type:
-      name: 22. Switch Type
-      description: 0=Single Pole, 1=3-Way Dumb, 2=3-Way Aux, 3=Full Sine Wave Mode.
-      default: "Single Pole"
-      selector: { select: { options: ["Single Pole","3-Way Dumb","3-Way Aux","Full Sine Wave Mode"] } }
+        ledColorWhenOn = 170
+        ledColorWhenOff = 170
+        ledIntensityWhenOn = 33
+        ledIntensityWhenOff = 1
+        ledBarScaling = Gen3 method (VZM-style)
 
-    # -------- Smart Bulb / Double Tap --------
-    p52_smart_bulb_mode:
-      name: 52. Smart Bulb Mode
-      description: 0=Disabled, 1=Enabled (bypasses relay).
-      default: "Smart Bulb Mode"
-      selector: { select: { options: ["Disabled","Smart Bulb Mode"] } }
-    p53_double_tap_up_to_p55:
-      name: 53. Enable 2x Tap Up to P55
-      description: 0=Disabled, 1=Enabled.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
-    p54_double_tap_down_to_p56:
-      name: 54. Enable 2x Tap Down to P56
-      description: 0=Disabled, 1=Enabled.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
-    p55_double_tap_up_level:
-      name: 55. 2x Tap Up Level
-      description: Range 2–254. Default 254.
-      default: 254
-      selector: { number: { min: 2, max: 254, step: 1 } }
-    p56_double_tap_down_level:
-      name: 56. 2x Tap Down Level
-      description: Range 0–254 (0 often “off”). Default 2.
-      default: 2
-      selector: { number: { min: 0, max: 254, step: 1 } }
+        defaultLevelLocal = 255
+        defaultLevelRemote = 255
 
-    # -------- LED Colors / Intensities --------
-    p60_led_color_on:
-      name: 60. LED Color When On
-      description: 0–255 (0=white, 1–254=color wheel, 255=sync). Default 170.
-      default: 170
-      selector: { number: { min: 0, max: 255, step: 1 } }
-    p61_led_color_off:
-      name: 61. LED Color When Off
-      description: 0–255 (0=white, 1–254=color wheel, 255=sync). Default 170.
-      default: 170
-      selector: { number: { min: 0, max: 255, step: 1 } }
-    p62_led_intensity_on:
-      name: 62. LED Intensity When On
-      description: 0–100 (%). Default 33.
-      default: 33
-      selector: { number: { min: 0, max: 100, step: 1 } }
-    p63_led_intensity_off:
-      name: 63. LED Intensity When Off
-      description: 0–100 (%). Default 1.
-      default: 1
-      selector: { number: { min: 0, max: 100, step: 1 } }
-    p64_led_bar_scaling:
-      name: 64. LED Bar Scaling
-      description: 0=Gen3 method (VZM-style), 1=Gen2 scaling.
-      default: "Gen3 method (VZM-style)"
-      selector: { select: { options: ["Gen3 method (VZM-style)","Match Gen 2 (LZWxx Scaling)"] } }
+        buttonDelay = 300ms
+        localProtection = Disabled
+        remoteProtection = Disabled
+        relayClick = Enabled (Click Sound Off)
+        firmwareUpdateInProgressIndicator = Enabled
 
-    # -------- Binding Default Level (Param 125) --------
-    p125_binding_default_level:
-      name: 125. Binding Default Level
-      description: 0=Disabled, 1=Enabled. Default 0.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
+        bindingOffToOnSyncLevel = Disabled
+        auxSwitchUniqueScenes = Disabled
+        higherOutputInNonNeutral = Disabled (default)
 
-    # -------- Misc --------
-    p50_button_delay:
-      name: Button Delay (Param 50)
-      description: Text like "0ms", "300ms", "500ms". Enter exactly as Z2M expects.
-      default: "300ms"
-      selector: { text: {} }
-    p256_local_protection:
-      name: Local Protection
-      description: 0=Disabled, 1=Enabled.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
-    p257_remote_protection:
-      name: Remote Protection
-      description: 0=Disabled, 1=Enabled.
-      default: "Disabled"
-      selector: { select: { options: ["Disabled","Enabled"] } }
-    p261_relay_click:
-      name: Relay Click Sound
-      description: Z2M label (e.g., "Enabled (Click Sound Off)").
-      default: "Enabled (Click Sound Off)"
-      selector: { select: { options: ["Enabled (Click Sound Off)","Audible Click On"] } }
-    p260_fw_update_indicator:
-      name: Firmware Update Indicator
-      description: 0=Disabled, 1=Enabled.
-      default: "Enabled"
-      selector: { select: { options: ["Enabled","Disabled"] } }
+        onOffLedMode = All
+        outputMode = Dimmer
+
+        quickStartLevel = 254
+        quickStartTime = 0
+
+        level_config.execute_if_off = true
+
+        # Per-LED segment defaults (0–101). Blank means send null.
+        defaultLed1ColorWhenOn =
+        defaultLed1ColorWhenOff =
+        defaultLed1IntensityWhenOn =
+        defaultLed1IntensityWhenOff =
+        defaultLed2ColorWhenOn =
+        defaultLed2ColorWhenOff =
+        defaultLed2IntensityWhenOn =
+        defaultLed2IntensityWhenOff =
+        defaultLed3ColorWhenOn =
+        defaultLed3ColorWhenOff =
+        defaultLed3IntensityWhenOn =
+        defaultLed3IntensityWhenOff =
+        defaultLed4ColorWhenOn =
+        defaultLed4ColorWhenOff =
+        defaultLed4IntensityWhenOn =
+        defaultLed4IntensityWhenOff =
+        defaultLed5ColorWhenOn =
+        defaultLed5ColorWhenOff =
+        defaultLed5IntensityWhenOn =
+        defaultLed5IntensityWhenOff =
+        defaultLed6ColorWhenOn =
+        defaultLed6ColorWhenOff =
+        defaultLed6IntensityWhenOn =
+        defaultLed6IntensityWhenOff =
+        defaultLed7ColorWhenOn =
+        defaultLed7ColorWhenOff =
+        defaultLed7IntensityWhenOn =
+        defaultLed7IntensityWhenOff =
+
+        fanControlMode = Disabled
+        fanLedLevelType = 0
+        highLevelForFanControlMode =
+        mediumLevelForFanControlMode =
+        lowLevelForFanControlMode =
+        ledColorForFanControlMode =
 
 mode: single
 
-# ===== Variables (bind !input to plain variables FIRST; then use in Jinja) =====
 variables:
   devices_raw: !input devices_multiline
+  params_raw: !input all_params_text
 
-  # Inputs -> plain vars
-  p1:  !input p1_dimming_speed_up_remote
-  p2:  !input p2_dimming_speed_up_local
-  p3:  !input p3_ramp_off_on_remote
-  p4:  !input p4_ramp_off_on_local
-  p5:  !input p5_dimming_speed_down_remote
-  p6:  !input p6_dimming_speed_down_local
-  p7:  !input p7_ramp_on_off_remote
-  p8:  !input p8_ramp_on_off_local
-  p9:  !input p9_min_level
-  p10: !input p10_max_level
-  p11: !input p11_invert_switch
-  p12: !input p12_auto_off
-  p15: !input p15_level_after_power
-  p17: !input p17_led_indicator_timeout
-  p18: !input p18_active_power_reports
-  p19: !input p19_periodic_reports
-  p20: !input p20_active_energy_reports
-  p22: !input p22_switch_type
-  p52: !input p52_smart_bulb_mode
-  p53: !input p53_double_tap_up_to_p55
-  p54: !input p54_double_tap_down_to_p56
-  p55: !input p55_double_tap_up_level
-  p56: !input p56_double_tap_down_level
-  p60: !input p60_led_color_on
-  p61: !input p61_led_color_off
-  p62: !input p62_led_intensity_on
-  p63: !input p63_led_intensity_off
-  p64: !input p64_led_bar_scaling
-  p125: !input p125_binding_default_level
-  p50: !input p50_button_delay
-  p256: !input p256_local_protection
-  p257: !input p257_remote_protection
-  p261: !input p261_relay_click
-  p260: !input p260_fw_update_indicator
-
-  # Prepare list of MQTT device names (flat list, trimmed, non-blank, up to 20)
+  # Parse device names
   device_names: >
-    {{ devices_raw.splitlines() | map('trim') | reject('equalto','') | list | unique | list | map('string') | list }}
+    {{ devices_raw.splitlines() | map('trim') | reject('equalto','') | list | unique | list }}
   device_names_limited: >
     {{ device_names[:20] }}
 
-  # Build desired map (no read-only; Param 26 removed)
-  desired_common: >
-    {{
-      dict(
-        dimmingSpeedUpRemote = p1,
-        dimmingSpeedUpLocal  = p2,
-        rampRateOffToOnRemote = p3,
-        rampRateOffToOnLocal  = p4,
-        dimmingSpeedDownRemote = p5,
-        dimmingSpeedDownLocal  = p6,
-        rampRateOnToOffRemote  = p7,
-        rampRateOnToOffLocal   = p8,
+  # Parse params into dict; blanks become null
+  parsed_params: >
+    {% set out = dict() %}
+    {% for line in params_raw.splitlines() %}
+      {% set l = line.strip() %}
+      {% if not l or l.startswith('#') %}
+        {% continue %}
+      {% endif %}
+      {% set parts = l.split('=', 1) %}
+      {% if parts|length == 2 %}
+        {% set k = parts[0].strip() %}
+        {% set v = parts[1].strip() %}
+        {% set val = (none if v == '' else v) %}
+        {% set out = dict(out, **{k: val}) %}
+      {% endif %}
+    {% endfor %}
+    {{ out }}
 
-        minimumLevel = p9,
-        maximumLevel = p10,
-        invertSwitch = p11,
-        autoTimerOff = p12,
-
-        stateAfterPowerRestored = p15,
-        loadLevelIndicatorTimeout = p17,
-
-        activePowerReports = p18,
-        periodicPowerAndEnergyReports = p19,
-        activeEnergyReports = p20,
-
-        switchType = p22,
-
-        smartBulbMode = p52,
-        doubleTapUpToParam55 = p53,
-        doubleTapDownToParam56 = p54,
-        brightnessLevelForDoubleTapUp = p55,
-        brightnessLevelForDoubleTapDown = p56,
-
-        ledColorWhenOn = p60,
-        ledColorWhenOff = p61,
-        ledIntensityWhenOn = p62,
-        ledIntensityWhenOff = p63,
-        ledBarScaling = p64,
-
-        bindingOffToOnSyncLevel = p125,
-
-        buttonDelay = p50,
-        localProtection = p256,
-        remoteProtection = p257,
-        relayClick = p261,
-        firmwareUpdateInProgressIndicator = p260
-      )
-    }}
+  desired_common: "{{ parsed_params }}"
 
 sequence:
   - variables:
@@ -319,224 +162,91 @@ sequence:
       sequence:
         - variables:
             dev_name: "{{ repeat.item }}"
-            # Try to find a light entity whose *device name* equals this MQTT friendly name
-            matched_entity: >
-              {% set found = namespace(e=None) %}
-              {% for e in states.light | map(attribute='entity_id') | list %}
-                {% if device_attr(device_id(e), 'name') == dev_name %}
-                  {% set found.e = e %}
-                  {% break %}
-                {% endif %}
-              {% endfor %}
-              {{ found.e }}
-            can_verify: "{{ matched_entity is not none }}"
             desired: "{{ desired_common }}"
-            # If we found an entity, compute diff; otherwise send full map
-            diff: >
-              {% if matched_entity %}
-                {% set out = dict() %}
-                {% for k, v in desired.items() %}
-                  {% if state_attr(matched_entity, k) != v %}
-                    {% set out = dict(out, **{k: v}) %}
-                  {% endif %}
-                {% endfor %}
-                {{ out }}
-              {% else %}
-                {{ desired }}
-              {% endif %}
-
-        # ----- Reporting: disable existing (max interval = 65535) -----
-        - variables:
             txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
+
+        # --- Reset reporting ---
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{
-                dict(id=dev_name, endpoint=1, cluster='genOnOff', attribute='onOff',
-                     minimum_report_interval=0, maximum_report_interval=65535,
-                     reportable_change=0, transaction=txn_base ~ '_onoff_disable') | tojson
-              }}
-        - wait_for_trigger:
-            - platform: mqtt
-              topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: "{{ value_json.transaction == (txn_base ~ '_onoff_disable') }}"
-          timeout: "00:00:10"
-          continue_on_timeout: true
+            payload: >
+              {{ dict(id=dev_name, endpoint=1, cluster='genOnOff', attribute='onOff',
+                      minimum_report_interval=0, maximum_report_interval=65535,
+                      reportable_change=0, transaction=txn_base ~ '_onoff_disable') | tojson }}
 
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{
-                dict(id=dev_name, endpoint=1, cluster='genLevelCtrl', attribute='currentLevel',
-                     minimum_report_interval=0, maximum_report_interval=65535,
-                     reportable_change=1, transaction=txn_base ~ '_level_disable') | tojson
-              }}
-        - wait_for_trigger:
-            - platform: mqtt
-              topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: "{{ value_json.transaction == (txn_base ~ '_level_disable') }}"
-          timeout: "00:00:10"
-          continue_on_timeout: true
+            payload: >
+              {{ dict(id=dev_name, endpoint=1, cluster='genLevelCtrl', attribute='currentLevel',
+                      minimum_report_interval=0, maximum_report_interval=65535,
+                      reportable_change=1, transaction=txn_base ~ '_level_disable') | tojson }}
 
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{
-                dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelLocal',
-                     minimum_report_interval=0, maximum_report_interval=65535,
-                     reportable_change=1, transaction=txn_base ~ '_dll_disable') | tojson
-              }}
-        - wait_for_trigger:
-            - platform: mqtt
-              topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: "{{ value_json.transaction == (txn_base ~ '_dll_disable') }}"
-          timeout: "00:00:10"
-          continue_on_timeout: true
+            payload: >
+              {{ dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelLocal',
+                      minimum_report_interval=0, maximum_report_interval=65535,
+                      reportable_change=1, transaction=txn_base ~ '_dll_disable') | tojson }}
 
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{
-                dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelRemote',
-                     minimum_report_interval=0, maximum_report_interval=65535,
-                     reportable_change=1, transaction=txn_base ~ '_dlr_disable') | tojson
-              }}
-        - wait_for_trigger:
-            - platform: mqtt
-              topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: "{{ value_json.transaction == (txn_base ~ '_dlr_disable') }}"
-          timeout: "00:00:10"
-          continue_on_timeout: true
+            payload: >
+              {{ dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelRemote',
+                      minimum_report_interval=0, maximum_report_interval=65535,
+                      reportable_change=1, transaction=txn_base ~ '_dlr_disable') | tojson }}
 
-        # ----- Reporting: apply desired -----
+        # --- Apply reporting ---
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{
-                dict(id=dev_name, endpoint=1, cluster='genOnOff', attribute='onOff',
-                     minimum_report_interval=0, maximum_report_interval=10800,
-                     reportable_change=0, transaction=txn_base ~ '_onoff_set') | tojson
-              }}
-        - wait_for_trigger:
-            - platform: mqtt
-              topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: "{{ value_json.transaction == (txn_base ~ '_onoff_set') and value_json.status == 'ok' }}"
-          timeout: "00:00:10"
-          continue_on_timeout: true
+            payload: >
+              {{ dict(id=dev_name, endpoint=1, cluster='genOnOff', attribute='onOff',
+                      minimum_report_interval=0, maximum_report_interval=10800,
+                      reportable_change=0, transaction=txn_base ~ '_onoff_set') | tojson }}
 
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{
-                dict(id=dev_name, endpoint=1, cluster='genLevelCtrl', attribute='currentLevel',
-                     minimum_report_interval=5, maximum_report_interval=10800,
-                     reportable_change=1, transaction=txn_base ~ '_level_set') | tojson
-              }}
-        - wait_for_trigger:
-            - platform: mqtt
-              topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: "{{ value_json.transaction == (txn_base ~ '_level_set') and value_json.status == 'ok' }}"
-          timeout: "00:00:10"
-          continue_on_timeout: true
+            payload: >
+              {{ dict(id=dev_name, endpoint=1, cluster='genLevelCtrl', attribute='currentLevel',
+                      minimum_report_interval=5, maximum_report_interval=10800,
+                      reportable_change=1, transaction=txn_base ~ '_level_set') | tojson }}
 
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{
-                dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelLocal',
-                     minimum_report_interval=0, maximum_report_interval=10800,
-                     reportable_change=1, transaction=txn_base ~ '_dll_set') | tojson
-              }}
-        - wait_for_trigger:
-            - platform: mqtt
-              topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: "{{ value_json.transaction == (txn_base ~ '_dll_set') and value_json.status == 'ok' }}"
-          timeout: "00:00:10"
-          continue_on_timeout: true
+            payload: >
+              {{ dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelLocal',
+                      minimum_report_interval=0, maximum_report_interval=10800,
+                      reportable_change=1, transaction=txn_base ~ '_dll_set') | tojson }}
 
         - action: mqtt.publish
           data:
             topic: zigbee2mqtt/bridge/request/device/configure_reporting
-            payload: >-
-              {{
-                dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelRemote',
-                     minimum_report_interval=0, maximum_report_interval=10800,
-                     reportable_change=1, transaction=txn_base ~ '_dlr_set') | tojson
-              }}
-        - wait_for_trigger:
-            - platform: mqtt
-              topic: zigbee2mqtt/bridge/response/device/configure_reporting
-              value_template: "{{ value_json.transaction == (txn_base ~ '_dlr_set') and value_json.status == 'ok' }}"
-          timeout: "00:00:10"
-          continue_on_timeout: true
+            payload: >
+              {{ dict(id=dev_name, endpoint=1, cluster='manuSpecificInovelli', attribute='defaultLevelRemote',
+                      minimum_report_interval=0, maximum_report_interval=10800,
+                      reportable_change=1, transaction=txn_base ~ '_dlr_set') | tojson }}
 
-        # ----- Params: push diff-only (if we can verify) or full set -----
-        - choose:
-            - conditions: "{{ can_verify and (diff|length == 0) }}"
-              sequence:
-                - action: logbook.log
-                  data:
-                    name: "Inovelli Defaults"
-                    message: "{{ dev_name }}: params up-to-date (no changes sent)."
-            - conditions: []
-              sequence:
-                - action: mqtt.publish
-                  data:
-                    topic: "zigbee2mqtt/{{ dev_name }}/set"
-                    qos: 0
-                    retain: false
-                    payload: "{{ diff | tojson }}"
-                - choose:
-                    - conditions: "{{ can_verify }}"
-                      sequence:
-                        - wait_template: >
-                            {% set ok = true %}
-                            {% for k, v in diff.items() %}
-                              {% set e = matched_entity %}
-                              {% if state_attr(e, k) != v %}
-                                {% set ok = false %}
-                              {% endif %}
-                            {% endfor %}
-                            {{ ok }}
-                          timeout: "00:00:15"
-                          continue_on_timeout: true
-                        - choose:
-                            - conditions: >
-                                {% set ok = true %}
-                                {% for k, v in diff.items() %}
-                                  {% if state_attr(matched_entity, k) != v %}
-                                    {% set ok = false %}
-                                  {% endif %}
-                                {% endfor %}
-                                {{ ok }}
-                              sequence:
-                                - action: logbook.log
-                                  data:
-                                    name: "Inovelli Defaults"
-                                    message: "{{ dev_name }}: updated {{ diff|length }} setting(s)."
-                            - conditions: []
-                              sequence:
-                                - action: logbook.log
-                                  data:
-                                    name: "Inovelli Defaults"
-                                    message: "{{ dev_name }}: FAILED to update params within timeout. Check Z2M logs."
-                    - conditions: []
-                      sequence:
-                        - action: logbook.log
-                          data:
-                            name: "Inovelli Defaults"
-                            message: "{{ dev_name }}: params sent (unverified — no matching HA light entity)."
+        # --- Send parameters (always full dict, including nulls) ---
+        - action: mqtt.publish
+          data:
+            topic: "zigbee2mqtt/{{ dev_name }}/set"
+            qos: 0
+            retain: false
+            payload: "{{ desired | tojson }}"
+
+        - action: logbook.log
+          data:
+            name: "Inovelli Params"
+            message: "{{ dev_name }}: full parameter set pushed ({{ desired|length }} keys)."
 
   - action: persistent_notification.create
     data:
       title: "Inovelli Blue – Results"
       message: >
         Finished processing {{ device_names_limited|length }} device(s).
-        See Logbook for per-device details.
+        See Logbook for details.
