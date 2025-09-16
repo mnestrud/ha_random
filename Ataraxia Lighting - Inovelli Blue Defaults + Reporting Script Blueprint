@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.3)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.4)
   description: >
     Sets Inovelli Blue parameters using Home Assistant config entities
     (number/select) with actions (HA 2024.8+). Only reporting is configured via MQTT.
@@ -152,43 +152,41 @@ variables:
 
   # Hard-coded defaults (derived from attached device data where present).
   # Missing keys will fall back to reference values.
-  hardcoded_defaults: >-
-    {{
-      dict(
-        dimmingSpeedUpRemote=0,
-        dimmingSpeedUpLocal=20,
-        rampRateOffToOnRemote=0,
-        rampRateOffToOnLocal=0,
-        dimmingSpeedDownRemote=127,
-        dimmingSpeedDownLocal=127,
-        invertSwitch="No",
-        autoTimerOff=0,
-        stateAfterPowerRestored=0,
-        loadLevelIndicatorTimeout="Stay On",
-        smartBulbMode="Smart Bulb Mode",
-        doubleTapUpToParam55="Disabled",
-        doubleTapDownToParam56="Disabled",
-        brightnessLevelForDoubleTapUp=254,
-        brightnessLevelForDoubleTapDown=1,
-        singleTapBehavior="Old Behavior",
-        buttonDelay="300ms",
-        ledColorWhenOn=170,
-        ledColorWhenOff=170,
-        ledIntensityWhenOn=33,
-        ledIntensityWhenOff=1,
-        defaultLevelLocal=251,
-        defaultLevelRemote=251,
-        localProtection="Disabled",
-        bindingOffToOnSyncLevel="Disabled",
-        firmwareUpdateInProgressIndicator="Enabled",
-        fanControlMode="Disabled",
-        lowLevelForFanControlMode=63,
-        onOffLedMode="All",
-        outputMode="Dimmer"
-        {# medium/high/ledColorForFanControlMode and LED segment defaults omitted (unknown) #}
-        {# quickStart* omitted (not present in attached) #}      
-      )
-    }}
+    hardcoded_defaults: >-
+    {{ {
+      'dimmingSpeedUpRemote': 0,
+      'dimmingSpeedUpLocal': 20,
+      'rampRateOffToOnRemote': 0,
+      'rampRateOffToOnLocal': 0,
+      'dimmingSpeedDownRemote': 127,
+      'dimmingSpeedDownLocal': 127,
+      'minimumLevel': 1,
+      'maximumLevel': 254,
+      'invertSwitch': 'No',
+      'autoTimerOff': 0,
+      'stateAfterPowerRestored': 0,
+      'loadLevelIndicatorTimeout': 'Stay On',
+      'smartBulbMode': 'Smart Bulb Mode',
+      'doubleTapUpToParam55': 'Disabled',
+      'doubleTapDownToParam56': 'Disabled',
+      'brightnessLevelForDoubleTapUp': 254,
+      'brightnessLevelForDoubleTapDown': 1,
+      'singleTapBehavior': 'Old Behavior',
+      'buttonDelay': '300ms',
+      'ledColorWhenOn': 170,
+      'ledColorWhenOff': 170,
+      'ledIntensityWhenOn': 33,
+      'ledIntensityWhenOff': 1,
+      'defaultLevelLocal': 251,
+      'defaultLevelRemote': 251,
+      'localProtection': 'Disabled',
+      'bindingOffToOnSyncLevel': 'Disabled',
+      'firmwareUpdateInProgressIndicator': 'Enabled',
+      'fanControlMode': 'Disabled',
+      'lowLevelForFanControlMode': 63,
+      'onOffLedMode': 'All',
+      'outputMode': 'Dimmer'
+    } }}
 
   # Parse overrides YAML (if any)
   overrides_parsed: >-
