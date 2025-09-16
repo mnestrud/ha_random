@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.0)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v0.8.1)
   description: >
     Sets Inovelli Blue parameters using Home Assistant config entities
     (number/select) with actions (HA 2024.8+). Only reporting is configured via MQTT.
@@ -8,8 +8,7 @@ blueprint:
     Optionally override any value using a single YAML mapping.
   domain: script
 
-  # 2024.8+: service calls are actions
-  # https://www.home-assistant.io/blog/2024/08/07/release-20248/
+  # 2024.8+: service calls are actions (number.set_value / select.select_option)
 
   input:
     # --- Devices ---
@@ -58,24 +57,6 @@ blueprint:
         text:
           multiline: true
 
-    # --- Optional extras for reporting timing (leave as-is for sane defaults) ---
-    reporting_min_interval:
-      name: Reporting min interval (seconds)
-      default: 5
-      selector:
-        number:
-          min: 0
-          max: 3600
-          step: 1
-    reporting_max_interval:
-      name: Reporting max interval (seconds)
-      default: 10800
-      selector:
-        number:
-          min: 60
-          max: 21600
-          step: 60
-
 mode: parallel
 max: 50
 
@@ -86,19 +67,10 @@ variables:
   send_reporting: !input send_reporting
   push_parameters: !input push_parameters
   overrides_yaml: !input overrides_yaml
-  rpt_min: !input reporting_min_interval
-  rpt_max: !input reporting_max_interval
 
-  # Helper: return first entity on a device that matches domain + suffix
-  find_entity: >-
-    {% macro find_entity(dev_id, domain, suffix) -%}
-    {%- set ents = device_entities(dev_id)
-        | select('match', '^' ~ domain ~ '\\.')
-        | select('endswith', '_' ~ suffix)
-        | list -%}
-    {{ ents[0] if ents|length > 0 else none }}
-    {%- endmacro -%}
-    {{ find_entity }}
+  # fixed “sane defaults” for reporting (min/max)
+  rpt_min: 5
+  rpt_max: 10800
 
   # Base param map: key -> (domain, suffix)
   base_params: >-
@@ -117,36 +89,27 @@ variables:
       ('autoTimerOff',                 'number', 'autotimeroff'),
       ('stateAfterPowerRestored',      'number', 'stateafterpowerrestored'),
       ('loadLevelIndicatorTimeout',    'select', 'loadlevelindicatortimeout'),
-
       ('smartBulbMode',                'select', 'smartbulbmode'),
       ('doubleTapUpToParam55',         'select', 'doubletapuptoparam55'),
       ('doubleTapDownToParam56',       'select', 'doubletapdowntoparam56'),
       ('brightnessLevelForDoubleTapUp','number', 'brightnesslevelfordoubletapup'),
       ('brightnessLevelForDoubleTapDown','number','brightnesslevelfordoubletapdown'),
-
       ('singleTapBehavior',            'select', 'singletapbehavior'),
       ('buttonDelay',                  'select', 'buttondelay'),
-
       ('ledColorWhenOn',               'number', 'ledcolorwhenon'),
       ('ledColorWhenOff',              'number', 'ledcolorwhenoff'),
       ('ledIntensityWhenOn',           'number', 'ledintensitywhenon'),
       ('ledIntensityWhenOff',          'number', 'ledintensitywhenoff'),
-
       ('defaultLevelLocal',            'number', 'defaultlevellocal'),
       ('defaultLevelRemote',           'number', 'defaultlevelremote'),
-
       ('localProtection',              'select', 'localprotection'),
       ('bindingOffToOnSyncLevel',      'select', 'bindingofftoonsynclevel'),
       ('firmwareUpdateInProgressIndicator', 'select', 'firmwareupdateinprogressindicator'),
-
-      # Fan control
       ('fanControlMode',               'select', 'fancontrolmode'),
       ('lowLevelForFanControlMode',    'number', 'lowlevelforfancontrolmode'),
       ('mediumLevelForFanControlMode', 'number', 'mediumlevelforfancontrolmode'),
       ('highLevelForFanControlMode',   'number', 'highlevelforfancontrolmode'),
       ('ledColorForFanControlMode',    'number', 'ledcolorforfancontrolmode'),
-
-      # Optional extras that may exist depending on firmware
       ('onOffLedMode',                 'select', 'onoffledmode'),
       ('outputMode',                   'select', 'outputmode'),
       ('quickStartLevel',              'number', 'quickstartlevel'),
@@ -172,11 +135,15 @@ variables:
   defaults_from_reference: >-
     {% set d = dict() %}
     {% for key, domain, suffix in all_params %}
-      {% set ent = find_entity(ref_dev, domain, suffix) %}
+      {% set ents = device_entities(ref_dev)
+          | select('match', '^' ~ domain ~ '\\.')
+          | select('search', '_' ~ suffix ~ '$')
+          | list %}
+      {% set ent = ents[0] if ents|length > 0 else none %}
       {% if ent %}
         {% set raw = states(ent) %}
         {% if domain == 'number' and raw not in ['unknown', 'unavailable', ''] %}
-          {% set val = raw | float if '.' in raw else raw | int %}
+          {% set val = (raw | float) if ('.' in raw) else (raw | int) %}
         {% else %}
           {% set val = raw %}
         {% endif %}
@@ -268,7 +235,7 @@ sequence:
                             "transaction": txn_base ~ "_dlr_disable"
                           } | tojson }}
 
-                    # set reporting with sane intervals
+                    # set reporting with fixed intervals (min=5s, max=10800s)
                     - action: mqtt.publish
                       data:
                         topic: zigbee2mqtt/bridge/request/device/configure_reporting
@@ -276,7 +243,7 @@ sequence:
                           {{ {
                             "id": dev_name, "endpoint": 1, "cluster": "genOnOff",
                             "attribute": "onOff", "minimum_report_interval": 0,
-                            "maximum_report_interval": rpt_max, "reportable_change": 0,
+                            "maximum_report_interval": 10800, "reportable_change": 0,
                             "transaction": txn_base ~ "_onoff_set"
                           } | tojson }}
                     - action: mqtt.publish
@@ -285,8 +252,8 @@ sequence:
                         payload: >-
                           {{ {
                             "id": dev_name, "endpoint": 1, "cluster": "genLevelCtrl",
-                            "attribute": "currentLevel", "minimum_report_interval": rpt_min,
-                            "maximum_report_interval": rpt_max, "reportable_change": 1,
+                            "attribute": "currentLevel", "minimum_report_interval": 5,
+                            "maximum_report_interval": 10800, "reportable_change": 1,
                             "transaction": txn_base ~ "_level_set"
                           } | tojson }}
                     - action: mqtt.publish
@@ -296,7 +263,7 @@ sequence:
                           {{ {
                             "id": dev_name, "endpoint": 1, "cluster": "manuSpecificInovelli",
                             "attribute": "defaultLevelLocal", "minimum_report_interval": 0,
-                            "maximum_report_interval": rpt_max, "reportable_change": 1,
+                            "maximum_report_interval": 10800, "reportable_change": 1,
                             "transaction": txn_base ~ "_dll_set"
                           } | tojson }}
                     - action: mqtt.publish
@@ -306,7 +273,7 @@ sequence:
                           {{ {
                             "id": dev_name, "endpoint": 1, "cluster": "manuSpecificInovelli",
                             "attribute": "defaultLevelRemote", "minimum_report_interval": 0,
-                            "maximum_report_interval": rpt_max, "reportable_change": 1,
+                            "maximum_report_interval": 10800, "reportable_change": 1,
                             "transaction": txn_base ~ "_dlr_set"
                           } | tojson }}
 
@@ -314,7 +281,6 @@ sequence:
             - choose:
                 - conditions: "{{ push_parameters }}"
                   sequence:
-                    # Iterate base params
                     - repeat:
                         for_each: "{{ all_params }}"
                         sequence:
@@ -323,7 +289,13 @@ sequence:
                               domain: "{{ repeat.item[1] }}"
                               suffix: "{{ repeat.item[2] }}"
                               ent: >-
-                                {{ find_entity(dev_id, domain, suffix) }}
+                                {{
+                                  (device_entities(dev_id)
+                                   | select('match', '^' ~ domain ~ '\\.')
+                                   | select('search', '_' ~ suffix ~ '$')
+                                   | list
+                                  ) | first
+                                }}
                               desired: "{{ desired_common[key] if key in desired_common else none }}"
                           - choose:
                               - conditions: >-
@@ -349,4 +321,3 @@ sequence:
                 name: "Inovelli Config"
                 message: >-
                   {{ dev_name }}: reporting={{ send_reporting }}, parameters={{ push_parameters }} applied.
-
