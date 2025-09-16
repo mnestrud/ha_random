@@ -823,7 +823,7 @@ variables:
        level_config = dict(
          execute_if_off = level_config_execute_if_off
        ),
-       # per-LED segments
+       {# per-LED segments #}
        defaultLed1ColorWhenOn = num(defaultLed1ColorWhenOn),
        defaultLed1ColorWhenOff = num(defaultLed1ColorWhenOff),
        defaultLed1IntensityWhenOn = num(defaultLed1IntensityWhenOn),
@@ -852,7 +852,7 @@ variables:
        defaultLed7ColorWhenOff = num(defaultLed7ColorWhenOff),
        defaultLed7IntensityWhenOn = num(defaultLed7IntensityWhenOn),
        defaultLed7IntensityWhenOff = num(defaultLed7IntensityWhenOff),
-       # fan control mode stuff
+       {# fan control mode stuff #}
        fanControlMode = fanControlMode,
        fanLedLevelType = fanLedLevelType,
        highLevelForFanControlMode = num(highLevelForFanControlMode),
