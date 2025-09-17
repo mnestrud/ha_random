@@ -1,7 +1,7 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v1.14)
+  name: Ataraxia Lighting – Hue Defaults (v1.15)
   description: >
-    Apply Philips Hue defaults via Zigbee2MQTT suitable for Ataraxia Lighting.
+    Apply Philips Hue defaults via Zigbee2MQTT without a reference device.
 
     What it does per device:
       • Configures state reporting (endpoint 11) for On/Off, Level, and Color Temperature
@@ -9,9 +9,11 @@ blueprint:
       • Applies light defaults via `/set`, sending ONE key per publish:
         - power_on_behavior
         - color_temp_startup
-        - color_options.execute_if_off
-        - level_config.execute_if_off
+        - color_options.execute_if_off  (ALWAYS pushed: true)
+        - level_config.execute_if_off   (ALWAYS pushed: true)
       • Wait a short delay between MQTT publishes (default 0.5s) to avoid flooding
+
+    MQTT base topic is configurable (default: "zigbee2mqtt").
 
     Parameters
       • MQTT Base Topic (text, default: zigbee2mqtt)
@@ -25,41 +27,25 @@ blueprint:
       • Target devices (list)
 
     Changelog
-      • v1.14: Added configurable MQTT base topic; added docs tables (no logic change)
-      • v1.13: Added author, min_version, tags, icon, input_order, richer docs
+      • v1.15: Remove unsupported blueprint keys (icon/tags/input_order). Keep always-push of execute_if_off flags.
+      • v1.14: Added configurable MQTT base topic; docs tables (no logic change)
+      • v1.13: Docs polish
       • v1.12: Send light defaults one key per publish
       • v1.11: Removed reference device
 
     Notes / limitations
       • Requires Zigbee2MQTT.
       • Assumes Hue lights use endpoint 11 for reporting config.
-      • Assumes Hue lights exposed through MQTT integration.
 
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Hue%20Defaults
-
-  author: mnestrud
   homeassistant:
     min_version: 2024.8.0
-  tags: ["hue", "zigbee2mqtt", "lighting", "defaults", "reporting"]
-  icon: mdi:lightbulb-multiple
-
-  input_order:
-    - base_topic
-    - state_action
-    - color_sync
-    - transition
-    - optimistic
-    - publish_delay
-    - configure_reporting
-    - power_on_behavior
-    - target_devices
 
   input:
     base_topic:
       name: MQTT Base Topic
-      description: >
-        The root MQTT topic used by Zigbee2MQTT. Typically "zigbee2mqtt".
+      description: The root MQTT topic used by Zigbee2MQTT. Typically "zigbee2mqtt".
       default: zigbee2mqtt
       selector:
         text: {}
@@ -67,28 +53,21 @@ blueprint:
     # DEVICE OPTIONS (Z2M per-device)
     state_action:
       name: state_action (device option)
-      description: >
-        When true: state changes are also published as "action" events by Zigbee2MQTT.
-        When false: only state updates are published. Default = false for Hue lights.
+      description: When true, Z2M also publishes action events. Default = false.
       default: false
       selector:
         boolean: {}
 
     color_sync:
       name: color_sync (device option)
-      description: >
-        When true: Hue color modes (xy vs color_temp) are kept in sync automatically.
-        When false: modes are independent and may not update across attributes.
-        Default = true (recommended).
+      description: Keep xy and color_temp modes in sync. Default = true.
       default: true
       selector:
         boolean: {}
 
     transition:
       name: Default transition time (seconds, device option)
-      description: >
-        Device-level default transition time for on/off, brightness, and color changes.
-        Min = 0, Max = 5, Step = 0.1. Default = 0.4 (Hue factory default).
+      description: Device-level default transition time for on/off, brightness, and color changes.
       default: 0.4
       selector:
         number:
@@ -99,9 +78,7 @@ blueprint:
 
     optimistic:
       name: optimistic (device option)
-      description: >
-        When true: Zigbee2MQTT assumes commands succeed and updates state immediately.
-        When false: wait for report/confirm before updating state. Default = true.
+      description: Assume success and update state immediately. Default = true.
       default: true
       selector:
         boolean: {}
@@ -109,11 +86,7 @@ blueprint:
     # LIGHT DEFAULTS
     power_on_behavior:
       name: Power-on behavior (light default)
-      description: >
-        Behavior after power is restored:
-          • previous = restore last known state (recommended)
-          • "on" = always turn on after power
-          • "off" = always remain off after power
+      description: previous=restore last state; "on"=always on; "off"=stay off after power restore.
       default: previous
       selector:
         select:
@@ -126,9 +99,7 @@ blueprint:
     # TIMING / REPORTING
     publish_delay:
       name: Delay between MQTT publishes
-      description: >
-        Delay after every MQTT publish (per device & per command) to reduce Zigbee congestion.
-        Min = 0, Max = 5, Step = 0.1. Default = 0.5.
+      description: Pause after each publish (seconds). Default 0.5.
       default: 0.5
       selector:
         number:
@@ -140,11 +111,10 @@ blueprint:
     configure_reporting:
       name: Configure Switch State Reporting (endpoint 11)
       description: >
-        If ON (default): configures reporting on endpoint 11 for:
-          • OnOff.onOff (min 0, max 10800, change 0)
-          • LevelCtrl.currentLevel (min 0, max 10800, change 1)
-          • LightingColorCtrl.colorTemperature (min 0, max 10800, change 1)
-        If OFF: reporting is left as-is.
+        If ON (default): configures reporting for:
+          • genOnOff.onOff (min 0, max 10800, change 0)
+          • genLevelCtrl.currentLevel (min 0, max 10800, change 1)
+          • lightingColorCtrl.colorTemperature (min 0, max 10800, change 1)
       default: true
       selector:
         boolean: {}
@@ -152,9 +122,7 @@ blueprint:
     # DEVICES
     target_devices:
       name: Hue bulbs (Zigbee2MQTT)
-      description: >
-        Select one or more Hue lights paired through Zigbee2MQTT to apply defaults.
-        Each device will be configured individually.
+      description: Select one or more Hue lights paired through Zigbee2MQTT to apply defaults.
       default: []
       selector:
         device:
@@ -255,7 +223,7 @@ sequence:
               {{ { 'id': name, 'options': desired_device_options } | tojson }}
         - delay: "{{ in_publish_delay }}"
 
-        # 2) Light defaults (/set) – ONE KEY PER PUBLISH
+        # 2) Light defaults (/set) – ONE KEY PER PUBLISH (and ALWAYS push execute_if_off flags)
         # power_on_behavior
         - action: mqtt.publish
           data:
@@ -272,7 +240,7 @@ sequence:
               {{ { 'color_temp_startup': color_temp_startup_default } | tojson }}
         - delay: "{{ in_publish_delay }}"
 
-        # color_options.execute_if_off
+        # color_options.execute_if_off (ALWAYS)
         - action: mqtt.publish
           data:
             topic: "{{ set_topic }}"
@@ -280,7 +248,7 @@ sequence:
               {{ { 'color_options': { 'execute_if_off': color_options_execute_if_off_default } } | tojson }}
         - delay: "{{ in_publish_delay }}"
 
-        # level_config.execute_if_off
+        # level_config.execute_if_off (ALWAYS)
         - action: mqtt.publish
           data:
             topic: "{{ set_topic }}"
