@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v1.3)
+  name: Ataraxia Lighting – Hue Defaults (v1.00)
   description: >
     For Hue bulbs via Zigbee2MQTT. Applies:
       • Reporting (strict, per-attribute on endpoint 11): OnOff.onOff, LevelCtrl.currentLevel, LightingColorCtrl.colorTemperature
@@ -183,8 +183,7 @@ sequence:
               'power_on_behavior': in_power_on_behavior,
               'color_temp_startup': _color_temp_startup_default,
               'color_options': {'execute_if_off': _color_options_execute_if_off},
-              'level_config': {'execute_if_off': _level_config_execute_if_off},
-              'effect': none
+              'level_config': {'execute_if_off': _level_config_execute_if_off}
             } | tojson }}"
         - delay:
             seconds: "{{ in_pause_seconds }}"
