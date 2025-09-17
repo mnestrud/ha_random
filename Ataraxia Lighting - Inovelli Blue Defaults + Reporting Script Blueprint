@@ -1,20 +1,24 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.06)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.1)
   description: >
     Apply consistent Inovelli Blue (and compatible) device defaults using direct
-    Zigbee2MQTT `configure` commands.
+    Zigbee2MQTT `configure` commands, with an optional reference-device clone.
 
-    This version simplifies everything by:
-      • Removing HA entity actions and replacing them with direct MQTT configure commands
-      • Adding extended parameters (per-LED, relay click, quick start, etc.)
-      • Applying Zigbee reporting settings
-      • Publishing Z2M per-device options
-      • Adding a configurable delay between MQTT publishes (default 0.5s)
+    • Configure Switch Options: Pushes parameters via Z2M `device/configure`
+      (either cloned from a reference device or from bundled hard-coded defaults).
+    • Configure Switch State Reporting: Sets reporting for onOff, currentLevel,
+      and Inovelli default-levels; also publishes Z2M per-device options.
+    • Reference clone uses a temporary MQTT Discovery sensor that is created,
+      primed, read, and then deleted automatically. It clones **all keys** managed
+      by this blueprint (no exclusions). If a key is missing on the reference,
+      the hard-coded default is used as a fallback.
+    • Delay between MQTT publishes is configurable (default 0.5s).
 
     Author: mnestrud
 
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Inovelli%20Blue%20Defaults%20%2B%20Reporting%20Script%20Blueprint
+
   input:
     reference_device:
       name: Reference device
@@ -24,8 +28,7 @@ blueprint:
         device:
           filter:
             - integration: mqtt
-      
-    
+
     use_hardcoded_defaults:
       name: Override reference with hard coded defaults
       description: >
@@ -47,8 +50,9 @@ blueprint:
     push_parameters:
       name: Configure Switch Options
       description: >
-        If ON, sends either hard-coded defaults (if override is ON) or values read from the
-        reference device directly to Zigbee2MQTT using configure commands.
+        If ON, sends either hard-coded defaults (if override is ON) or values cloned
+        from the reference device (temporary MQTT discovery sensor) to Zigbee2MQTT
+        using configure commands.
       default: true
       selector:
         boolean: {}
@@ -161,17 +165,88 @@ variables:
       }
     }}
 
-  desired_common: >-
-    {% if use_hardcoded_defaults %}
-      {{ hardcoded_defaults }}
-    {% else %}
-      {{ {} }}
-    {% endif %}
-
 sequence:
   - variables:
       devices_20: >-
         {{ (tgt_devs or [])[:20] }}
+
+  # Build desired_common:
+  # - If override is ON: use hardcoded_defaults
+  # - Else if a reference device is provided: create temporary MQTT discovery sensor, prime, read, delete; merge with hardcoded defaults
+  # - Else: fall back to hardcoded_defaults
+  - choose:
+      - conditions: "{{ use_hardcoded_defaults }}"
+        sequence:
+          - variables:
+              desired_common: "{{ hardcoded_defaults }}"
+      - conditions: "{{ (not use_hardcoded_defaults) and (ref_dev is not none) }}"
+        sequence:
+          - variables:
+              ref_name: >-
+                {{ device_attr(ref_dev, 'name') or device_attr(ref_dev, 'name_by_user') or ref_dev }}
+              ref_slug: >-
+                {{ (device_attr(ref_dev, 'name') or device_attr(ref_dev, 'name_by_user') or ref_dev)
+                   | lower | regex_replace('[^a-z0-9]+', '_') | trim('_') }}
+              disc_topic: >-
+                {{ 'homeassistant/sensor/ref_switch_json_' ~ ref_slug ~ '/config' }}
+              ref_entity: >-
+                {{ 'sensor.ref_switch_json_' ~ ref_slug }}
+          - action: mqtt.publish
+            data:
+              topic: "{{ disc_topic }}"
+              payload: >-
+                {{
+                  {
+                    "name": "Ref Switch JSON " ~ ref_slug,
+                    "object_id": "ref_switch_json_" ~ ref_slug,
+                    "unique_id": "ref_switch_json_z2m_" ~ ref_slug,
+                    "state_topic": "zigbee2mqtt/" ~ ref_name,
+                    "json_attributes_topic": "zigbee2mqtt/" ~ ref_name,
+                    "value_template": "{{ value_json.state | default('unknown') }}",
+                    "device": { "identifiers": ["ref_switch_json_virtual_" ~ ref_slug] }
+                  } | tojson
+                }}
+              retain: true
+          - action: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/bridge/request/device/state"
+              payload: >-
+                {{ {"id": ref_name} | tojson }}
+          - wait_for_trigger:
+              - platform: mqtt
+                topic: >-
+                  {{ 'zigbee2mqtt/' ~ ref_name }}
+            timeout: "00:00:05"
+            continue_on_timeout: true
+          - variables:
+              desired_from_reference: >-
+                {%- set e = ref_entity -%}
+                {%- set out = dict() -%}
+                {%- for k in hardcoded_defaults.keys() -%}
+                  {%- set v = state_attr(e, k) -%}
+                  {%- if v is not none -%}
+                    {%- set out = out | combine({ k: v }) -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                {{ out }}
+          - variables:
+              desired_common: >-
+                {%- set out = dict() -%}
+                {%- for k in hardcoded_defaults.keys() -%}
+                  {%- set v = desired_from_reference.get(k) -%}
+                  {%- set final = v if v is not none else hardcoded_defaults[k] -%}
+                  {%- set out = out | combine({ k: final }) -%}
+                {%- endfor -%}
+                {{ out }}
+          - action: mqtt.publish
+            data:
+              topic: "{{ disc_topic }}"
+              payload: ""
+              retain: true
+      - conditions: "{{ (not use_hardcoded_defaults) and (ref_dev is none) }}"
+        sequence:
+          - variables:
+              desired_common: "{{ hardcoded_defaults }}"
 
   - repeat:
       for_each: "{{ devices_20 }}"
