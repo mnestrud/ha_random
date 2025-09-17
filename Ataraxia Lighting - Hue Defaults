@@ -1,0 +1,234 @@
+blueprint:
+  name: Ataraxia Lighting – Hue Defaults (v0.1)
+  description: >
+    For Hue bulbs via Zigbee2MQTT. Applies:
+      • Device options (via bridge): state_action, color_sync, transition
+      • Light defaults (via device /set): power_on_behavior, color_temp_startup,
+        color_options.execute_if_off, level_config.execute_if_off,
+        color_mode=color_temp, effect=null
+    Optional debug verifies: logs device-options bridge response and
+    reads back light state properties.
+  domain: script
+
+input:
+  target_devices:
+    name: Hue bulbs (Zigbee2MQTT)
+    selector:
+      device:
+        multiple: true
+        filter:
+          - integration: mqtt
+
+  # DEVICE OPTIONS (EXPOSED)
+  state_action:
+    name: state_action (device option)
+    description: >
+      When true, state changes are also published as 'action' events.
+      Default false for Hue lights.
+    default: false
+    selector:
+      boolean:
+
+  color_sync:
+    name: color_sync (device option)
+    description: >
+      When true, Hue color modes are kept in sync (e.g., XY↔color_temp).
+      Default true (recommended).
+    default: true
+    selector:
+      boolean:
+
+  transition:
+    name: Default transition (seconds, device option)
+    description: >
+      Applies as the device default for on/off/brightness/color changes.
+      Min 0; no real max in Z2M. (UI uses a large cap.)
+    default: 0.4
+    selector:
+      number:
+        min: 0
+        max: 3600
+        step: 0.1
+        mode: slider
+
+  # LIGHT DEFAULTS (ONLY EXPOSE power_on_behavior)
+  power_on_behavior:
+    name: Power-on behavior
+    description: Behavior after mains power is restored.
+    default: previous
+    selector:
+      select:
+        mode: dropdown
+        options:
+          - previous
+          - on
+          - off
+          # Some Hue fw/variants may also support: default, recover
+
+  apply_immediately:
+    name: Apply now
+    default: true
+    selector:
+      boolean:
+
+  debug_verify:
+    name: Debug: verify & log
+    description: >
+      Log device-options bridge response and read-back key light fields.
+    default: false
+    selector:
+      boolean:
+
+# Hidden defaults (per your earlier request)
+variables:
+  _color_options_execute_if_off: true
+  _level_config_execute_if_off: true
+  _color_temp_startup_default: 370
+  _hidden_color_mode: "color_temp"
+  _hidden_effect: none
+  _verify_timeout: "00:00:03"
+
+mode: parallel
+max: 50
+
+sequence:
+  - variables:
+      _devices: >-
+        {{ (iif(target_devices is defined, target_devices, []))[:200] }}
+
+  - repeat:
+      for_each: "{{ _devices }}"
+      sequence:
+        - variables:
+            _dev_id: "{{ repeat.item }}"
+            _name: >-
+              {{ device_attr(_dev_id, 'name') or device_attr(_dev_id, 'name_by_user') or _dev_id }}
+            _set_topic: "zigbee2mqtt/{{ _name }}/set"
+            _get_topic: "zigbee2mqtt/{{ _name }}/get"
+            _state_topic: "zigbee2mqtt/{{ _name }}"
+            _req_devopts_topic: "zigbee2mqtt/bridge/request/device/options"
+            _resp_devopts_topic: "zigbee2mqtt/bridge/response/device/options"
+
+        # 1) Apply DEVICE OPTIONS via bridge
+        - action: mqtt.publish
+          data:
+            topic: "{{ _req_devopts_topic }}"
+            payload: >-
+              {{
+                {
+                  "id": _name,
+                  "options": {
+                    "transition": transition,
+                    "color_sync": color_sync,
+                    "state_action": state_action
+                  }
+                } | tojson
+              }}
+
+        # 2) Apply LIGHT defaults via device /set
+        - choose:
+            - conditions: "{{ apply_immediately }}"
+              sequence:
+                - action: mqtt.publish
+                  data:
+                    topic: "{{ _set_topic }}"
+                    payload: >-
+                      {{
+                        {
+                          "power_on_behavior": power_on_behavior,
+                          "color_temp_startup": _color_temp_startup_default,
+                          "color_options": { "execute_if_off": _color_options_execute_if_off },
+                          "level_config": { "execute_if_off": _level_config_execute_if_off },
+                          "color_mode": _hidden_color_mode,
+                          "effect": _hidden_effect
+                        } | tojson
+                      }}
+
+        # 3) DEBUG: Verify (bridge response + device state read-back)
+        - choose:
+            - conditions: "{{ debug_verify }}"
+              sequence:
+                # (same verify steps as before: bridge response + state read-back)
+                - wait_for_trigger:
+                    - platform: mqtt
+                      topic: "{{ _resp_devopts_topic }}"
+                  timeout: "{{ _verify_timeout }}"
+                  continue_on_timeout: true
+
+                - choose:
+                    - conditions: "{{ wait.trigger is defined }}"
+                      sequence:
+                        - variables:
+                            _resp_payload: "{{ wait.trigger.payload | default('') }}"
+                        - action: system_log.write
+                          data:
+                            level: info
+                            message: >-
+                              [Hue Z2M Defaults][VERIFY] {{ _name }} →
+                              device options response: {{ _resp_payload }}
+                    - conditions: "{{ wait.trigger is not defined }}"
+                      sequence:
+                        - action: system_log.write
+                          data:
+                            level: warning
+                            message: >-
+                              [Hue Z2M Defaults][VERIFY] {{ _name }} →
+                              no device-options response on {{ _resp_devopts_topic }}
+
+                - action: mqtt.publish
+                  data:
+                    topic: "{{ _get_topic }}"
+                    payload: >-
+                      {{
+                        {
+                          "power_on_behavior": "",
+                          "color_temp_startup": "",
+                          "color_options": "",
+                          "level_config": "",
+                          "color_mode": "",
+                          "effect": ""
+                        } | tojson
+                      }}
+                - wait_for_trigger:
+                    - platform: mqtt
+                      topic: "{{ _state_topic }}"
+                  timeout: "{{ _verify_timeout }}"
+                  continue_on_timeout: true
+
+                - choose:
+                    - conditions: "{{ wait.trigger is defined }}"
+                      sequence:
+                        - variables:
+                            _payload: "{{ wait.trigger.payload | default('') }}"
+                            _data: >-
+                              {% set p = _payload | default('') %}
+                              {% if p %}
+                                {{ p | from_json }}
+                              {% else %}
+                                { }
+                              {% endif %}
+                            _pob: "{{ _data.power_on_behavior | default('(missing)') }}"
+                            _cts: "{{ _data.color_temp_startup | default('(missing)') }}"
+                            _co_eio: "{{ _data.color_options.execute_if_off if _data.color_options is defined else '(missing)'}}"
+                            _lc_eio: "{{ _data.level_config.execute_if_off if _data.level_config is defined else '(missing)'}}"
+                            _cm: "{{ _data.color_mode | default('(missing)') }}"
+                            _eff: "{{ _data.effect | default('(missing)') }}"
+                        - action: system_log.write
+                          data:
+                            level: info
+                            message: >-
+                              [Hue Z2M Defaults][VERIFY] {{ _name }} →
+                              power_on_behavior={{ _pob }},
+                              color_temp_startup={{ _cts }},
+                              color_options.execute_if_off={{ _co_eio }},
+                              level_config.execute_if_off={{ _lc_eio }},
+                              color_mode={{ _cm }},
+                              effect={{ _eff }}
+                    - conditions: "{{ wait.trigger is not defined }}"
+                      sequence:
+                        - action: system_log.write
+                          data:
+                            level: warning
+                            message: >-
+                              [Hue Z2M Defaults][VERIFY] {{ _name }} →
+                              timed out waiting for state on {{ _state_topic }}
