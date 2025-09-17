@@ -19,11 +19,12 @@ blueprint:
     reference_device:
       name: Reference device
       description: Used as the source of parameter values when not overriding with hard-coded defaults.
+      default: null
       selector:
         device:
           filter:
             - integration: mqtt
-      default: null
+      
     
     use_hardcoded_defaults:
       name: Override reference with hard coded defaults
