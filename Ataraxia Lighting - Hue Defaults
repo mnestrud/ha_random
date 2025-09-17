@@ -1,21 +1,69 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v1.12)
+  name: Ataraxia Lighting – Hue Defaults (v1.14)
   description: >
-    Apply Philips Hue defaults via Zigbee2MQTT without a reference device.
+    Apply Philips Hue defaults via Zigbee2MQTT suitable for Ataraxia Lighting.
 
-    Per device it:
+    What it does per device:
       • Configures state reporting (endpoint 11) for On/Off, Level, and Color Temperature
       • Publishes Zigbee2MQTT device options (transition, color_sync, state_action, optimistic, qos=0)
-      • Applies light defaults via /set, sending ONE key per publish (power_on_behavior,
-        color_temp_startup, color_options.execute_if_off, level_config.execute_if_off)
-      • Waits a short delay between MQTT publishes (default 0.5s)
+      • Applies light defaults via `/set`, sending ONE key per publish:
+        - power_on_behavior
+        - color_temp_startup
+        - color_options.execute_if_off
+        - level_config.execute_if_off
+      • Wait a short delay between MQTT publishes (default 0.5s) to avoid flooding
 
-    Author: mnestrud
+    Parameters
+      • MQTT Base Topic (text, default: zigbee2mqtt)
+      • state_action (bool, default: false)
+      • color_sync (bool, default: true)
+      • transition (number, default: 0.4)
+      • optimistic (bool, default: true)
+      • Power-on behavior (select, default: previous)
+      • Delay between MQTT publishes (number, default: 0.5s)
+      • Configure Switch State Reporting (bool, default: true)
+      • Target devices (list)
+
+    Changelog
+      • v1.14: Added configurable MQTT base topic; added docs tables (no logic change)
+      • v1.13: Added author, min_version, tags, icon, input_order, richer docs
+      • v1.12: Send light defaults one key per publish
+      • v1.11: Removed reference device
+
+    Notes / limitations
+      • Requires Zigbee2MQTT.
+      • Assumes Hue lights use endpoint 11 for reporting config.
+      • Assumes Hue lights exposed through MQTT integration.
 
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Hue%20Defaults
 
+  author: mnestrud
+  homeassistant:
+    min_version: 2024.8.0
+  tags: ["hue", "zigbee2mqtt", "lighting", "defaults", "reporting"]
+  icon: mdi:lightbulb-multiple
+
+  input_order:
+    - base_topic
+    - state_action
+    - color_sync
+    - transition
+    - optimistic
+    - publish_delay
+    - configure_reporting
+    - power_on_behavior
+    - target_devices
+
   input:
+    base_topic:
+      name: MQTT Base Topic
+      description: >
+        The root MQTT topic used by Zigbee2MQTT. Typically "zigbee2mqtt".
+      default: zigbee2mqtt
+      selector:
+        text: {}
+
     # DEVICE OPTIONS (Z2M per-device)
     state_action:
       name: state_action (device option)
@@ -121,6 +169,8 @@ max: 50
 # Internal variables
 # --------------------
 variables:
+  base_topic: !input base_topic
+
   # Inputs → variables
   in_state_action: !input state_action
   in_color_sync: !input color_sync
@@ -149,9 +199,9 @@ variables:
         'qos': 0
       } }}
 
-  # Common request topics
-  req_devopts_topic: "zigbee2mqtt/bridge/request/device/options"
-  req_cfgrep_topic: "zigbee2mqtt/bridge/request/device/configure_reporting"
+  # Common request topics based on base_topic
+  req_devopts_topic: "{{ base_topic }}/bridge/request/device/options"
+  req_cfgrep_topic: "{{ base_topic }}/bridge/request/device/configure_reporting"
 
 # -------------
 # Main sequence
@@ -164,7 +214,7 @@ sequence:
             dev_id: "{{ repeat.item }}"
             name: >-
               {{ device_attr(dev_id, 'name') or device_attr(dev_id, 'name_by_user') or dev_id }}
-            set_topic: "zigbee2mqtt/{{ name }}/set"
+            set_topic: "{{ base_topic }}/{{ name }}/set"
 
         # 0) Strict reporting (endpoint 11)
         - choose:
