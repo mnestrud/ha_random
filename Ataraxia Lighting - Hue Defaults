@@ -1,11 +1,12 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v0.7)
+  name: Ataraxia Lighting – Hue Defaults (v0.8)
   description: >
     For Hue bulbs via Zigbee2MQTT. Applies:
       • Device options (via bridge): state_action, color_sync, transition
       • Light defaults (via device /set): power_on_behavior, color_temp_startup,
         color_options.execute_if_off, level_config.execute_if_off,
         color_mode=color_temp, effect=null
+    Adds a configurable pause between commands to avoid Zigbee congestion.
   domain: script
   author: mnestrud
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Hue%20Defaults
@@ -64,6 +65,17 @@ blueprint:
             - "on"
             - "off"
 
+    pause_seconds:
+      name: Pause between MQTT publishes (seconds)
+      description: Delay between each Zigbee2MQTT command and between devices.
+      default: 0.5
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 0.1
+          mode: slider
+
 # Hidden defaults (constants)
 variables:
   _color_options_execute_if_off: true
@@ -77,6 +89,7 @@ variables:
   in_color_sync: !input color_sync
   in_transition: !input transition
   in_power_on_behavior: !input power_on_behavior
+  in_pause_seconds: !input pause_seconds
 
   # Safe slice of devices for the loop
   _devices_200: "{{ (_devices | default([], true))[:200] }}"
@@ -107,6 +120,8 @@ sequence:
                 'state_action': in_state_action
               }
             } | tojson }}"
+        - delay:
+            seconds: "{{ in_pause_seconds }}"
 
         # 2) Apply LIGHT defaults via device /set
         - action: mqtt.publish
@@ -120,3 +135,5 @@ sequence:
               'color_mode': _hidden_color_mode,
               'effect': none
             } | tojson }}"
+        - delay:
+            seconds: "{{ in_pause_seconds }}"
