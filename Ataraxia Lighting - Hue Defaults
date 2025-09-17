@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v0.1)
+  name: Ataraxia Lighting – Hue Defaults (v0.2)
   description: >
     For Hue bulbs via Zigbee2MQTT. Applies:
       • Device options (via bridge): state_action, color_sync, transition
@@ -9,6 +9,8 @@ blueprint:
     Optional debug verifies: logs device-options bridge response and
     reads back light state properties.
   domain: script
+  author: mnestrud
+  source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Hue%20Defaults
 
 input:
   target_devices:
@@ -61,9 +63,8 @@ input:
         mode: dropdown
         options:
           - previous
-          - on
-          - off
-          # Some Hue fw/variants may also support: default, recover
+          - "on"     # quote to avoid YAML 1.1 boolean
+          - "off"    # quote to avoid YAML 1.1 boolean
 
   apply_immediately:
     name: Apply now
@@ -72,20 +73,19 @@ input:
       boolean:
 
   debug_verify:
-    name: "Debug: verify & log"
+    name: "Debug: verify & log"   # <- quoted to avoid mapping error
     description: >
       Log device-options bridge response and read-back key light fields.
     default: false
     selector:
       boolean:
 
-# Hidden defaults (per your earlier request)
+# Hidden defaults
 variables:
   _color_options_execute_if_off: true
   _level_config_execute_if_off: true
   _color_temp_startup_default: 370
   _hidden_color_mode: "color_temp"
-  _hidden_effect: none
   _verify_timeout: "00:00:03"
 
 mode: parallel
@@ -140,7 +140,7 @@ sequence:
                           "color_options": { "execute_if_off": _color_options_execute_if_off },
                           "level_config": { "execute_if_off": _level_config_execute_if_off },
                           "color_mode": _hidden_color_mode,
-                          "effect": _hidden_effect
+                          "effect": none   # real JSON null (Jinja's `none`)
                         } | tojson
                       }}
 
@@ -148,7 +148,6 @@ sequence:
         - choose:
             - conditions: "{{ debug_verify }}"
               sequence:
-                # (same verify steps as before: bridge response + state read-back)
                 - wait_for_trigger:
                     - platform: mqtt
                       topic: "{{ _resp_devopts_topic }}"
@@ -210,7 +209,7 @@ sequence:
                             _pob: "{{ _data.power_on_behavior | default('(missing)') }}"
                             _cts: "{{ _data.color_temp_startup | default('(missing)') }}"
                             _co_eio: "{{ _data.color_options.execute_if_off if _data.color_options is defined else '(missing)'}}"
-                            _lc_eio: "{{ _data.level_config.execute_if_off if _data.level_config is defined else '(missing)'}}"
+                            _lc_eio: "{{ _data.level_config.execute_if_off if _data.level_config is defined else '(missing)')}}"
                             _cm: "{{ _data.color_mode | default('(missing)') }}"
                             _eff: "{{ _data.effect | default('(missing)') }}"
                         - action: system_log.write
