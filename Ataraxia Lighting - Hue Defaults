@@ -113,36 +113,25 @@ sequence:
         - action: mqtt.publish
           data:
             topic: "{{ _req_devopts_topic }}"
-            payload: >-
-              {{
-                {
-                  "id": _name,
-                  "options": {
-                    "transition": transition,
-                    "color_sync": color_sync,
-                    "state_action": state_action
-                  }
-                } | tojson
-              }}
+            payload: "{{ {'id': _name, 'options': {'transition': transition, 'color_sync': color_sync, 'state_action': state_action}} | tojson }}"
+
 
         # 2) Apply LIGHT defaults via device /set
         - choose:
             - conditions: "{{ apply_immediately }}"
               sequence:
                 - action: mqtt.publish
-                  data:
-                    topic: "{{ _set_topic }}"
-                    payload: >-
-                      {{
-                        {
-                          "power_on_behavior": power_on_behavior,
-                          "color_temp_startup": _color_temp_startup_default,
-                          "color_options": { "execute_if_off": _color_options_execute_if_off },
-                          "level_config": { "execute_if_off": _level_config_execute_if_off },
-                          "color_mode": _hidden_color_mode,
-                          "effect": none   # real JSON null (Jinja's `none`)
-                        } | tojson
-                      }}
+                    data:
+                      topic: "{{ _set_topic }}"
+                      payload: "{{ {
+                        'power_on_behavior': power_on_behavior,
+                        'color_temp_startup': _color_temp_startup_default,
+                        'color_options': {'execute_if_off': _color_options_execute_if_off},
+                        'level_config': {'execute_if_off': _level_config_execute_if_off},
+                        'color_mode': _hidden_color_mode,
+                        'effect': none
+                      } | tojson }}"
+
 
         # 3) DEBUG: Verify (bridge response + device state read-back)
         - choose:
@@ -175,19 +164,16 @@ sequence:
                               no device-options response on {{ _resp_devopts_topic }}
 
                 - action: mqtt.publish
-                  data:
-                    topic: "{{ _get_topic }}"
-                    payload: >-
-                      {{
-                        {
-                          "power_on_behavior": "",
-                          "color_temp_startup": "",
-                          "color_options": "",
-                          "level_config": "",
-                          "color_mode": "",
-                          "effect": ""
-                        } | tojson
-                      }}
+                    data:
+                      topic: "{{ _get_topic }}"
+                      payload: "{{ {
+                        'power_on_behavior': '',
+                        'color_temp_startup': '',
+                        'color_options': '',
+                        'level_config': '',
+                        'color_mode': '',
+                        'effect': ''
+                      } | tojson }}"
                 - wait_for_trigger:
                     - platform: mqtt
                       topic: "{{ _state_topic }}"
