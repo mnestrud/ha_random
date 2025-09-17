@@ -1,13 +1,14 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v1.00)
+  name: Ataraxia Lighting – Hue Defaults (v1.01)
   description: >
-    For Hue bulbs via Zigbee2MQTT. Applies:
-      • Reporting (strict, per-attribute on endpoint 11): OnOff.onOff, LevelCtrl.currentLevel, LightingColorCtrl.colorTemperature
-      • Device options (bridge): state_action, color_sync, transition
-      • Light defaults (/set): power_on_behavior, color_temp_startup,
-        color_options.execute_if_off, level_config.execute_if_off,
-        color_mode=color_temp, effect=null
-    Adds a configurable pause between commands to avoid Zigbee congestion.
+    Script blueprint for applying Philips Hue defaults via Zigbee2MQTT.
+    For each selected Hue bulb (endpoint 11), the script performs three steps:
+      1) Configure strict reporting for on/off, brightness (level), and color temperature.
+      2) Apply Zigbee2MQTT device options (transition, color_sync, state_action).
+      3) Apply light defaults (power_on_behavior, color_temp_startup,
+         color_options.execute_if_off, level_config.execute_if_off).
+    Each MQTT publish is followed by a configurable pause to avoid Zigbee congestion.
+    Note: transition=0.4s is the Hue factory default transition time.
   domain: script
   author: mnestrud
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Hue%20Defaults
@@ -15,28 +16,41 @@ blueprint:
   input:
     target_devices:
       name: Hue bulbs (Zigbee2MQTT)
+      description: >
+        Select one or more Hue lights paired through Zigbee2MQTT to apply defaults.
+        Each device will be configured individually.
       selector:
         device:
           multiple: true
           filter:
             - integration: mqtt
 
-    # DEVICE OPTIONS (EXPOSED)
     state_action:
       name: state_action (device option)
+      description: >
+        When true: state changes are also published as "action" events.
+        When false: only state updates are sent.
+        Default = false for Hue lights.
       default: false
       selector:
         boolean:
 
     color_sync:
       name: color_sync (device option)
+      description: >
+        When true: Hue color modes (xy vs color_temp) are kept in sync automatically.
+        When false: modes are independent and may not update across attributes.
+        Default = true (recommended).
       default: true
       selector:
         boolean:
 
     transition:
-      name: Default transition (seconds, device option)
-      description: Min 0; max 5.0.
+      name: Default transition time (seconds, device option)
+      description: >
+        Device-level default transition time for on/off, brightness, and color changes.
+        Min = 0, Max = 5, Step = 0.1.
+        Default = 0.4 (this matches Hue’s factory default transition).
       default: 0.4
       selector:
         number:
@@ -45,9 +59,14 @@ blueprint:
           step: 0.1
           mode: slider
 
-    # LIGHT DEFAULTS (ONLY EXPOSE power_on_behavior)
     power_on_behavior:
-      name: Power-on behavior
+      name: Power-on behavior (light default)
+      description: >
+        Defines how the bulb behaves after power is restored:
+          • previous = restore last known state (recommended)
+          • "on" = always turn on after power
+          • "off" = always remain off after power
+        This is stored in the bulb’s firmware.
       default: previous
       selector:
         select:
@@ -59,7 +78,10 @@ blueprint:
 
     pause_seconds:
       name: Pause between MQTT publishes (seconds)
-      description: Delay between each Zigbee2MQTT command and between devices.
+      description: >
+        Delay inserted after every MQTT publish (per device and per command).
+        Helps reduce Zigbee congestion when updating multiple lights.
+        Min = 0, Max = 5, Step = 0.1. Default = 0.5.
       default: 0.5
       selector:
         number:
@@ -70,7 +92,13 @@ blueprint:
 
     configure_reporting:
       name: Configure strict reporting (endpoint 11)
-      description: Sends 3 configure_reporting calls per device.
+      description: >
+        When enabled (default): configures the bulb’s reporting for three attributes
+        on endpoint 11:
+          • OnOff.onOff (min 0, max 10800, change 0)
+          • LevelCtrl.currentLevel (min 0, max 10800, change 1)
+          • LightingColorCtrl.colorTemperature (min 0, max 10800, change 1)
+        When disabled: reporting is left as-is and not reconfigured.
       default: true
       selector:
         boolean:
@@ -108,7 +136,7 @@ sequence:
             _req_devopts_topic: "zigbee2mqtt/bridge/request/device/options"
             _req_cfgrep_topic: "zigbee2mqtt/bridge/request/device/configure_reporting"
 
-        # 0) Strict REPORTING (endpoint 11): onOff, currentLevel, colorTemperature
+        # 0) Strict reporting setup (endpoint 11)
         - choose:
             - conditions: "{{ in_configure_reporting }}"
               sequence:
@@ -160,7 +188,7 @@ sequence:
                 - delay:
                     seconds: "{{ in_pause_seconds }}"
 
-        # 1) Device options via bridge
+        # 1) Device options
         - action: mqtt.publish
           data:
             topic: "{{ _req_devopts_topic }}"
@@ -175,7 +203,7 @@ sequence:
         - delay:
             seconds: "{{ in_pause_seconds }}"
 
-        # 2) Light defaults via /set
+        # 2) Light defaults
         - action: mqtt.publish
           data:
             topic: "{{ _set_topic }}"
@@ -187,3 +215,74 @@ sequence:
             } | tojson }}"
         - delay:
             seconds: "{{ in_pause_seconds }}"
+
+# ------------------------------------------------------------------------------
+# Reference: Example MQTT payloads (for Developer Tools → MQTT → Publish)
+# (These are comments only; they do not run.)
+#
+# Base topics (default):
+#   Request:  zigbee2mqtt/bridge/request/...
+#   Response: zigbee2mqtt/bridge/response/...
+#   Device:   zigbee2mqtt/<FRIENDLY_NAME>/set
+#
+# 1) Strict reporting – OnOff.onOff (endpoint 11)
+# Topic: zigbee2mqtt/bridge/request/device/configure_reporting
+# Payload:
+# {
+#   "id": "LivingRoom_Hue",
+#   "endpoint": 11,
+#   "cluster": "genOnOff",
+#   "attribute": "onOff",
+#   "minimum_report_interval": 0,
+#   "maximum_report_interval": 10800,
+#   "reportable_change": 0
+# }
+#
+# 2) Strict reporting – LevelCtrl.currentLevel (endpoint 11)
+# Topic: zigbee2mqtt/bridge/request/device/configure_reporting
+# Payload:
+# {
+#   "id": "LivingRoom_Hue",
+#   "endpoint": 11,
+#   "cluster": "genLevelCtrl",
+#   "attribute": "currentLevel",
+#   "minimum_report_interval": 0,
+#   "maximum_report_interval": 10800,
+#   "reportable_change": 1
+# }
+#
+# 3) Strict reporting – LightingColorCtrl.colorTemperature (endpoint 11)
+# Topic: zigbee2mqtt/bridge/request/device/configure_reporting
+# Payload:
+# {
+#   "id": "LivingRoom_Hue",
+#   "endpoint": 11,
+#   "cluster": "lightingColorCtrl",
+#   "attribute": "colorTemperature",
+#   "minimum_report_interval": 0,
+#   "maximum_report_interval": 10800,
+#   "reportable_change": 1
+# }
+#
+# 4) Device options (transition, color_sync, state_action)
+# Topic: zigbee2mqtt/bridge/request/device/options
+# Payload:
+# {
+#   "id": "LivingRoom_Hue",
+#   "options": {
+#     "transition": 0.4,
+#     "color_sync": true,
+#     "state_action": false
+#   }
+# }
+#
+# 5) Light defaults (/set)
+# Topic: zigbee2mqtt/LivingRoom_Hue/set
+# Payload:
+# {
+#   "power_on_behavior": "previous",
+#   "color_temp_startup": 370,
+#   "color_options": { "execute_if_off": true },
+#   "level_config":  { "execute_if_off": true }
+# }
+# ------------------------------------------------------------------------------
