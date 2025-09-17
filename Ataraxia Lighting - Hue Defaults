@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v0.5)
+  name: Ataraxia Lighting – Hue Defaults (v0.6)
   description: >
     For Hue bulbs via Zigbee2MQTT. Applies:
       • Device options (via bridge): state_action, color_sync, transition
@@ -80,7 +80,7 @@ blueprint:
       selector:
         boolean:
 
-# Hidden defaults
+# Hidden defaults (constants)
 variables:
   _color_options_execute_if_off: true
   _level_config_execute_if_off: true
@@ -88,16 +88,24 @@ variables:
   _hidden_color_mode: "color_temp"
   _verify_timeout: "00:00:03"
 
+  # Bind blueprint inputs to internal variables
+  _devices: !input target_devices
+  in_state_action: !input state_action
+  in_color_sync: !input color_sync
+  in_transition: !input transition
+  in_power_on_behavior: !input power_on_behavior
+  in_apply_immediately: !input apply_immediately
+  in_debug_verify: !input debug_verify
+
+  # Safe slice of devices for the loop
+  _devices_200: "{{ (_devices | default([], true))[:200] }}"
+
 mode: parallel
 max: 50
 
 sequence:
-  - variables:
-      _devices: >-
-        {{ (target_devices if target_devices is defined else [])[:200] }}
-
   - repeat:
-      for_each: "{{ _devices }}"
+      for_each: "{{ _devices_200 }}"
       sequence:
         - variables:
             _dev_id: "{{ repeat.item }}"
@@ -113,17 +121,24 @@ sequence:
         - action: mqtt.publish
           data:
             topic: "{{ _req_devopts_topic }}"
-            payload: "{{ {'id': _name, 'options': {'transition': transition, 'color_sync': color_sync, 'state_action': state_action}} | tojson }}"
+            payload: "{{ {
+              'id': _name,
+              'options': {
+                'transition': in_transition,
+                'color_sync': in_color_sync,
+                'state_action': in_state_action
+              }
+            } | tojson }}"
 
         # 2) Apply LIGHT defaults via device /set
         - choose:
-            - conditions: "{{ apply_immediately }}"
+            - conditions: "{{ in_apply_immediately }}"
               sequence:
                 - action: mqtt.publish
                   data:
                     topic: "{{ _set_topic }}"
                     payload: "{{ {
-                      'power_on_behavior': power_on_behavior,
+                      'power_on_behavior': in_power_on_behavior,
                       'color_temp_startup': _color_temp_startup_default,
                       'color_options': {'execute_if_off': _color_options_execute_if_off},
                       'level_config': {'execute_if_off': _level_config_execute_if_off},
@@ -133,7 +148,7 @@ sequence:
 
         # 3) DEBUG: Verify (bridge response + device state read-back)
         - choose:
-            - conditions: "{{ debug_verify }}"
+            - conditions: "{{ in_debug_verify }}"
               sequence:
                 # 3a) Wait for bridge response to device options
                 - wait_for_trigger:
