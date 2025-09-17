@@ -72,7 +72,7 @@ input:
       boolean:
 
   debug_verify:
-    name: Debug: verify & log
+    name: "Debug: verify & log"
     description: >
       Log device-options bridge response and read-back key light fields.
     default: false
