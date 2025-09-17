@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v0.2)
+  name: Ataraxia Lighting – Hue Defaults (v0.3)
   description: >
     For Hue bulbs via Zigbee2MQTT. Applies:
       • Device options (via bridge): state_action, color_sync, transition
@@ -12,73 +12,73 @@ blueprint:
   author: mnestrud
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Hue%20Defaults
 
-input:
-  target_devices:
-    name: Hue bulbs (Zigbee2MQTT)
-    selector:
-      device:
-        multiple: true
-        filter:
-          - integration: mqtt
+  input:
+    target_devices:
+      name: Hue bulbs (Zigbee2MQTT)
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: mqtt
 
-  # DEVICE OPTIONS (EXPOSED)
-  state_action:
-    name: state_action (device option)
-    description: >
-      When true, state changes are also published as 'action' events.
-      Default false for Hue lights.
-    default: false
-    selector:
-      boolean:
+    # DEVICE OPTIONS (EXPOSED)
+    state_action:
+      name: state_action (device option)
+      description: >
+        When true, state changes are also published as 'action' events.
+        Default false for Hue lights.
+      default: false
+      selector:
+        boolean:
 
-  color_sync:
-    name: color_sync (device option)
-    description: >
-      When true, Hue color modes are kept in sync (e.g., XY↔color_temp).
-      Default true (recommended).
-    default: true
-    selector:
-      boolean:
+    color_sync:
+      name: color_sync (device option)
+      description: >
+        When true, Hue color modes are kept in sync (e.g., XY↔color_temp).
+        Default true (recommended).
+      default: true
+      selector:
+        boolean:
 
-  transition:
-    name: Default transition (seconds, device option)
-    description: >
-      Applies as the device default for on/off/brightness/color changes.
-      Min 0; no real max in Z2M. (UI uses a large cap.)
-    default: 0.4
-    selector:
-      number:
-        min: 0
-        max: 3600
-        step: 0.1
-        mode: slider
+    transition:
+      name: Default transition (seconds, device option)
+      description: >
+        Applies as the device default for on/off/brightness/color changes.
+        Min 0; no real max in Z2M. (UI uses a large cap.)
+      default: 0.4
+      selector:
+        number:
+          min: 0
+          max: 3600
+          step: 0.1
+          mode: slider
 
-  # LIGHT DEFAULTS (ONLY EXPOSE power_on_behavior)
-  power_on_behavior:
-    name: Power-on behavior
-    description: Behavior after mains power is restored.
-    default: previous
-    selector:
-      select:
-        mode: dropdown
-        options:
-          - previous
-          - "on"     # quote to avoid YAML 1.1 boolean
-          - "off"    # quote to avoid YAML 1.1 boolean
+    # LIGHT DEFAULTS (ONLY EXPOSE power_on_behavior)
+    power_on_behavior:
+      name: Power-on behavior
+      description: Behavior after mains power is restored.
+      default: previous
+      selector:
+        select:
+          mode: dropdown
+          options:
+            - previous
+            - "on"   # quoted to avoid YAML 1.1 boolean
+            - "off"  # quoted to avoid YAML 1.1 boolean
 
-  apply_immediately:
-    name: Apply now
-    default: true
-    selector:
-      boolean:
+    apply_immediately:
+      name: Apply now
+      default: true
+      selector:
+        boolean:
 
-  debug_verify:
-    name: "Debug: verify & log"   # <- quoted to avoid mapping error
-    description: >
-      Log device-options bridge response and read-back key light fields.
-    default: false
-    selector:
-      boolean:
+    debug_verify:
+      name: "Debug: verify & log"
+      description: >
+        Log device-options bridge response and read-back key light fields.
+      default: false
+      selector:
+        boolean:
 
 # Hidden defaults
 variables:
@@ -94,7 +94,7 @@ max: 50
 sequence:
   - variables:
       _devices: >-
-        {{ (iif(target_devices is defined, target_devices, []))[:200] }}
+        {{ (target_devices if target_devices is defined else [])[:200] }}
 
   - repeat:
       for_each: "{{ _devices }}"
