@@ -1,8 +1,8 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.12)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.13, Z2M configure only, configurable topic)
   description: >
     Apply consistent Inovelli Blue (and compatible) device defaults using direct
-    Zigbee2MQTT `configure` commands.
+    Zigbee2MQTT `configure` commands. This blueprint **does not use a reference device**.
 
     What it does per device:
       • Configure Switch Options: pushes bundled hard-coded defaults via Z2M `device/configure`
@@ -13,38 +13,15 @@ blueprint:
 
     MQTT base topic is configurable (default: "zigbee2mqtt").
 
-    Parameters
-      • MQTT Base Topic (text, default: zigbee2mqtt)
-      • Configure Switch State Reporting (bool, default: true)
-      • Configure Switch Options (bool, default: true)
-      • Delay between MQTT publishes (number, default: 0.5s)
-      • Target devices (list)
-
-    Notes / limitations
-      • Requires Zigbee2MQTT.
-      • Assumes device uses the standard Inovelli parameter names as exposed by Z2M.
+    Author: mnestrud
 
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Inovelli%20Blue%20Defaults%20%2B%20Reporting%20Script%20Blueprint
 
-  author: mnestrud
-  homeassistant:
-    min_version: 2024.8.0
-  tags: ["inovelli", "zigbee2mqtt", "lighting", "defaults", "reporting"]
-  icon: mdi:light-switch
-
-  input_order:
-    - base_topic
-    - send_reporting
-    - push_parameters
-    - publish_delay
-    - target_devices
-
   input:
     base_topic:
       name: MQTT Base Topic
-      description: >
-        The root MQTT topic used by Zigbee2MQTT. Typically "zigbee2mqtt".
+      description: The root MQTT topic used by Zigbee2MQTT. Typically "zigbee2mqtt".
       default: zigbee2mqtt
       selector:
         text: {}
@@ -88,6 +65,9 @@ blueprint:
           filter:
             - integration: mqtt
       default: []
+
+homeassistant:
+  min_version: 2024.8.0
 
 mode: parallel
 max: 50
@@ -292,7 +272,7 @@ sequence:
                             }}
                       - delay: "{{ publish_delay }}"
 
-                # Extra push for level_config.execute_if_off
+                # Always push level_config.execute_if_off
                 - action: mqtt.publish
                   data:
                     topic: "{{ base_topic }}/{{ dev_name }}/set"
