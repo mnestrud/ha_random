@@ -1,21 +1,54 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.11)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.12, Z2M configure only, configurable topic)
   description: >
     Apply consistent Inovelli Blue (and compatible) device defaults using direct
-    Zigbee2MQTT `configure` commands. This version removes all reference cloning.
+    Zigbee2MQTT `configure` commands. This blueprint **does not use a reference device**.
 
-    • Configure Switch Options: Pushes parameters via Z2M `device/configure`
-      using the bundled hard-coded defaults below.
-    • Configure Switch State Reporting: Sets reporting for onOff, currentLevel,
-      and Inovelli default-levels; also publishes Z2M per-device options.
-    • Delay between MQTT publishes is configurable (default 0.5s).
+    What it does per device:
+      • Configure Switch Options: pushes bundled hard-coded defaults via Z2M `device/configure`
+      • Configure Switch State Reporting: sets reporting for on/off, level, and Inovelli default-levels
+      • Publish Zigbee2MQTT device options (transition/state_action/optimistic/qos)
+      • Send `level_config.execute_if_off=true` to each device
+      • Wait a short delay between MQTT publishes (default 0.5s) to avoid flooding
 
-    Author: mnestrud
+    MQTT base topic is configurable (default: "zigbee2mqtt").
+
+    Parameters
+      • MQTT Base Topic (text, default: zigbee2mqtt)
+      • Configure Switch State Reporting (bool, default: true)
+      • Configure Switch Options (bool, default: true)
+      • Delay between MQTT publishes (number, default: 0.5s)
+      • Target devices (list)
+
+    Notes / limitations
+      • Requires Zigbee2MQTT.
+      • Assumes device uses the standard Inovelli parameter names as exposed by Z2M.
 
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Inovelli%20Blue%20Defaults%20%2B%20Reporting%20Script%20Blueprint
 
+  author: mnestrud
+  homeassistant:
+    min_version: 2024.8.0
+  tags: ["inovelli", "zigbee2mqtt", "lighting", "defaults", "reporting"]
+  icon: mdi:light-switch
+
+  input_order:
+    - base_topic
+    - send_reporting
+    - push_parameters
+    - publish_delay
+    - target_devices
+
   input:
+    base_topic:
+      name: MQTT Base Topic
+      description: >
+        The root MQTT topic used by Zigbee2MQTT. Typically "zigbee2mqtt".
+      default: zigbee2mqtt
+      selector:
+        text: {}
+
     send_reporting:
       name: Configure Switch State Reporting
       description: >
@@ -60,6 +93,7 @@ mode: parallel
 max: 50
 
 variables:
+  base_topic: !input base_topic
   tgt_devs: !input target_devices
   send_reporting: !input send_reporting
   push_parameters: !input push_parameters
@@ -72,6 +106,9 @@ variables:
   z2m_state_action: false
   z2m_optimistic: true
   z2m_qos: 0
+
+  # Hidden extra defaults
+  level_config_execute_if_off_default: true
 
   hardcoded_defaults: >-
     {{
@@ -158,7 +195,7 @@ sequence:
               sequence:
                 - action: mqtt.publish
                   data:
-                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    topic: "{{ base_topic }}/bridge/request/device/configure_reporting"
                     payload: >-
                       {{
                         {
@@ -174,7 +211,7 @@ sequence:
                 - delay: "{{ publish_delay }}"
                 - action: mqtt.publish
                   data:
-                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    topic: "{{ base_topic }}/bridge/request/device/configure_reporting"
                     payload: >-
                       {{
                         {
@@ -190,7 +227,7 @@ sequence:
                 - delay: "{{ publish_delay }}"
                 - action: mqtt.publish
                   data:
-                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    topic: "{{ base_topic }}/bridge/request/device/configure_reporting"
                     payload: >-
                       {{
                         {
@@ -206,7 +243,7 @@ sequence:
                 - delay: "{{ publish_delay }}"
                 - action: mqtt.publish
                   data:
-                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
+                    topic: "{{ base_topic }}/bridge/request/device/configure_reporting"
                     payload: >-
                       {{
                         {
@@ -222,7 +259,7 @@ sequence:
                 - delay: "{{ publish_delay }}"
                 - action: mqtt.publish
                   data:
-                    topic: zigbee2mqtt/bridge/request/device/options
+                    topic: "{{ base_topic }}/bridge/request/device/options"
                     payload: >-
                       {{
                         {
@@ -245,7 +282,7 @@ sequence:
                     sequence:
                       - action: mqtt.publish
                         data:
-                          topic: zigbee2mqtt/bridge/request/device/configure
+                          topic: "{{ base_topic }}/bridge/request/device/configure"
                           payload: >-
                             {{
                               {
@@ -254,3 +291,11 @@ sequence:
                               } | tojson
                             }}
                       - delay: "{{ publish_delay }}"
+
+                # Extra push for level_config.execute_if_off
+                - action: mqtt.publish
+                  data:
+                    topic: "{{ base_topic }}/{{ dev_name }}/set"
+                    payload: >-
+                      {{ { 'level_config': { 'execute_if_off': level_config_execute_if_off_default } } | tojson }}
+                - delay: "{{ publish_delay }}"
