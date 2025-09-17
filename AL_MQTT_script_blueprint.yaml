@@ -1,16 +1,11 @@
 # =============================================================================
 # Changelog
-# v0.5 (current)
-# - Added "already-correct?" checks to skip redundant publishes:
-#   • Inovelli: compares adapted bri against brightness, defaultLevelLocal, defaultLevelRemote.
-#   • Group: compares adapted bri & mired against brightness & color_temp.
-# - Added optional inputs to point at HA entities for accurate comparison.
-# - Improved input/field descriptions and structure for clarity.
-# - Delay logic updated: 1s delay now occurs only when the first mqtt.publish runs.
+# v1.0 (current)
+# - Removed level_config and color_options.  These seem to be persistent.
 # =============================================================================
 
 blueprint:
-  name: Ataraxia Lighting Adaptation Control Script (v0.5)
+  name: Ataraxia Lighting - Light and Switch MQTT Control Script (v1.0)
   domain: script
   author: mnestrud
   description: >
@@ -197,7 +192,6 @@ sequence:
               payload: |-
                 {{
                   {
-                    "level_config": {"execute_if_off": true},
                     "defaultLevelLocal": bri,
                     "defaultLevelRemote": bri,
                     "brightness": bri,
@@ -224,9 +218,8 @@ sequence:
                 {{
                   {
                     "state": state_for_lights,
-                    "level_config": {"execute_if_off": true},
-                    "color_options": {"execute_if_off": true},
                     "brightness": bri,
                     "color_temp": mired
                   } | tojson
                 }}
+
