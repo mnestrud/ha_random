@@ -1,12 +1,12 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.1)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.05, Z2M configure only)
   description: >
     Apply consistent Inovelli Blue (and compatible) device defaults using direct
     Zigbee2MQTT `configure` commands.
 
     This version simplifies everything by:
       • Removing HA entity actions and replacing them with direct MQTT configure commands
-      • Adding all extended parameters (per-LED, relay click, quick start, etc.)
+      • Adding extended parameters (per-LED, relay click, quick start, etc.)
       • Applying Zigbee reporting settings
       • Publishing Z2M per-device options
       • Adding a configurable delay between MQTT publishes (default 0.5s)
@@ -15,24 +15,23 @@ blueprint:
   input:
     reference_device:
       name: Reference device
-      description: Used as the source of parameter values when "Use hard-coded defaults" is OFF.
+      description: Used as the source of parameter values when not overriding with hard-coded defaults.
       selector:
         device:
           filter:
             - integration: mqtt
 
-    target_devices:
-      name: Target devices
-      description: Up to 20 devices to configure in one run.
+    use_hardcoded_defaults:
+      name: Override reference with hard coded defaults
+      description: >
+        If ON, ignores the reference device and uses the bundled defaults. OFF by default.
+        With this ON, the script is valid even if no reference device is selected.
+      default: false
       selector:
-        device:
-          multiple: true
-          filter:
-            - integration: mqtt
-      default: []
+        boolean: {}
 
     send_reporting:
-      name: Configure Zigbee reporting
+      name: Configure Switch State Reporting
       description: >
         If ON, applies reporting for on/off, level, and Inovelli-specific attributes,
         plus publishes Z2M device options.
@@ -41,19 +40,11 @@ blueprint:
         boolean: {}
 
     push_parameters:
-      name: Push parameters (via Z2M configure)
+      name: Configure Switch Options
       description: >
-        If ON, sends either hard-coded defaults (if enabled) or values read from the
+        If ON, sends either hard-coded defaults (if override is ON) or values read from the
         reference device directly to Zigbee2MQTT using configure commands.
       default: true
-      selector:
-        boolean: {}
-
-    use_hardcoded_defaults:
-      name: Use hard-coded defaults
-      description: >
-        If ON, ignores the reference device and uses the bundled defaults. OFF by default.
-      default: false
       selector:
         boolean: {}
 
@@ -68,6 +59,16 @@ blueprint:
           max: 5
           step: 0.1
           unit_of_measurement: seconds
+
+    target_devices:
+      name: Target devices
+      description: Up to 20 devices to configure in one run.
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: mqtt
+      default: []
 
 mode: parallel
 max: 50
