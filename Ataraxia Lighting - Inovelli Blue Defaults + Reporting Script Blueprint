@@ -23,7 +23,8 @@ blueprint:
         device:
           filter:
             - integration: mqtt
-
+      default: null
+    
     use_hardcoded_defaults:
       name: Override reference with hard coded defaults
       description: >
