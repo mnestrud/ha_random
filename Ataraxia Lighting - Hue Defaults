@@ -1,9 +1,10 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v0.8)
+  name: Ataraxia Lighting – Hue Defaults (v1.2)
   description: >
     For Hue bulbs via Zigbee2MQTT. Applies:
-      • Device options (via bridge): state_action, color_sync, transition
-      • Light defaults (via device /set): power_on_behavior, color_temp_startup,
+      • Reporting (strict, per-attribute on endpoint 11): OnOff.onOff, LevelCtrl.currentLevel, LightingColorCtrl.colorTemperature
+      • Device options (bridge): state_action, color_sync, transition
+      • Light defaults (/set): power_on_behavior, color_temp_startup,
         color_options.execute_if_off, level_config.execute_if_off,
         color_mode=color_temp, effect=null
     Adds a configurable pause between commands to avoid Zigbee congestion.
@@ -23,27 +24,19 @@ blueprint:
     # DEVICE OPTIONS (EXPOSED)
     state_action:
       name: state_action (device option)
-      description: >
-        When true, state changes are also published as 'action' events.
-        Default false for Hue lights.
       default: false
       selector:
         boolean:
 
     color_sync:
       name: color_sync (device option)
-      description: >
-        When true, Hue color modes are kept in sync (e.g., XY↔color_temp).
-        Default true (recommended).
       default: true
       selector:
         boolean:
 
     transition:
       name: Default transition (seconds, device option)
-      description: >
-        Applies as the device default for on/off/brightness/color changes.
-        Min 0; max 5.0.
+      description: Min 0; max 5.0.
       default: 0.4
       selector:
         number:
@@ -55,7 +48,6 @@ blueprint:
     # LIGHT DEFAULTS (ONLY EXPOSE power_on_behavior)
     power_on_behavior:
       name: Power-on behavior
-      description: Behavior after mains power is restored.
       default: previous
       selector:
         select:
@@ -76,6 +68,13 @@ blueprint:
           step: 0.1
           mode: slider
 
+    configure_reporting:
+      name: Configure strict reporting (endpoint 11)
+      description: Sends 3 configure_reporting calls per device.
+      default: true
+      selector:
+        boolean:
+
 # Hidden defaults (constants)
 variables:
   _color_options_execute_if_off: true
@@ -90,6 +89,7 @@ variables:
   in_transition: !input transition
   in_power_on_behavior: !input power_on_behavior
   in_pause_seconds: !input pause_seconds
+  in_configure_reporting: !input configure_reporting
 
   # Safe slice of devices for the loop
   _devices_200: "{{ (_devices | default([], true))[:200] }}"
@@ -107,8 +107,61 @@ sequence:
               {{ device_attr(_dev_id, 'name') or device_attr(_dev_id, 'name_by_user') or _dev_id }}
             _set_topic: "zigbee2mqtt/{{ _name }}/set"
             _req_devopts_topic: "zigbee2mqtt/bridge/request/device/options"
+            _req_cfgrep_topic: "zigbee2mqtt/bridge/request/device/configure_reporting"
 
-        # 1) Apply DEVICE OPTIONS via bridge
+        # 0) Strict REPORTING (endpoint 11): onOff, currentLevel, colorTemperature
+        - choose:
+            - conditions: "{{ in_configure_reporting }}"
+              sequence:
+                # OnOff.onOff  (min 0, max 10800, change 0)
+                - action: mqtt.publish
+                  data:
+                    topic: "{{ _req_cfgrep_topic }}"
+                    payload: "{{ {
+                      'id': _name,
+                      'endpoint': 11,
+                      'cluster': 'genOnOff',
+                      'attribute': 'onOff',
+                      'minimum_report_interval': 0,
+                      'maximum_report_interval': 10800,
+                      'reportable_change': 0
+                    } | tojson }}"
+                - delay:
+                    seconds: "{{ in_pause_seconds }}"
+
+                # LevelCtrl.currentLevel (min 0, max 10800, change 1)
+                - action: mqtt.publish
+                  data:
+                    topic: "{{ _req_cfgrep_topic }}"
+                    payload: "{{ {
+                      'id': _name,
+                      'endpoint': 11,
+                      'cluster': 'genLevelCtrl',
+                      'attribute': 'currentLevel',
+                      'minimum_report_interval': 0,
+                      'maximum_report_interval': 10800,
+                      'reportable_change': 1
+                    } | tojson }}"
+                - delay:
+                    seconds: "{{ in_pause_seconds }}"
+
+                # LightingColorCtrl.colorTemperature (min 0, max 10800, change 1)
+                - action: mqtt.publish
+                  data:
+                    topic: "{{ _req_cfgrep_topic }}"
+                    payload: "{{ {
+                      'id': _name,
+                      'endpoint': 11,
+                      'cluster': 'lightingColorCtrl',
+                      'attribute': 'colorTemperature',
+                      'minimum_report_interval': 0,
+                      'maximum_report_interval': 10800,
+                      'reportable_change': 1
+                    } | tojson }}"
+                - delay:
+                    seconds: "{{ in_pause_seconds }}"
+
+        # 1) Device options via bridge
         - action: mqtt.publish
           data:
             topic: "{{ _req_devopts_topic }}"
@@ -123,7 +176,7 @@ sequence:
         - delay:
             seconds: "{{ in_pause_seconds }}"
 
-        # 2) Apply LIGHT defaults via device /set
+        # 2) Light defaults via /set
         - action: mqtt.publish
           data:
             topic: "{{ _set_topic }}"
