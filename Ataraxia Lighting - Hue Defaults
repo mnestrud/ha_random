@@ -1,14 +1,15 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v1.01)
+  name: Ataraxia Lighting – Hue Defaults (v1.04)
   description: >
     Script blueprint for applying Philips Hue defaults via Zigbee2MQTT.
     For each selected Hue bulb (endpoint 11), the script performs three steps:
       1) Configure strict reporting for on/off, brightness (level), and color temperature.
-      2) Apply Zigbee2MQTT device options (transition, color_sync, state_action).
+      2) Apply Zigbee2MQTT device options (transition, color_sync, state_action, optimistic, qos=0).
       3) Apply light defaults (power_on_behavior, color_temp_startup,
          color_options.execute_if_off, level_config.execute_if_off).
     Each MQTT publish is followed by a configurable pause to avoid Zigbee congestion.
     Note: transition=0.4s is the Hue factory default transition time.
+
   domain: script
   author: mnestrud
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Hue%20Defaults
@@ -25,11 +26,12 @@ blueprint:
           filter:
             - integration: mqtt
 
+    # DEVICE OPTIONS (EXPOSED)
     state_action:
       name: state_action (device option)
       description: >
-        When true: state changes are also published as "action" events.
-        When false: only state updates are sent.
+        When true: state changes are also published as "action" events by Zigbee2MQTT.
+        When false: only state updates are published.
         Default = false for Hue lights.
       default: false
       selector:
@@ -59,6 +61,18 @@ blueprint:
           step: 0.1
           mode: slider
 
+    optimistic:
+      name: optimistic (device option)
+      description: >
+        When true: Zigbee2MQTT assumes commands succeed and updates state immediately (optimistic mode).
+        When false: Zigbee2MQTT waits for the device to report/confirm before updating state.
+        Default = true (optimistic) — this makes HA feel more responsive,
+        but may occasionally show ghost states if a command fails.
+      default: true
+      selector:
+        boolean:
+
+    # LIGHT DEFAULTS (EXPOSED)
     power_on_behavior:
       name: Power-on behavior (light default)
       description: >
@@ -76,6 +90,7 @@ blueprint:
             - "on"
             - "off"
 
+    # TIMING / REPORTING
     pause_seconds:
       name: Pause between MQTT publishes (seconds)
       description: >
@@ -94,7 +109,7 @@ blueprint:
       name: Configure strict reporting (endpoint 11)
       description: >
         When enabled (default): configures the bulb’s reporting for three attributes
-        on endpoint 11:
+        on endpoint 11 with fixed intervals/thresholds:
           • OnOff.onOff (min 0, max 10800, change 0)
           • LevelCtrl.currentLevel (min 0, max 10800, change 1)
           • LightingColorCtrl.colorTemperature (min 0, max 10800, change 1)
@@ -114,6 +129,7 @@ variables:
   in_state_action: !input state_action
   in_color_sync: !input color_sync
   in_transition: !input transition
+  in_optimistic: !input optimistic
   in_power_on_behavior: !input power_on_behavior
   in_pause_seconds: !input pause_seconds
   in_configure_reporting: !input configure_reporting
@@ -188,7 +204,7 @@ sequence:
                 - delay:
                     seconds: "{{ in_pause_seconds }}"
 
-        # 1) Device options
+        # 1) Device options (persistent; stored in Zigbee2MQTT)
         - action: mqtt.publish
           data:
             topic: "{{ _req_devopts_topic }}"
@@ -198,13 +214,14 @@ sequence:
                 'transition': in_transition,
                 'color_sync': in_color_sync,
                 'state_action': in_state_action,
+                'optimistic': in_optimistic,
                 'qos': 0
               }
             } | tojson }}"
         - delay:
             seconds: "{{ in_pause_seconds }}"
 
-        # 2) Light defaults
+        # 2) Light defaults (/set on the device topic)
         - action: mqtt.publish
           data:
             topic: "{{ _set_topic }}"
@@ -265,7 +282,7 @@ sequence:
 #   "reportable_change": 1
 # }
 #
-# 4) Device options (transition, color_sync, state_action)
+# 4) Device options (transition, color_sync, state_action, optimistic, qos)
 # Topic: zigbee2mqtt/bridge/request/device/options
 # Payload:
 # {
@@ -273,7 +290,9 @@ sequence:
 #   "options": {
 #     "transition": 0.4,
 #     "color_sync": true,
-#     "state_action": false
+#     "state_action": false,
+#     "optimistic": true,
+#     "qos": 0
 #   }
 # }
 #
