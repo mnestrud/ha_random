@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.05)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.06)
   description: >
     Apply consistent Inovelli Blue (and compatible) device defaults using direct
     Zigbee2MQTT `configure` commands.
@@ -11,7 +11,10 @@ blueprint:
       • Publishing Z2M per-device options
       • Adding a configurable delay between MQTT publishes (default 0.5s)
 
+    Author: mnestrud
+
   domain: script
+  source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Inovelli%20Blue%20Defaults%20%2B%20Reporting%20Script%20Blueprint
   input:
     reference_device:
       name: Reference device
