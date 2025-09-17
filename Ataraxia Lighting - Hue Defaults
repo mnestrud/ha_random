@@ -1,41 +1,30 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v1.05)
+  name: Ataraxia Lighting – Hue Defaults (v1.12)
   description: >
-    Script blueprint for applying Philips Hue defaults via Zigbee2MQTT.
-    For each selected Hue bulb (endpoint 11), the script performs three steps:
-      1) Configure strict reporting for on/off, brightness (level), and color temperature.
-      2) Apply Zigbee2MQTT device options (transition, color_sync, state_action, optimistic, qos=0).
-      3) Apply light defaults (power_on_behavior, color_temp_startup,
-         color_options.execute_if_off, level_config.execute_if_off).
-    Each MQTT publish is followed by a configurable pause to avoid Zigbee congestion.
-    Note: transition=0.4s is the Hue factory default transition time.
+    Apply Philips Hue defaults via Zigbee2MQTT without a reference device.
+
+    Per device it:
+      • Configures state reporting (endpoint 11) for On/Off, Level, and Color Temperature
+      • Publishes Zigbee2MQTT device options (transition, color_sync, state_action, optimistic, qos=0)
+      • Applies light defaults via /set, sending ONE key per publish (power_on_behavior,
+        color_temp_startup, color_options.execute_if_off, level_config.execute_if_off)
+      • Waits a short delay between MQTT publishes (default 0.5s)
+
+    Author: mnestrud
 
   domain: script
-  author: mnestrud
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Hue%20Defaults
 
   input:
-    target_devices:
-      name: Hue bulbs (Zigbee2MQTT)
-      description: >
-        Select one or more Hue lights paired through Zigbee2MQTT to apply defaults.
-        Each device will be configured individually.
-      selector:
-        device:
-          multiple: true
-          filter:
-            - integration: mqtt
-
-    # DEVICE OPTIONS (EXPOSED)
+    # DEVICE OPTIONS (Z2M per-device)
     state_action:
       name: state_action (device option)
       description: >
         When true: state changes are also published as "action" events by Zigbee2MQTT.
-        When false: only state updates are published.
-        Default = false for Hue lights.
+        When false: only state updates are published. Default = false for Hue lights.
       default: false
       selector:
-        boolean:
+        boolean: {}
 
     color_sync:
       name: color_sync (device option)
@@ -45,14 +34,13 @@ blueprint:
         Default = true (recommended).
       default: true
       selector:
-        boolean:
+        boolean: {}
 
     transition:
       name: Default transition time (seconds, device option)
       description: >
         Device-level default transition time for on/off, brightness, and color changes.
-        Min = 0, Max = 5, Step = 0.1.
-        Default = 0.4 (this matches Hue’s factory default transition).
+        Min = 0, Max = 5, Step = 0.1. Default = 0.4 (Hue factory default).
       default: 0.4
       selector:
         number:
@@ -64,23 +52,20 @@ blueprint:
     optimistic:
       name: optimistic (device option)
       description: >
-        When true: Zigbee2MQTT assumes commands succeed and updates state immediately (optimistic mode).
-        When false: Zigbee2MQTT waits for the device to report/confirm before updating state.
-        Default = true (optimistic) — this makes HA feel more responsive,
-        but may occasionally show ghost states if a command fails.
+        When true: Zigbee2MQTT assumes commands succeed and updates state immediately.
+        When false: wait for report/confirm before updating state. Default = true.
       default: true
       selector:
-        boolean:
+        boolean: {}
 
-    # LIGHT DEFAULTS (EXPOSED)
+    # LIGHT DEFAULTS
     power_on_behavior:
       name: Power-on behavior (light default)
       description: >
-        Defines how the bulb behaves after power is restored:
+        Behavior after power is restored:
           • previous = restore last known state (recommended)
           • "on" = always turn on after power
           • "off" = always remain off after power
-        This is stored in the bulb’s firmware.
       default: previous
       selector:
         select:
@@ -91,11 +76,10 @@ blueprint:
             - "off"
 
     # TIMING / REPORTING
-    pause_seconds:
-      name: Pause between MQTT publishes (seconds)
+    publish_delay:
+      name: Delay between MQTT publishes
       description: >
-        Delay inserted after every MQTT publish (per device and per command).
-        Helps reduce Zigbee congestion when updating multiple lights.
+        Delay after every MQTT publish (per device & per command) to reduce Zigbee congestion.
         Min = 0, Max = 5, Step = 0.1. Default = 0.5.
       default: 0.5
       selector:
@@ -106,203 +90,150 @@ blueprint:
           mode: slider
 
     configure_reporting:
-      name: Configure strict reporting (endpoint 11)
+      name: Configure Switch State Reporting (endpoint 11)
       description: >
-        When enabled (default): configures the bulb’s reporting for three attributes
-        on endpoint 11 with fixed intervals/thresholds:
+        If ON (default): configures reporting on endpoint 11 for:
           • OnOff.onOff (min 0, max 10800, change 0)
           • LevelCtrl.currentLevel (min 0, max 10800, change 1)
           • LightingColorCtrl.colorTemperature (min 0, max 10800, change 1)
-        When disabled: reporting is left as-is and not reconfigured.
+        If OFF: reporting is left as-is.
       default: true
       selector:
-        boolean:
+        boolean: {}
 
-# Hidden defaults (constants)
+    # DEVICES
+    target_devices:
+      name: Hue bulbs (Zigbee2MQTT)
+      description: >
+        Select one or more Hue lights paired through Zigbee2MQTT to apply defaults.
+        Each device will be configured individually.
+      default: []
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: mqtt
+
+mode: parallel
+max: 50
+
+# --------------------
+# Internal variables
+# --------------------
 variables:
-  _color_options_execute_if_off: true
-  _level_config_execute_if_off: true
-  _color_temp_startup_default: 370
-
-  # Bind blueprint inputs to internal variables
-  _devices: !input target_devices
+  # Inputs → variables
   in_state_action: !input state_action
   in_color_sync: !input color_sync
   in_transition: !input transition
   in_optimistic: !input optimistic
   in_power_on_behavior: !input power_on_behavior
-  in_pause_seconds: !input pause_seconds
+  in_publish_delay: !input publish_delay
   in_configure_reporting: !input configure_reporting
 
-  # Safe slice of devices for the loop
-  _devices_200: "{{ (_devices | default([], true))[:200] }}"
+  # Constant defaults for Hue
+  color_temp_startup_default: 370
+  color_options_execute_if_off_default: true
+  level_config_execute_if_off_default: true
 
-mode: parallel
-max: 50
+  # Devices (slice for safety)
+  _devices: !input target_devices
+  devices_200: "{{ (_devices | default([], true))[:200] }}"
 
+  # Desired values (no reference path)
+  desired_device_options: >-
+    {{ {
+        'transition': in_transition,
+        'color_sync': in_color_sync,
+        'state_action': in_state_action,
+        'optimistic': in_optimistic,
+        'qos': 0
+      } }}
+
+  # Common request topics
+  req_devopts_topic: "zigbee2mqtt/bridge/request/device/options"
+  req_cfgrep_topic: "zigbee2mqtt/bridge/request/device/configure_reporting"
+
+# -------------
+# Main sequence
+# -------------
 sequence:
   - repeat:
-      for_each: "{{ _devices_200 }}"
+      for_each: "{{ devices_200 }}"
       sequence:
         - variables:
-            _dev_id: "{{ repeat.item }}"
-            _name: >-
-              {{ device_attr(_dev_id, 'name') or device_attr(_dev_id, 'name_by_user') or _dev_id }}
-            _set_topic: "zigbee2mqtt/{{ _name }}/set"
-            _req_devopts_topic: "zigbee2mqtt/bridge/request/device/options"
-            _req_cfgrep_topic: "zigbee2mqtt/bridge/request/device/configure_reporting"
+            dev_id: "{{ repeat.item }}"
+            name: >-
+              {{ device_attr(dev_id, 'name') or device_attr(dev_id, 'name_by_user') or dev_id }}
+            set_topic: "zigbee2mqtt/{{ name }}/set"
 
-        # 0) Strict reporting setup (endpoint 11)
+        # 0) Strict reporting (endpoint 11)
         - choose:
             - conditions: "{{ in_configure_reporting }}"
               sequence:
-                # OnOff.onOff  (min 0, max 10800, change 0)
+                # OnOff.onOff
                 - action: mqtt.publish
                   data:
-                    topic: "{{ _req_cfgrep_topic }}"
-                    payload: "{{ {
-                      'id': _name,
-                      'endpoint': 11,
-                      'cluster': 'genOnOff',
-                      'attribute': 'onOff',
-                      'minimum_report_interval': 0,
-                      'maximum_report_interval': 10800,
-                      'reportable_change': 0
-                    } | tojson }}"
-                - delay:
-                    seconds: "{{ in_pause_seconds }}"
+                    topic: "{{ req_cfgrep_topic }}"
+                    payload: >-
+                      {{ { 'id': name, 'endpoint': 11, 'cluster': 'genOnOff', 'attribute': 'onOff',
+                           'minimum_report_interval': 0, 'maximum_report_interval': 10800, 'reportable_change': 0 } | tojson }}
+                - delay: "{{ in_publish_delay }}"
 
-                # LevelCtrl.currentLevel (min 0, max 10800, change 1)
+                # LevelCtrl.currentLevel
                 - action: mqtt.publish
                   data:
-                    topic: "{{ _req_cfgrep_topic }}"
-                    payload: "{{ {
-                      'id': _name,
-                      'endpoint': 11,
-                      'cluster': 'genLevelCtrl',
-                      'attribute': 'currentLevel',
-                      'minimum_report_interval': 0,
-                      'maximum_report_interval': 10800,
-                      'reportable_change': 1
-                    } | tojson }}"
-                - delay:
-                    seconds: "{{ in_pause_seconds }}"
+                    topic: "{{ req_cfgrep_topic }}"
+                    payload: >-
+                      {{ { 'id': name, 'endpoint': 11, 'cluster': 'genLevelCtrl', 'attribute': 'currentLevel',
+                           'minimum_report_interval': 0, 'maximum_report_interval': 10800, 'reportable_change': 1 } | tojson }}
+                - delay: "{{ in_publish_delay }}"
 
-                # LightingColorCtrl.colorTemperature (min 0, max 10800, change 1)
+                # LightingColorCtrl.colorTemperature
                 - action: mqtt.publish
                   data:
-                    topic: "{{ _req_cfgrep_topic }}"
-                    payload: "{{ {
-                      'id': _name,
-                      'endpoint': 11,
-                      'cluster': 'lightingColorCtrl',
-                      'attribute': 'colorTemperature',
-                      'minimum_report_interval': 0,
-                      'maximum_report_interval': 10800,
-                      'reportable_change': 1
-                    } | tojson }}"
-                - delay:
-                    seconds: "{{ in_pause_seconds }}"
+                    topic: "{{ req_cfgrep_topic }}"
+                    payload: >-
+                      {{ { 'id': name, 'endpoint': 11, 'cluster': 'lightingColorCtrl', 'attribute': 'colorTemperature',
+                           'minimum_report_interval': 0, 'maximum_report_interval': 10800, 'reportable_change': 1 } | tojson }}
+                - delay: "{{ in_publish_delay }}"
 
-        # 1) Device options (persistent; stored in Zigbee2MQTT)
+        # 1) Device options (Z2M device-level) – single publish
         - action: mqtt.publish
           data:
-            topic: "{{ _req_devopts_topic }}"
-            payload: "{{ {
-              'id': _name,
-              'options': {
-                'transition': in_transition,
-                'color_sync': in_color_sync,
-                'state_action': in_state_action,
-                'optimistic': in_optimistic,
-                'qos': 0
-              }
-            } | tojson }}"
-        - delay:
-            seconds: "{{ in_pause_seconds }}"
+            topic: "{{ req_devopts_topic }}"
+            payload: >-
+              {{ { 'id': name, 'options': desired_device_options } | tojson }}
+        - delay: "{{ in_publish_delay }}"
 
-        # 2) Light defaults (/set on the device topic)
+        # 2) Light defaults (/set) – ONE KEY PER PUBLISH
+        # power_on_behavior
         - action: mqtt.publish
           data:
-            topic: "{{ _set_topic }}"
-            payload: "{{ {
-              'power_on_behavior': in_power_on_behavior,
-              'color_temp_startup': _color_temp_startup_default,
-              'color_options': {'execute_if_off': _color_options_execute_if_off},
-              'level_config': {'execute_if_off': _level_config_execute_if_off}
-            } | tojson }}"
-        - delay:
-            seconds: "{{ in_pause_seconds }}"
+            topic: "{{ set_topic }}"
+            payload: >-
+              {{ { 'power_on_behavior': in_power_on_behavior } | tojson }}
+        - delay: "{{ in_publish_delay }}"
 
-# ------------------------------------------------------------------------------
-# Reference: Example MQTT payloads (for Developer Tools → MQTT → Publish)
-# (These are comments only; they do not run.)
-#
-# Base topics (default):
-#   Request:  zigbee2mqtt/bridge/request/...
-#   Response: zigbee2mqtt/bridge/response/...
-#   Device:   zigbee2mqtt/<FRIENDLY_NAME>/set
-#
-# 1) Strict reporting – OnOff.onOff (endpoint 11)
-# Topic: zigbee2mqtt/bridge/request/device/configure_reporting
-# Payload:
-# {
-#   "id": "LivingRoom_Hue",
-#   "endpoint": 11,
-#   "cluster": "genOnOff",
-#   "attribute": "onOff",
-#   "minimum_report_interval": 0,
-#   "maximum_report_interval": 10800,
-#   "reportable_change": 0
-# }
-#
-# 2) Strict reporting – LevelCtrl.currentLevel (endpoint 11)
-# Topic: zigbee2mqtt/bridge/request/device/configure_reporting
-# Payload:
-# {
-#   "id": "LivingRoom_Hue",
-#   "endpoint": 11,
-#   "cluster": "genLevelCtrl",
-#   "attribute": "currentLevel",
-#   "minimum_report_interval": 0,
-#   "maximum_report_interval": 10800,
-#   "reportable_change": 1
-# }
-#
-# 3) Strict reporting – LightingColorCtrl.colorTemperature (endpoint 11)
-# Topic: zigbee2mqtt/bridge/request/device/configure_reporting
-# Payload:
-# {
-#   "id": "LivingRoom_Hue",
-#   "endpoint": 11,
-#   "cluster": "lightingColorCtrl",
-#   "attribute": "colorTemperature",
-#   "minimum_report_interval": 0,
-#   "maximum_report_interval": 10800,
-#   "reportable_change": 1
-# }
-#
-# 4) Device options (transition, color_sync, state_action, optimistic, qos)
-# Topic: zigbee2mqtt/bridge/request/device/options
-# Payload:
-# {
-#   "id": "LivingRoom_Hue",
-#   "options": {
-#     "transition": 0.4,
-#     "color_sync": true,
-#     "state_action": false,
-#     "optimistic": true,
-#     "qos": 0
-#   }
-# }
-#
-# 5) Light defaults (/set)
-# Topic: zigbee2mqtt/LivingRoom_Hue/set
-# Payload:
-# {
-#   "power_on_behavior": "previous",
-#   "color_temp_startup": 370,
-#   "color_options": { "execute_if_off": true },
-#   "level_config":  { "execute_if_off": true }
-# }
-# ------------------------------------------------------------------------------
+        # color_temp_startup
+        - action: mqtt.publish
+          data:
+            topic: "{{ set_topic }}"
+            payload: >-
+              {{ { 'color_temp_startup': color_temp_startup_default } | tojson }}
+        - delay: "{{ in_publish_delay }}"
+
+        # color_options.execute_if_off
+        - action: mqtt.publish
+          data:
+            topic: "{{ set_topic }}"
+            payload: >-
+              {{ { 'color_options': { 'execute_if_off': color_options_execute_if_off_default } } | tojson }}
+        - delay: "{{ in_publish_delay }}"
+
+        # level_config.execute_if_off
+        - action: mqtt.publish
+          data:
+            topic: "{{ set_topic }}"
+            payload: >-
+              {{ { 'level_config': { 'execute_if_off': level_config_execute_if_off_default } } | tojson }}
+        - delay: "{{ in_publish_delay }}"
