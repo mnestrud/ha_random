@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.13, Z2M configure only, configurable topic)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.14)
   description: >
     Apply consistent Inovelli Blue (and compatible) device defaults using direct
     Zigbee2MQTT `configure` commands. This blueprint **does not use a reference device**.
