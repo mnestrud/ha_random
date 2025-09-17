@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v1.04)
+  name: Ataraxia Lighting – Hue Defaults (v1.05)
   description: >
     Script blueprint for applying Philips Hue defaults via Zigbee2MQTT.
     For each selected Hue bulb (endpoint 11), the script performs three steps:
