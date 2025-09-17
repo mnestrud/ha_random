@@ -1,52 +1,51 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.00)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.01)
   description: >
     Sets Inovelli Blue parameters using Home Assistant config entities (number/select)
     with actions (HA 2024.8+). Only reporting is configured via MQTT. Provide up to 20
     devices; one shared set of config values applied to all. Defaults are read live from
     a reference device's current entity states, OR from hard-coded defaults when the
     toggle is enabled.
-  domain: script  # 2024.8+: service calls are actions (number.set_value / select.select_option)
+  domain: script
+  input:
+    reference_device:
+      name: Reference device (for defaults)
+      description: "We'll read this device's current config entity values as defaults."
+      selector:
+        device:
+          filter:
+            - integration: mqtt
 
-input:
-  reference_device:
-    name: Reference device (for defaults)
-    description: "We'll read this device's current config entity values as defaults."
-    selector:
-      device:
-        filter:
-          - integration: mqtt
+    target_devices:
+      name: Target devices (up to 20)
+      description: "Pick up to 20 Inovelli Blue switches/dimmers."
+      selector:
+        device:
+          multiple: true
+          filter:
+            - integration: mqtt
+      default: []
 
-  target_devices:
-    name: Target devices (up to 20)
-    description: "Pick up to 20 Inovelli Blue switches/dimmers."
-    selector:
-      device:
-        multiple: true
-        filter:
-          - integration: mqtt
-    default: []
+    send_reporting:
+      name: Configure Zigbee reporting (MQTT)
+      description: "If enabled, reset and re-apply reporting (OnOff, LevelCtrl, defaultLevelLocal/Remote) via MQTT."
+      default: true
+      selector:
+        boolean: {}
 
-  send_reporting:
-    name: Configure Zigbee reporting (MQTT)
-    description: "If enabled, reset and re-apply reporting (OnOff, LevelCtrl, defaultLevelLocal/Remote) via MQTT."
-    default: true
-    selector:
-      boolean: {}
+    push_parameters:
+      name: Push parameters to config entities
+      description: "If enabled, set number/select entities on each device to the desired values."
+      default: true
+      selector:
+        boolean: {}
 
-  push_parameters:
-    name: Push parameters to config entities
-    description: "If enabled, set number/select entities on each device to the desired values."
-    default: true
-    selector:
-      boolean: {}
-
-  use_hardcoded_defaults:
-    name: Use hard-coded defaults
-    description: "Enable to ignore the reference device and apply the hard-coded defaults below."
-    default: false
-    selector:
-      boolean: {}
+    use_hardcoded_defaults:
+      name: Use hard-coded defaults
+      description: "Enable to ignore the reference device and apply the hard-coded defaults below."
+      default: false
+      selector:
+        boolean: {}
 
 mode: parallel
 max: 50
@@ -290,19 +289,19 @@ sequence:
                 - action: mqtt.publish
                   data:
                     topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                    payload: >-
-                      {{
-                        {
-                          "id": dev_name,
-                          "endpoint": 1,
-                          "cluster": "genOnOff",
-                          "attribute": "onOff",
-                          "minimum_report_interval": 0,
-                          "maximum_report_interval": rpt_max,
-                          "reportable_change": 0,
-                          "transaction": txn_base ~ "_onoff_set"
-                        } | tojson
-                      }}
+                  payload: >-
+                    {{
+                      {
+                        "id": dev_name,
+                        "endpoint": 1,
+                        "cluster": "genOnOff",
+                        "attribute": "onOff",
+                        "minimum_report_interval": 0,
+                        "maximum_report_interval": rpt_max,
+                        "reportable_change": 0,
+                        "transaction": txn_base ~ "_onoff_set"
+                      } | tojson
+                    }}
 
                 - action: mqtt.publish
                   data:
