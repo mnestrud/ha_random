@@ -1,16 +1,51 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.01)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.02)
   description: >
-    Sets Inovelli Blue parameters using Home Assistant config entities (number/select)
-    with actions (HA 2024.8+). Only reporting is configured via MQTT. Provide up to 20
-    devices; one shared set of config values applied to all. Defaults are read live from
-    a reference device's current entity states, OR from hard-coded defaults when the
-    toggle is enabled.
+    Apply consistent Inovelli Blue device settings and Zigbee reporting in one go.
+    This script does two things (you can toggle each on/off):
+
+    1) Push parameters to each device's Home Assistant config entities (numbers/selects)
+       using HA *actions* (2024.8+). These include dim/ramp speeds, min/max levels,
+       LED options, power-restore behavior, etc. The values come from either:
+         • A reference device's current entity states (default), or
+         • A built-in set of hard-coded defaults (optional toggle).
+
+       Defaults if you do nothing:
+         • "Push parameters" = enabled (true)
+         • Source of values = the chosen reference device (not the hard-coded set)
+
+       Notable hard-coded defaults include:
+         – minimumLevel: 1
+         – maximumLevel: 254
+         – stateAfterPowerRestored: 255
+         – onOffLedMode: "All"
+         – outputMode: "Dimmer"
+         – defaultLevelLocal/Remote: 251, etc.
+
+    2) Configure Zigbee reporting via MQTT (through Zigbee2MQTT) for each selected device:
+         • genOnOff.onOff: min 0s, max 10800s, change 0
+         • genLevelCtrl.currentLevel: min 1s, max 10800s, change 1
+         • manuSpecificInovelli.{defaultLevelLocal, defaultLevelRemote}: min 0s, max 10800s, change 1
+       It also publishes per-device Z2M options:
+         – transition: 0.4
+         – state_action: false
+         – optimistic: true
+         – qos: 0
+
+       Defaults if you do nothing:
+         • "Configure Zigbee reporting" = enabled (true)
+         • Reporting intervals: min/currentLevel = 1s, max = 10800s (3 hours)
+         • Z2M device options above are sent once per device.
+
   domain: script
   input:
     reference_device:
       name: Reference device (for defaults)
-      description: "We'll read this device's current config entity values as defaults."
+      description: >
+        Used as the source of parameter values when "Use hard-coded defaults" is OFF (default).
+        The script reads the current HA entity states (numbers/selects) of this device and
+        applies them to the selected target devices. If you turn ON "Use hard-coded defaults",
+        this input is ignored.
       selector:
         device:
           filter:
@@ -18,7 +53,9 @@ blueprint:
 
     target_devices:
       name: Target devices (up to 20)
-      description: "Pick up to 20 Inovelli Blue switches/dimmers."
+      description: >
+        The Inovelli Blue devices to configure. The script processes them one by one.
+        Max 20 are applied in a single run to keep payloads manageable.
       selector:
         device:
           multiple: true
@@ -28,21 +65,33 @@ blueprint:
 
     send_reporting:
       name: Configure Zigbee reporting (MQTT)
-      description: "If enabled, reset and re-apply reporting (OnOff, LevelCtrl, defaultLevelLocal/Remote) via MQTT."
+      description: >
+        If ON (default), the script applies reporting for:
+          • genOnOff.onOff  → min 0s, max 10800s, change 0
+          • genLevelCtrl.currentLevel → min 1s, max 10800s, change 1
+          • manuSpecificInovelli.defaultLevelLocal/Remote → min 0s, max 10800s, change 1
+        It also publishes per-device Z2M options: transition=0.4, state_action=false,
+        optimistic=true, qos=0.
       default: true
       selector:
         boolean: {}
 
     push_parameters:
       name: Push parameters to config entities
-      description: "If enabled, set number/select entities on each device to the desired values."
+      description: >
+        If ON (default), the script writes number/select values on each device using HA actions:
+          • Source of values is the reference device (default), unless "Use hard-coded defaults" is ON.
+          • Example keys: min/max level, dim/ramp speeds, LED settings, power-restore behavior, etc.
+        Note: Requires HA 2024.8+ where service calls are actions.
       default: true
       selector:
         boolean: {}
 
     use_hardcoded_defaults:
       name: Use hard-coded defaults
-      description: "Enable to ignore the reference device and apply the hard-coded defaults below."
+      description: >
+        If ON, ignores the reference device and uses the built-in defaults bundled in this
+        blueprint (see comments near 'hardcoded_defaults'). OFF by default.
       default: false
       selector:
         boolean: {}
@@ -57,11 +106,11 @@ variables:
   push_parameters: !input push_parameters
   use_hardcoded_defaults: !input use_hardcoded_defaults
 
-  # fixed reporting intervals
-  rpt_min: 1            # CHANGED from 5 -> 1
-  rpt_max: 10800
+  # Reporting intervals
+  rpt_min: 1          # default: 1 second
+  rpt_max: 10800      # default: 10800 seconds (3 hours)
 
-  # Zigbee2MQTT per-device options to push
+  # Zigbee2MQTT per-device options
   z2m_transition: 0.4
   z2m_state_action: false
   z2m_optimistic: true
@@ -113,7 +162,7 @@ variables:
       ]
     }}
 
-  # LED segment params (1..7) without using .append (sandbox-safe)
+  # LED segment params (1..7)
   led_params: >-
     {%- set out = [] -%}
     {%- for i in range(1,8) -%}
@@ -165,7 +214,7 @@ variables:
         'maximumLevel': 254,
         'invertSwitch': 'No',
         'autoTimerOff': 0,
-        'stateAfterPowerRestored': 255,   # CHANGED from 0 -> 255
+        'stateAfterPowerRestored': 255,
         'loadLevelIndicatorTimeout': 'Stay On',
         'smartBulbMode': 'Smart Bulb Mode',
         'doubleTapUpToParam55': 'Disabled',
@@ -190,7 +239,7 @@ variables:
       }
     }}
 
-  # Final desired map (toggle selects which source to use)
+  # Final desired map
   desired_common: >-
     {% if use_hardcoded_defaults %}
       {{ hardcoded_defaults }}
@@ -212,11 +261,10 @@ sequence:
               {{ device_attr(dev_id, 'name') or device_attr(dev_id, 'name_by_user') or dev_id }}
             txn_base: "{{ dev_name ~ '_' ~ (now().timestamp()|int) }}"
 
-        # Reporting via MQTT (only)
+        # (1) Zigbee reporting via MQTT + Z2M options
         - choose:
             - conditions: "{{ send_reporting }}"
               sequence:
-                # disable reporting
                 - action: mqtt.publish
                   data:
                     topic: zigbee2mqtt/bridge/request/device/configure_reporting
@@ -228,80 +276,11 @@ sequence:
                           "cluster": "genOnOff",
                           "attribute": "onOff",
                           "minimum_report_interval": 0,
-                          "maximum_report_interval": 65535,
+                          "maximum_report_interval": rpt_max,
                           "reportable_change": 0,
-                          "transaction": txn_base ~ "_onoff_disable"
+                          "transaction": txn_base ~ "_onoff_set"
                         } | tojson
                       }}
-
-                - action: mqtt.publish
-                  data:
-                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                    payload: >-
-                      {{
-                        {
-                          "id": dev_name,
-                          "endpoint": 1,
-                          "cluster": "genLevelCtrl",
-                          "attribute": "currentLevel",
-                          "minimum_report_interval": 0,
-                          "maximum_report_interval": 65535,
-                          "reportable_change": 1,
-                          "transaction": txn_base ~ "_level_disable"
-                        } | tojson
-                      }}
-
-                - action: mqtt.publish
-                  data:
-                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                    payload: >-
-                      {{
-                        {
-                          "id": dev_name,
-                          "endpoint": 1,
-                          "cluster": "manuSpecificInovelli",
-                          "attribute": "defaultLevelLocal",
-                          "minimum_report_interval": 0,
-                          "maximum_report_interval": 65535,
-                          "reportable_change": 1,
-                          "transaction": txn_base ~ "_dll_disable"
-                        } | tojson
-                      }}
-
-                - action: mqtt.publish
-                  data:
-                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                    payload: >-
-                      {{
-                        {
-                          "id": dev_name,
-                          "endpoint": 1,
-                          "cluster": "manuSpecificInovelli",
-                          "attribute": "defaultLevelRemote",
-                          "minimum_report_interval": 0,
-                          "maximum_report_interval": 65535,
-                          "reportable_change": 1,
-                          "transaction": txn_base ~ "_dlr_disable"
-                        } | tojson
-                      }}
-
-                # set reporting with fixed intervals
-                - action: mqtt.publish
-                  data:
-                    topic: zigbee2mqtt/bridge/request/device/configure_reporting
-                  payload: >-
-                    {{
-                      {
-                        "id": dev_name,
-                        "endpoint": 1,
-                        "cluster": "genOnOff",
-                        "attribute": "onOff",
-                        "minimum_report_interval": 0,
-                        "maximum_report_interval": rpt_max,
-                        "reportable_change": 0,
-                        "transaction": txn_base ~ "_onoff_set"
-                      } | tojson
-                    }}
 
                 - action: mqtt.publish
                   data:
@@ -354,7 +333,6 @@ sequence:
                         } | tojson
                       }}
 
-                # Push Zigbee2MQTT per-device options (transition, state_action, optimistic, qos)
                 - action: mqtt.publish
                   data:
                     topic: zigbee2mqtt/bridge/request/device/options
@@ -371,7 +349,7 @@ sequence:
                         } | tojson
                       }}
 
-        # Push config via entities (actions)
+        # (2) Push config via HA entities (numbers/selects) using actions
         - choose:
             - conditions: "{{ push_parameters }}"
               sequence:
