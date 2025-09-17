@@ -197,7 +197,8 @@ sequence:
               'options': {
                 'transition': in_transition,
                 'color_sync': in_color_sync,
-                'state_action': in_state_action
+                'state_action': in_state_action,
+                'qos': 0
               }
             } | tojson }}"
         - delay:
