@@ -1,11 +1,11 @@
 blueprint:
-  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.11)"
+  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.13)"
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap automation.
 
     - Config single = Night (optional light target)
     - Config double = Day (optional light target)
-    - Up/Down single = Adaptive helper control + optional LED
+    - Up/Down single = Adaptive helper control + optional LED + optional Action (scene/script/light)
     - Up/Down double & triple = optional Action (scene/script/light) + optional LED
     - Up Held / Down Held = smooth brightness ramp for assigned light targets
       • Disables Adaptive helper on hold start
@@ -95,7 +95,32 @@ blueprint:
         entity:
           filter: {domain: script}
 
-    # ---- Actions (double / triple) + per-action Light mode (unchanged)
+    # ---- Single tap optional actions (RESTORED)
+    up_single_action:
+      name: Up Single Action
+      description: Optional action to run on up_single (scene/script/light).
+      default: []
+      selector:
+        entity:
+          filter: [{domain: scene}, {domain: script}, {domain: light}]
+    up_single_light_mode:
+      name: Up Single • Light mode
+      default: "toggle"
+      selector: {select: {options: ["on","off","toggle"]}}
+
+    down_single_action:
+      name: Down Single Action
+      description: Optional action to run on down_single (scene/script/light).
+      default: []
+      selector:
+        entity:
+          filter: [{domain: scene}, {domain: script}, {domain: light}]
+    down_single_light_mode:
+      name: Down Single • Light mode
+      default: "toggle"
+      selector: {select: {options: ["on","off","toggle"]}}
+
+    # ---- Double / Triple actions + per-action Light mode (unchanged)
     up_double_action:
       name: Up Double Action
       default: []
@@ -341,6 +366,12 @@ variables:
   adaptive_helper_entity: !input adaptive_helper
   adaptive_script_entity: !input adaptive_script
 
+  # Single optional actions (restored)
+  up_single_action: !input up_single_action
+  down_single_action: !input down_single_action
+  up_single_light_mode: !input up_single_light_mode
+  down_single_light_mode: !input down_single_light_mode
+
   led_script_entity: !input led_script
   debug_enabled: !input enable_debug_logging
 
@@ -495,7 +526,7 @@ actions:
                   color_temp_kelvin: !input night_color_temp_k
                   transition: !input night_transition
 
-      # ========== ADAPTIVE: single taps ==========
+      # ========== SINGLE TAPS: LED + Adaptive + (RESTORED) Optional Actions ==========
       - conditions:
           - condition: trigger
             id:
@@ -566,6 +597,44 @@ actions:
                         target: {entity_id: !input adaptive_script}
                         data:
                           variables: {target_state: "OFF"}
+
+          # (RESTORED) Optional Action for Single Taps
+          - choose:
+              # UP single optional action
+              - conditions: [{condition: trigger, id: ACTION_UP_SINGLE_AL_LIVE}]
+                sequence:
+                  - choose:
+                      - conditions: [{condition: template, value_template: "{{ up_single_action != [] and (up_single_action | string)[:7] == 'script.' }}"}]
+                        sequence: [{action: script.turn_on, target: {entity_id: !input up_single_action}}]
+                      - conditions: [{condition: template, value_template: "{{ up_single_action != [] and (up_single_action | string)[:6] == 'scene.' }}"}]
+                        sequence: [{action: scene.turn_on, target: {entity_id: !input up_single_action}}]
+                      - conditions: [{condition: template, value_template: "{{ up_single_action != [] and (up_single_action | string)[:6] == 'light.' }}"}]
+                        sequence:
+                          - choose:
+                              - conditions: [{condition: template, value_template: "{{ up_single_light_mode == 'on' }}"}]
+                                sequence: [{action: light.turn_on, target: {entity_id: !input up_single_action}}]
+                              - conditions: [{condition: template, value_template: "{{ up_single_light_mode == 'off' }}"}]
+                                sequence: [{action: light.turn_off, target: {entity_id: !input up_single_action}}]
+                              - conditions: [{condition: template, value_template: "{{ up_single_light_mode == 'toggle' }}"}]
+                                sequence: [{action: light.toggle, target: {entity_id: !input up_single_action}}]
+
+              # DOWN single optional action
+              - conditions: [{condition: trigger, id: ACTION_DOWN_SINGLE_AL_PRESTAGE}]
+                sequence:
+                  - choose:
+                      - conditions: [{condition: template, value_template: "{{ down_single_action != [] and (down_single_action | string)[:7] == 'script.' }}"}]
+                        sequence: [{action: script.turn_on, target: {entity_id: !input down_single_action}}]
+                      - conditions: [{condition: template, value_template: "{{ down_single_action != [] and (down_single_action | string)[:6] == 'scene.' }}"}]
+                        sequence: [{action: scene.turn_on, target: {entity_id: !input down_single_action}}]
+                      - conditions: [{condition: template, value_template: "{{ down_single_action != [] and (down_single_action | string)[:6] == 'light.' }}"}]
+                        sequence:
+                          - choose:
+                              - conditions: [{condition: template, value_template: "{{ down_single_light_mode == 'on' }}"}]
+                                sequence: [{action: light.turn_on, target: {entity_id: !input down_single_action}}]
+                              - conditions: [{condition: template, value_template: "{{ down_single_light_mode == 'off' }}"}]
+                                sequence: [{action: light.turn_off, target: {entity_id: !input down_single_action}}]
+                              - conditions: [{condition: template, value_template: "{{ down_single_light_mode == 'toggle' }}"}]
+                                sequence: [{action: light.toggle, target: {entity_id: !input down_single_action}}]
 
       # ========== HELD DIMMING (UP/DOWN) ==========
       - conditions:
