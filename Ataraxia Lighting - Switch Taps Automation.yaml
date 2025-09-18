@@ -1,477 +1,375 @@
 blueprint:
-  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.7)"
+  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.10)"
   description: >
-    Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap blueprint.
+    Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap automation.
+
     - Config single = Night (optional light target)
     - Config double = Day (optional light target)
-    - Up/Down single = Adaptive helper control + optional Action (scene/script/light) + optional LED
+    - Up/Down single = Adaptive helper control + optional LED
     - Up/Down double & triple = optional Action (scene/script/light) + optional LED
+    - Up Held / Down Held = smooth brightness ramp for assigned light targets
+      • Disables Adaptive helper on hold start
+      • Repeats brightness_step_pct with short transition until release
+      • If no held targets are set, held behavior is disabled (does nothing)
+
     Notes:
     • Uses Home Assistant 2024.8+ “actions” style (service calls are now actions).
     • LED effect runs only when the chosen Effect is non-blank.
-    • If an Action is a light, per-action "Light mode" lets you On/Off/Toggle that light.
 
   domain: automation
   author: mnestrud (edited by Home Assistant Assistant)
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/main/Ataraxia Lighting - Switch Taps Automation.yaml
-  homeassistant:
-    min_version: 2024.8.0
 
-  input:
+input:
+  # ---- Switch
+  inovelli_device:
+    name: Inovelli switch (Zigbee2MQTT)
+    selector:
+      device:
+        filter:
+          - integration: mqtt
+        multiple: false
 
-    # ---- Switch
-    inovelli_device:
-      name: Inovelli switch (Zigbee2MQTT)
-      selector:
-        device:
-          filter:
-            - integration: mqtt
-          multiple: false
+  # ---- Config buttons can be disabled entirely
+  enable_config_buttons:
+    name: Enable Config buttons (Day/Night)
+    description: If OFF, all Config button behavior is disabled.
+    default: true
+    selector:
+      boolean: {}
 
-    # ---- Lights (for Config buttons)
-    light_group:
-      name: Light target (single light or Zigbee group)
-      default: []
-      selector:
-        entity:
-          domain: light
+  # ---- Optional light target for Day/Night config taps
+  light_group:
+    name: Light target (single light or Zigbee group)
+    default: []
+    selector:
+      entity:
+        domain: light
 
-    day_brightness:
-      name: Daytime brightness (%)
-      default: 80
-      selector:
-        number: {min: 1, max: 100, mode: slider, unit_of_measurement: "%"}
+  day_brightness:
+    name: Daytime brightness (%)
+    default: 80
+    selector:
+      number: {min: 1, max: 100, mode: slider, unit_of_measurement: "%"}
 
-    day_color_temp_k:
-      name: Daytime color temperature (K)
-      default: 4000
-      selector:
-        number: {min: 2000, max: 6500, step: 50, unit_of_measurement: "K"}
+  day_color_temp_k:
+    name: Daytime color temperature (K)
+    default: 4000
+    selector:
+      number: {min: 2000, max: 6500, step: 50, unit_of_measurement: "K"}
 
-    night_brightness:
-      name: Nighttime brightness (%)
-      default: 20
-      selector:
-        number: {min: 1, max: 100, mode: slider, unit_of_measurement: "%"}
+  night_brightness:
+    name: Nighttime brightness (%)
+    default: 20
+    selector:
+      number: {min: 1, max: 100, mode: slider, unit_of_measurement: "%"}
 
-    night_color_temp_k:
-      name: Nighttime color temperature (K)
-      default: 2700
-      selector:
-        number: {min: 1800, max: 4000, step: 50, unit_of_measurement: "K"}
+  night_color_temp_k:
+    name: Nighttime color temperature (K)
+    default: 2700
+    selector:
+      number: {min: 1800, max: 4000, step: 50, unit_of_measurement: "K"}
 
-    day_transition:
-      name: Day transition (seconds)
-      default: 0.4
-      selector:
-        number: {min: 0, max: 10, step: 0.1, unit_of_measurement: s}
+  day_transition:
+    name: Day transition (seconds)
+    default: 0.4
+    selector:
+      number: {min: 0, max: 10, step: 0.1, unit_of_measurement: s}
 
-    night_transition:
-      name: Night transition (seconds)
-      default: 0.4
-      selector:
-        number: {min: 0, max: 10, step: 0.1, unit_of_measurement: s}
+  night_transition:
+    name: Night transition (seconds)
+    default: 0.4
+    selector:
+      number: {min: 0, max: 10, step: 0.1, unit_of_measurement: s}
 
-    # ---- Adaptive Lighting
-    adaptive_helper:
-      name: Adaptive helper (input_boolean)
-      default: []
-      selector:
-        entity:
-          filter: {domain: input_boolean}
+  # ---- Adaptive Lighting helper/script
+  adaptive_helper:
+    name: Adaptive helper (input_boolean)
+    default: []
+    selector:
+      entity:
+        filter: {domain: input_boolean}
 
-    adaptive_script:
-      name: Adaptive script
-      description: Accepts variable 'target_state' "ON"/"OFF"
-      default: []
-      selector:
-        entity:
-          filter: {domain: script}
+  adaptive_script:
+    name: Adaptive script
+    description: Accepts variable 'target_state' "ON"/"OFF"
+    default: []
+    selector:
+      entity:
+        filter: {domain: script}
 
-    # ---- Actions (Scene / Script / Light) + per-action Light mode
-    up_single_action:
-      name: Up Single Action
-      description: Optional action to run on up_single.
-      default: []
-      selector:
-        entity:
-          filter:
-            - domain: scene
-            - domain: script
-            - domain: light
-    up_single_light_mode:
-      name: Up Single • Light mode
-      description: What to do if the Up Single Action is a light
-      default: "toggle"
-      selector:
-        select:
-          options:
-            - "on"
-            - "off"
-            - "toggle"
+  # ---- Actions (double / triple) + per-action Light mode (unchanged)
+  up_double_action:
+    name: Up Double Action
+    default: []
+    selector:
+      entity:
+        filter: [{domain: scene}, {domain: script}, {domain: light}]
+  up_double_light_mode:
+    name: Up Double • Light mode
+    default: "toggle"
+    selector: {select: {options: ["on","off","toggle"]}}
 
-    down_single_action:
-      name: Down Single Action
-      description: Optional action to run on down_single.
-      default: []
-      selector:
-        entity:
-          filter:
-            - domain: scene
-            - domain: script
-            - domain: light
-    down_single_light_mode:
-      name: Down Single • Light mode
-      description: What to do if the Down Single Action is a light
-      default: "toggle"
-      selector:
-        select:
-          options:
-            - "on"
-            - "off"
-            - "toggle"
+  down_double_action:
+    name: Down Double Action
+    default: []
+    selector:
+      entity:
+        filter: [{domain: scene}, {domain: script}, {domain: light}]
+  down_double_light_mode:
+    name: Down Double • Light mode
+    default: "toggle"
+    selector: {select: {options: ["on","off","toggle"]}}
 
-    up_double_action:
-      name: Up Double Action
-      default: []
-      selector:
-        entity:
-          filter:
-            - domain: scene
-            - domain: script
-            - domain: light
-    up_double_light_mode:
-      name: Up Double • Light mode
-      description: What to do if the Up Double Action is a light
-      default: "toggle"
-      selector:
-        select:
-          options:
-            - "on"
-            - "off"
-            - "toggle"
+  up_triple_action:
+    name: Up Triple Action
+    default: []
+    selector:
+      entity:
+        filter: [{domain: scene}, {domain: script}, {domain: light}]
+  up_triple_light_mode:
+    name: Up Triple • Light mode
+    default: "toggle"
+    selector: {select: {options: ["on","off","toggle"]}}
 
-    down_double_action:
-      name: Down Double Action
-      default: []
-      selector:
-        entity:
-          filter:
-            - domain: scene
-            - domain: script
-            - domain: light
-    down_double_light_mode:
-      name: Down Double • Light mode
-      description: What to do if the Down Double Action is a light
-      default: "toggle"
-      selector:
-        select:
-          options:
-            - "on"
-            - "off"
-            - "toggle"
+  down_triple_action:
+    name: Down Triple Action
+    default: []
+    selector:
+      entity:
+        filter: [{domain: scene}, {domain: script}, {domain: light}]
+  down_triple_light_mode:
+    name: Down Triple • Light mode
+    default: "toggle"
+    selector: {select: {options: ["on","off","toggle"]}}
 
-    up_triple_action:
-      name: Up Triple Action
-      default: []
-      selector:
-        entity:
-          filter:
-            - domain: scene
-            - domain: script
-            - domain: light
-    up_triple_light_mode:
-      name: Up Triple • Light mode
-      description: What to do if the Up Triple Action is a light
-      default: "toggle"
-      selector:
-        select:
-          options:
-            - "on"
-            - "off"
-            - "toggle"
+  # ---- LED script & per-action LED effects (unchanged)
+  led_script:
+    name: Inovelli LED effect script
+    description: "Must accept: led, color, level, effect, duration, target"
+    default: script.inovelli_blue_led_2025_1
+    selector:
+      entity:
+        filter:
+          domain: script
 
-    down_triple_action:
-      name: Down Triple Action
-      default: []
-      selector:
-        entity:
-          filter:
-            - domain: scene
-            - domain: script
-            - domain: light
-    down_triple_light_mode:
-      name: Down Triple • Light mode
-      description: What to do if the Down Triple Action is a light
-      default: "toggle"
-      selector:
-        select:
-          options:
-            - "on"
-            - "off"
-            - "toggle"
+  up_single_effect:
+    name: up_single • Effect (blank = none)
+    default: ""
+    selector:
+      select:
+        custom_value: true
+        options: &effects_opts
+          - 'Off'
+          - 'Clear'
+          - 'Solid'
+          - 'Aurora'
+          - 'Slow Chase'
+          - 'Chase'
+          - 'Fast Chase'
+          - 'Slow Blink'
+          - 'Medium Blink'
+          - 'Fast Blink'
+          - 'Slow Falling'
+          - 'Medium Falling'
+          - 'Fast Falling'
+          - 'Open/Close'
+          - 'Pulse'
+          - 'Slow Rising'
+          - 'Medium Rising'
+          - 'Fast Rising'
+          - 'Slow Siren'
+          - 'Fast Siren'
+          - 'Small to Big'
 
-    # ---- LED script entity
-    led_script:
-      name: Inovelli LED effect script
-      description: "Must accept: led, color, level, effect, duration, target"
-      default: script.inovelli_blue_led_2025_1
-      selector: {entity: {filter: {domain: script}}}
+  up_single_color:
+    name: up_single • Color
+    default: Pink
+    selector: {select: {custom_value: true, options: &color_opts [Red, Orange, Yellow, Green, Cyan, Teal, Blue, Purple, Light Pink, Pink, White]}}
 
-    # ---- Per-action LED configuration
-    # Anchors: option lists (sourced from zanix blueprint).
-    up_single_effect:
-      name: up_single • Effect (blank = none)
-      default: ""
-      selector:
-        select:
-          custom_value: true
-          options: &effects_opts
-            - 'Off'
-            - 'Clear'
-            - 'Solid'
-            - 'Aurora'
-            - 'Slow Chase'
-            - 'Chase'
-            - 'Fast Chase'
-            - 'Slow Blink'
-            - 'Medium Blink'
-            - 'Fast Blink'
-            - 'Slow Falling'
-            - 'Medium Falling'
-            - 'Fast Falling'
-            - 'Open/Close'
-            - 'Pulse'
-            - 'Slow Rising'
-            - 'Medium Rising'
-            - 'Fast Rising'
-            - 'Slow Siren'
-            - 'Fast Siren'
-            - 'Small to Big'
-    up_single_color:
-      name: up_single • Color
-      default: Pink
-      selector:
-        select:
-          custom_value: true
-          options: &color_opts
-            - Red
-            - Orange
-            - Yellow
-            - Green
-            - Cyan
-            - Teal
-            - Blue
-            - Purple
-            - Light Pink
-            - Pink
-            - White
-    up_single_level:
-      name: up_single • LED level (1–100)
-      default: 50
-      selector: {number: {min: 1, max: 100}}
-    up_single_duration:
-      name: up_single • Duration
-      default: 10 Seconds
-      selector:
-        select:
-          custom_value: true
-          options: &duration_opts
-            - 1 Second
-            - 2 Seconds
-            - 3 Seconds
-            - 4 Seconds
-            - 5 Seconds
-            - 6 Seconds
-            - 7 Seconds
-            - 8 Seconds
-            - 9 Seconds
-            - 10 Seconds
-            - 15 Seconds
-            - 20 Seconds
-            - 25 Seconds
-            - 30 Seconds
-            - 35 Seconds
-            - 40 Seconds
-            - 45 Seconds
-            - 50 Seconds
-            - 55 Seconds
-            - 1 Minute
-            - 2 Minutes
-            - 3 Minutes
-            - 4 Minutes
-            - 5 Minutes
-            - 6 Minutes
-            - 7 Minutes
-            - 8 Minutes
-            - 9 Minutes
-            - 10 Minutes
-            - 15 Minutes
-            - 20 Minutes
-            - 25 Minutes
-            - 30 Minutes
-            - 35 Minutes
-            - 40 Minutes
-            - 45 Minutes
-            - 50 Minutes
-            - 55 Minutes
-            - 1 Hour
-            - 2 Hours
-            - 3 Hours
-            - 4 Hours
-            - 5 Hours
-            - 6 Hours
-            - 7 Hours
-            - 8 Hours
-            - 9 Hours
-            - 10 Hours
-            - 15 Hours
-            - 20 Hours
-            - 1 Day
-            - 2 Days
-            - 3 Days
-            - 4 Days
-            - 5 Days
-            - Indefinitely
-            - Forever
+  up_single_level:
+    name: up_single • LED level (1–100)
+    default: 50
+    selector: {number: {min: 1, max: 100}}
 
-    down_single_effect:
-      name: down_single • Effect (blank = none)
-      default: ""
-      selector: {select: {custom_value: true, options: *effects_opts}}
-    down_single_color:
-      name: down_single • Color
-      default: Pink
-      selector: {select: {custom_value: true, options: *color_opts}}
-    down_single_level:
-      name: down_single • LED level (1–100)
-      default: 50
-      selector: {number: {min: 1, max: 100}}
-    down_single_duration:
-      name: down_single • Duration
-      default: 10 Seconds
-      selector: {select: {custom_value: true, options: *duration_opts}}
+  up_single_duration:
+    name: up_single • Duration
+    default: 10 Seconds
+    selector: {select: {custom_value: true, options: &duration_opts [
+      '1 Second','2 Seconds','3 Seconds','4 Seconds','5 Seconds','6 Seconds','7 Seconds','8 Seconds','9 Seconds','10 Seconds',
+      '15 Seconds','20 Seconds','25 Seconds','30 Seconds','35 Seconds','40 Seconds','45 Seconds','50 Seconds','55 Seconds',
+      '1 Minute','2 Minutes','3 Minutes','4 Minutes','5 Minutes','6 Minutes','7 Minutes','8 Minutes','9 Minutes','10 Minutes',
+      '15 Minutes','20 Minutes','25 Minutes','30 Minutes','35 Minutes','40 Minutes','45 Minutes','50 Minutes','55 Minutes',
+      '1 Hour','2 Hours','3 Hours','4 Hours','5 Hours','6 Hours','7 Hours','8 Hours','9 Hours','10 Hours','15 Hours','20 Hours',
+      '1 Day','2 Days','3 Days','4 Days','5 Days','Indefinitely','Forever' ]}}
 
-    up_double_effect:
-      name: up_double • Effect (blank = none)
-      default: ""
-      selector: {select: {custom_value: true, options: *effects_opts}}
-    up_double_color:
-      name: up_double • Color
-      default: Pink
-      selector: {select: {custom_value: true, options: *color_opts}}
-    up_double_level:
-      name: up_double • LED level (1–100)
-      default: 50
-      selector: {number: {min: 1, max: 100}}
-    up_double_duration:
-      name: up_double • Duration
-      default: 10 Seconds
-      selector: {select: {custom_value: true, options: *duration_opts}}
+  down_single_effect:
+    name: down_single • Effect (blank = none)
+    default: ""
+    selector: {select: {custom_value: true, options: *effects_opts}}
+  down_single_color:
+    name: down_single • Color
+    default: Pink
+    selector: {select: {custom_value: true, options: *color_opts}}
+  down_single_level:
+    name: down_single • LED level (1–100)
+    default: 50
+    selector: {number: {min: 1, max: 100}}
+  down_single_duration:
+    name: down_single • Duration
+    default: 10 Seconds
+    selector: {select: {custom_value: true, options: *duration_opts}}
 
-    down_double_effect:
-      name: down_double • Effect (blank = none)
-      default: ""
-      selector: {select: {custom_value: true, options: *effects_opts}}
-    down_double_color:
-      name: down_double • Color
-      default: Pink
-      selector: {select: {custom_value: true, options: *color_opts}}
-    down_double_level:
-      name: down_double • LED level (1–100)
-      default: 50
-      selector: {number: {min: 1, max: 100}}
-    down_double_duration:
-      name: down_double • Duration
-      default: 10 Seconds
-      selector: {select: {custom_value: true, options: *duration_opts}}
+  up_double_effect:
+    name: up_double • Effect (blank = none)
+    default: ""
+    selector: {select: {custom_value: true, options: *effects_opts}}
+  up_double_color:
+    name: up_double • Color
+    default: Pink
+    selector: {select: {custom_value: true, options: *color_opts}}
+  up_double_level:
+    name: up_double • LED level (1–100)
+    default: 50
+    selector: {number: {min: 1, max: 100}}
+  up_double_duration:
+    name: up_double • Duration
+    default: 10 Seconds
+    selector: {select: {custom_value: true, options: *duration_opts}}
 
-    up_triple_effect:
-      name: up_triple • Effect (blank = none)
-      default: ""
-      selector: {select: {custom_value: true, options: *effects_opts}}
-    up_triple_color:
-      name: up_triple • Color
-      default: Pink
-      selector: {select: {custom_value: true, options: *color_opts}}
-    up_triple_level:
-      name: up_triple • LED level (1–100)
-      default: 50
-      selector: {number: {min: 1, max: 100}}
-    up_triple_duration:
-      name: up_triple • Duration
-      default: 10 Seconds
-      selector: {select: {custom_value: true, options: *duration_opts}}
+  down_double_effect:
+    name: down_double • Effect (blank = none)
+    default: ""
+    selector: {select: {custom_value: true, options: *effects_opts}}
+  down_double_color:
+    name: down_double • Color
+    default: Pink
+    selector: {select: {custom_value: true, options: *color_opts}}
+  down_double_level:
+    name: down_double • LED level (1–100)
+    default: 50
+    selector: {number: {min: 1, max: 100}}
+  down_double_duration:
+    name: down_double • Duration
+    default: 10 Seconds
+    selector: {select: {custom_value: true, options: *duration_opts}}
 
-    down_triple_effect:
-      name: down_triple • Effect (blank = none)
-      default: ""
-      selector: {select: {custom_value: true, options: *effects_opts}}
-    down_triple_color:
-      name: down_triple • Color
-      default: Pink
-      selector: {select: {custom_value: true, options: *color_opts}}
-    down_triple_level:
-      name: down_triple • LED level (1–100)
-      default: 50
-      selector: {number: {min: 1, max: 100}}
-    down_triple_duration:
-      name: down_triple • Duration
-      default: 10 Seconds
-      selector: {select: {custom_value: true, options: *duration_opts}}
+  up_triple_effect:
+    name: up_triple • Effect (blank = none)
+    default: ""
+    selector: {select: {custom_value: true, options: *effects_opts}}
+  up_triple_color:
+    name: up_triple • Color
+    default: Pink
+    selector: {select: {custom_value: true, options: *color_opts}}
+  up_triple_level:
+    name: up_triple • LED level (1–100)
+    default: 50
+    selector: {number: {min: 1, max: 100}}
+  up_triple_duration:
+    name: up_triple • Duration
+    default: 10 Seconds
+    selector: {select: {custom_value: true, options: *duration_opts}}
 
-    # ---- Optional debug logging
-    enable_debug_logging:
-      name: Enable system log line (debug)
-      default: false
-      selector: {boolean: {}}
+  down_triple_effect:
+    name: down_triple • Effect (blank = none)
+    default: ""
+    selector: {select: {custom_value: true, options: *effects_opts}}
+  down_triple_color:
+    name: down_triple • Color
+    default: Pink
+    selector: {select: {custom_value: true, options: *color_opts}}
+  down_triple_level:
+    name: down_triple • LED level (1–100)
+    default: 50
+    selector: {number: {min: 1, max: 100}}
+  down_triple_duration:
+    name: down_triple • Duration
+    default: 10 Seconds
+    selector: {select: {custom_value: true, options: *duration_opts}}
+
+  # ---- Held dimming targets + tuning
+  up_held_targets:
+    name: Up Held • light targets
+    description: Lights to brighten while the paddle is held up.
+    default: []
+    selector:
+      entity:
+        multiple: true
+        filter: {domain: light}
+
+  down_held_targets:
+    name: Down Held • light targets
+    description: Lights to dim while the paddle is held down.
+    default: []
+    selector:
+      entity:
+        multiple: true
+        filter: {domain: light}
+
+  held_step_pct:
+    name: Held step size (% per tick)
+    description: Brightness step applied each tick while held.
+    default: 7
+    selector:
+      number: {min: 1, max: 25, step: 1, unit_of_measurement: "%"}
+
+  held_interval:
+    name: Held tick interval (seconds)
+    description: How often to apply steps while held.
+    default: 0.20
+    selector:
+      number: {min: 0.05, max: 1, step: 0.05, unit_of_measurement: s, mode: slider}
+
+  held_transition:
+    name: Held per-step transition (seconds)
+    description: Transition time per step (keep below interval for smoothness).
+    default: 0.15
+    selector:
+      number: {min: 0, max: 1, step: 0.05, unit_of_measurement: s, mode: slider}
+
+  # ---- Optional debug logging
+  enable_debug_logging:
+    name: Enable system log line (debug)
+    default: false
+    selector: {boolean: {}}
 
 # ===== Variables
 variables:
   switch_device: !input inovelli_device
+
   light_target: !input light_group
+  enable_config_buttons: !input enable_config_buttons
+
   adaptive_helper_entity: !input adaptive_helper
   adaptive_script_entity: !input adaptive_script
-
-  action_up_single: !input up_single_action
-  action_down_single: !input down_single_action
-  action_up_double: !input up_double_action
-  action_down_double: !input down_double_action
-  action_up_triple: !input up_triple_action
-  action_down_triple: !input down_triple_action
-
-  mode_up_single: !input up_single_light_mode
-  mode_down_single: !input down_single_light_mode
-  mode_up_double: !input up_double_light_mode
-  mode_down_double: !input down_double_light_mode
-  mode_up_triple: !input up_triple_light_mode
-  mode_down_triple: !input down_triple_light_mode
 
   led_script_entity: !input led_script
   debug_enabled: !input enable_debug_logging
 
-  # derived
-  led_target_light: >
-    {{ device_entities(switch_device) | select('match', '^light\\.') | list | first }}
-  is_adaptive_enabled: >
-    {{ adaptive_helper_entity != [] and adaptive_script_entity != [] }}
-  has_light_target: >
-    {{ light_target != [] }}
-
-  action_up_single_set: "{{ action_up_single != [] }}"
-  action_down_single_set: "{{ action_down_single != [] }}"
-  action_up_double_set: "{{ action_up_double != [] }}"
-  action_down_double_set: "{{ action_down_double != [] }}"
-  action_up_triple_set: "{{ action_up_triple != [] }}"
-  action_down_triple_set: "{{ action_down_triple != [] }}"
-
-  # per-action effects (for clean templating checks)
   eff_up_single: !input up_single_effect
   eff_down_single: !input down_single_effect
   eff_up_double: !input up_double_effect
   eff_down_double: !input down_double_effect
   eff_up_triple: !input up_triple_effect
   eff_down_triple: !input down_triple_effect
+
+  # Held dimming config
+  up_held_targets: !input up_held_targets
+  down_held_targets: !input down_held_targets
+  held_step_pct: !input held_step_pct
+  held_interval: !input held_interval
+  held_transition: !input held_transition
+
+  # derived
+  led_target_light: >
+    {{ device_entities(switch_device) | select('match', '^light\\.') | list | first }}
+
+  is_adaptive_enabled: >
+    {{ not (adaptive_helper_entity == [] or adaptive_script_entity == []) }}
+
+  has_light_target: >
+    {{ light_target != [] }}
 
 triggers:
   - trigger: device
@@ -480,6 +378,7 @@ triggers:
     type: action
     subtype: config_single
     id: SCENE_NIGHT
+
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
@@ -487,57 +386,64 @@ triggers:
     subtype: config_double
     id: SCENE_DAY
 
-  # renamed IDs for single taps (Adaptive Lighting)
+  # Adaptive: singles
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_single
     id: ACTION_UP_SINGLE_AL_LIVE
+
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_single
     id: ACTION_DOWN_SINGLE_AL_PRESTAGE
+
+  # Held start
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: up_held
-    id: STOP_ADAPT
+    id: ACTION_UP_HELD
+
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
     subtype: down_held
-    id: STOP_ADAPT
+    id: ACTION_DOWN_HELD
 
-  # Double/Triple
+  # Held release (support both spellings)
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
-    subtype: up_double
-    id: ACTION_UP_DOUBLE
+    subtype: up_release
+    id: ACTION_UP_RELEASE_A
+
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
-    subtype: down_double
-    id: ACTION_DOWN_DOUBLE
+    subtype: up_released
+    id: ACTION_UP_RELEASE_B
+
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
-    subtype: up_triple
-    id: ACTION_UP_TRIPLE
+    subtype: down_release
+    id: ACTION_DOWN_RELEASE_A
+
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
     type: action
-    subtype: down_triple
-    id: ACTION_DOWN_TRIPLE
+    subtype: down_released
+    id: ACTION_DOWN_RELEASE_B
 
 conditions: []
 
@@ -545,7 +451,11 @@ actions:
   - choose:
 
       # ========== CONFIG BUTTON: DAY ==========
-      - conditions: [{condition: trigger, id: SCENE_DAY}]
+      - conditions:
+          - condition: trigger
+            id: SCENE_DAY
+          - condition: template
+            value_template: "{{ enable_config_buttons }}"
         sequence:
           - if:
               - condition: template
@@ -565,7 +475,11 @@ actions:
                   transition: !input day_transition
 
       # ========== CONFIG BUTTON: NIGHT ==========
-      - conditions: [{condition: trigger, id: SCENE_NIGHT}]
+      - conditions:
+          - condition: trigger
+            id: SCENE_NIGHT
+          - condition: template
+            value_template: "{{ enable_config_buttons }}"
         sequence:
           - if:
               - condition: template
@@ -584,18 +498,20 @@ actions:
                   color_temp_kelvin: !input night_color_temp_k
                   transition: !input night_transition
 
-      # ========== ADAPTIVE: LIVE / PRESTAGE / STOP (LED only if effect set) + optional Single Actions ==========
+      # ========== ADAPTIVE: single taps ==========
       - conditions:
           - condition: trigger
-            id: [ACTION_UP_SINGLE_AL_LIVE, ACTION_DOWN_SINGLE_AL_PRESTAGE, STOP_ADAPT]
+            id:
+              - ACTION_UP_SINGLE_AL_LIVE
+              - ACTION_DOWN_SINGLE_AL_PRESTAGE
         sequence:
-          # LED for up_single / down_single (only if effect non-blank and target exists)
+          # Optional LED for single taps
           - choose:
               - conditions: [{condition: trigger, id: ACTION_UP_SINGLE_AL_LIVE}]
                 sequence:
                   - if:
                       - condition: template
-                        value_template: >
+                        value_template: >-
                           {{ (eff_up_single | string | trim) != '' and (led_target_light | string | trim) != '' }}
                     then:
                       - action: !input led_script
@@ -610,7 +526,7 @@ actions:
                 sequence:
                   - if:
                       - condition: template
-                        value_template: >
+                        value_template: >-
                           {{ (eff_down_single | string | trim) != '' and (led_target_light | string | trim) != '' }}
                     then:
                       - action: !input led_script
@@ -622,7 +538,7 @@ actions:
                           duration: !input down_single_duration
                           target: {entity_id: "{{ led_target_light }}"}
 
-          # Adaptive helper/script control
+          # Adaptive helper/script control for single taps
           - if:
               - condition: template
                 value_template: "{{ is_adaptive_enabled }}"
@@ -630,118 +546,122 @@ actions:
               - choose:
                   - conditions:
                       - condition: template
-                        value_template: >
-                          {{ trigger.id in ['ACTION_UP_SINGLE_AL_LIVE','ACTION_DOWN_SINGLE_AL_PRESTAGE']
-                             and is_state(adaptive_helper_entity, 'off') }}
+                        value_template: >-
+                          {{ trigger.id == 'ACTION_UP_SINGLE_AL_LIVE' and is_state(adaptive_helper_entity, 'off') }}
                     sequence:
                       - action: input_boolean.turn_on
                         target: {entity_id: !input adaptive_helper}
                       - delay: {milliseconds: 500}
-                      - choose:
-                          - conditions: [{condition: trigger, id: ACTION_UP_SINGLE_AL_LIVE}]
-                            sequence:
-                              - action: script.turn_on
-                                target: {entity_id: !input adaptive_script}
-                                data:
-                                  variables: {target_state: "ON"}
-                          - conditions: [{condition: trigger, id: ACTION_DOWN_SINGLE_AL_PRESTAGE}]
-                            sequence:
-                              - action: script.turn_on
-                                target: {entity_id: !input adaptive_script}
-                                data:
-                                  variables: {target_state: "OFF"}
+                      - action: script.turn_on
+                        target: {entity_id: !input adaptive_script}
+                        data:
+                          variables: {target_state: "ON"}
+
                   - conditions:
-                      - condition: trigger
-                        id: STOP_ADAPT
+                      - condition: template
+                        value_template: >-
+                          {{ trigger.id == 'ACTION_DOWN_SINGLE_AL_PRESTAGE' and is_state(adaptive_helper_entity, 'off') }}
                     sequence:
-                      - action: input_boolean.turn_off
+                      - action: input_boolean.turn_on
                         target: {entity_id: !input adaptive_helper}
+                      - delay: {milliseconds: 500}
+                      - action: script.turn_on
+                        target: {entity_id: !input adaptive_script}
+                        data:
+                          variables: {target_state: "OFF"}
 
-          # Optional SINGLE actions (scene/script/light)
-          - choose:
-              - conditions:
-                  - condition: trigger
-                    id: ACTION_UP_SINGLE_AL_LIVE
+      # ========== HELD DIMMING (UP/DOWN) ==========
+      - conditions:
+          - condition: trigger
+            id:
+              - ACTION_UP_HELD
+              - ACTION_DOWN_HELD
+        sequence:
+          # Determine targets and step from direction (NO fallback to light_group)
+          - variables:
+              _targets: >-
+                {% if trigger.id == 'ACTION_UP_HELD' %}
+                  {{ up_held_targets }}
+                {% else %}
+                  {{ down_held_targets }}
+                {% endif %}
+              _step: >-
+                {% if trigger.id == 'ACTION_UP_HELD' %}
+                  {{ held_step_pct | int }}
+                {% else %}
+                  {{ (held_step_pct | int) * -1 }}
+                {% endif %}
+
+          # If no targets defined, do nothing (held disabled)
+          - if:
+              - condition: template
+                value_template: "{{ _targets != [] }}"
+            then:
+              # Stop adaptive on hold start (only if we're actually dimming)
+              - if:
                   - condition: template
-                    value_template: "{{ action_up_single_set }}"
-                sequence:
-                  - choose:
-                      - conditions: [{condition: template, value_template: "{{ (action_up_single | string)[:7] == 'script.' }}"}]
-                        sequence:
-                          - action: script.turn_on
-                            target: {entity_id: !input up_single_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_up_single | string)[:6] == 'scene.' }}"}]
-                        sequence:
-                          - action: scene.turn_on
-                            target: {entity_id: !input up_single_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_up_single | string)[:6] == 'light.' }}"}]
-                        sequence:
-                          - choose:
-                              - conditions: [{condition: template, value_template: "{{ mode_up_single == 'on' }}"}]
-                                sequence:
-                                  - action: light.turn_on
-                                    target: {entity_id: !input up_single_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_up_single == 'off' }}"}]
-                                sequence:
-                                  - action: light.turn_off
-                                    target: {entity_id: !input up_single_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_up_single == 'toggle' }}"}]
-                                sequence:
-                                  - action: light.toggle
-                                    target: {entity_id: !input up_single_action}
+                    value_template: "{{ adaptive_helper_entity != [] }}"
+                then:
+                  - action: input_boolean.turn_off
+                    target: {entity_id: !input adaptive_helper}
 
-              - conditions:
-                  - condition: trigger
-                    id: ACTION_DOWN_SINGLE_AL_PRESTAGE
-                  - condition: template
-                    value_template: "{{ action_down_single_set }}"
-                sequence:
-                  - choose:
-                      - conditions: [{condition: template, value_template: "{{ (action_down_single | string)[:7] == 'script.' }}"}]
-                        sequence:
-                          - action: script.turn_on
-                            target: {entity_id: !input down_single_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_down_single | string)[:6] == 'scene.' }}"}]
-                        sequence:
-                          - action: scene.turn_on
-                            target: {entity_id: !input down_single_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_down_single | string)[:6] == 'light.' }}"}]
-                        sequence:
-                          - choose:
-                              - conditions: [{condition: template, value_template: "{{ mode_down_single == 'on' }}"}]
-                                sequence:
-                                  - action: light.turn_on
-                                    target: {entity_id: !input down_single_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_down_single == 'off' }}"}]
-                                sequence:
-                                  - action: light.turn_off
-                                    target: {entity_id: !input down_single_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_down_single == 'toggle' }}"}]
-                                sequence:
-                                  - action: light.toggle
-                                    target: {entity_id: !input down_single_action}
+              # Repeat until release; on each timeout (no release yet), apply brightness step
+              - repeat:
+                  sequence:
+                    - wait_for_trigger:
+                        - platform: device
+                          domain: mqtt
+                          device_id: !input inovelli_device
+                          type: action
+                          subtype: up_release
+                        - platform: device
+                          domain: mqtt
+                          device_id: !input inovelli_device
+                          type: action
+                          subtype: up_released
+                        - platform: device
+                          domain: mqtt
+                          device_id: !input inovelli_device
+                          type: action
+                          subtype: down_release
+                        - platform: device
+                          domain: mqtt
+                          device_id: !input inovelli_device
+                          type: action
+                          subtype: down_released
+                      timeout: "{{ held_interval }}"
+                      continue_on_timeout: true
 
-      # ========== ACTIONS (Double/Triple) + per-action LED ==========
+                    - choose:
+                        - conditions:
+                            - condition: template
+                              value_template: "{{ not wait.completed }}"
+                          sequence:
+                            - action: light.turn_on
+                              target:
+                                entity_id: "{{ _targets }}"
+                              data:
+                                brightness_step_pct: "{{ _step }}"
+                                transition: "{{ held_transition }}"
+                      default: []
+                  until:
+                    - condition: template
+                      value_template: "{{ wait.completed }}"
+
+      # ========== Double/Triple actions (unchanged) ==========
       - conditions:
           - condition: trigger
             id: [ACTION_UP_DOUBLE, ACTION_DOWN_DOUBLE, ACTION_UP_TRIPLE, ACTION_DOWN_TRIPLE]
         sequence:
-
+          # UP double
           - choose:
-
-              # UP double
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'ACTION_UP_DOUBLE' and action_up_double_set }}"
+                    value_template: "{{ trigger.id == 'ACTION_UP_DOUBLE' and up_double_action != [] }}"
                 sequence:
-                  - if: [{condition: template, value_template: "{{ debug_enabled }}"}]
-                    then:
-                      - action: system_log.write
-                        data: {message: "Up Double Action", level: info}
                   - if:
                       - condition: template
-                        value_template: >
-                          {{ (eff_up_double | string | trim) != '' and (led_target_light | string | trim) != '' }}
+                        value_template: "{{ (eff_up_double | string | trim) != '' and (led_target_light | string | trim) != '' }}"
                     then:
                       - action: !input led_script
                         data:
@@ -752,43 +672,29 @@ actions:
                           duration: !input up_double_duration
                           target: {entity_id: "{{ led_target_light }}"}
                   - choose:
-                      - conditions: [{condition: template, value_template: "{{ (action_up_double | string)[:7] == 'script.' }}"}]
-                        sequence:
-                          - action: script.turn_on
-                            target: {entity_id: !input up_double_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_up_double | string)[:6] == 'scene.' }}"}]
-                        sequence:
-                          - action: scene.turn_on
-                            target: {entity_id: !input up_double_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_up_double | string)[:6] == 'light.' }}"}]
+                      - conditions: [{condition: template, value_template: "{{ (up_double_action | string)[:7] == 'script.' }}"}]
+                        sequence: [{action: script.turn_on, target: {entity_id: !input up_double_action}}]
+                      - conditions: [{condition: template, value_template: "{{ (up_double_action | string)[:6] == 'scene.' }}"}]
+                        sequence: [{action: scene.turn_on, target: {entity_id: !input up_double_action}}]
+                      - conditions: [{condition: template, value_template: "{{ (up_double_action | string)[:6] == 'light.' }}"}]
                         sequence:
                           - choose:
-                              - conditions: [{condition: template, value_template: "{{ mode_up_double == 'on' }}"}]
-                                sequence:
-                                  - action: light.turn_on
-                                    target: {entity_id: !input up_double_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_up_double == 'off' }}"}]
-                                sequence:
-                                  - action: light.turn_off
-                                    target: {entity_id: !input up_double_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_up_double == 'toggle' }}"}]
-                                sequence:
-                                  - action: light.toggle
-                                    target: {entity_id: !input up_double_action}
+                              - conditions: [{condition: template, value_template: "{{ up_double_light_mode == 'on' }}"}]
+                                sequence: [{action: light.turn_on, target: {entity_id: !input up_double_action}}]
+                              - conditions: [{condition: template, value_template: "{{ up_double_light_mode == 'off' }}"}]
+                                sequence: [{action: light.turn_off, target: {entity_id: !input up_double_action}}]
+                              - conditions: [{condition: template, value_template: "{{ up_double_light_mode == 'toggle' }}"}]
+                                sequence: [{action: light.toggle, target: {entity_id: !input up_double_action}}]
 
-              # DOWN double
+          # DOWN double
+          - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'ACTION_DOWN_DOUBLE' and action_down_double_set }}"
+                    value_template: "{{ trigger.id == 'ACTION_DOWN_DOUBLE' and down_double_action != [] }}"
                 sequence:
-                  - if: [{condition: template, value_template: "{{ debug_enabled }}"}]
-                    then:
-                      - action: system_log.write
-                        data: {message: "Down Double Action", level: info}
                   - if:
                       - condition: template
-                        value_template: >
-                          {{ (eff_down_double | string | trim) != '' and (led_target_light | string | trim) != '' }}
+                        value_template: "{{ (eff_down_double | string | trim) != '' and (led_target_light | string | trim) != '' }}"
                     then:
                       - action: !input led_script
                         data:
@@ -799,43 +705,29 @@ actions:
                           duration: !input down_double_duration
                           target: {entity_id: "{{ led_target_light }}"}
                   - choose:
-                      - conditions: [{condition: template, value_template: "{{ (action_down_double | string)[:7] == 'script.' }}"}]
-                        sequence:
-                          - action: script.turn_on
-                            target: {entity_id: !input down_double_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_down_double | string)[:6] == 'scene.' }}"}]
-                        sequence:
-                          - action: scene.turn_on
-                            target: {entity_id: !input down_double_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_down_double | string)[:6] == 'light.' }}"}]
+                      - conditions: [{condition: template, value_template: "{{ (down_double_action | string)[:7] == 'script.' }}"}]
+                        sequence: [{action: script.turn_on, target: {entity_id: !input down_double_action}}]
+                      - conditions: [{condition: template, value_template: "{{ (down_double_action | string)[:6] == 'scene.' }}"}]
+                        sequence: [{action: scene.turn_on, target: {entity_id: !input down_double_action}}]
+                      - conditions: [{condition: template, value_template: "{{ (down_double_action | string)[:6] == 'light.' }}"}]
                         sequence:
                           - choose:
-                              - conditions: [{condition: template, value_template: "{{ mode_down_double == 'on' }}"}]
-                                sequence:
-                                  - action: light.turn_on
-                                    target: {entity_id: !input down_double_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_down_double == 'off' }}"}]
-                                sequence:
-                                  - action: light.turn_off
-                                    target: {entity_id: !input down_double_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_down_double == 'toggle' }}"}]
-                                sequence:
-                                  - action: light.toggle
-                                    target: {entity_id: !input down_double_action}
+                              - conditions: [{condition: template, value_template: "{{ down_double_light_mode == 'on' }}"}]
+                                sequence: [{action: light.turn_on, target: {entity_id: !input down_double_action}}]
+                              - conditions: [{condition: template, value_template: "{{ down_double_light_mode == 'off' }}"}]
+                                sequence: [{action: light.turn_off, target: {entity_id: !input down_double_action}}]
+                              - conditions: [{condition: template, value_template: "{{ down_double_light_mode == 'toggle' }}"}]
+                                sequence: [{action: light.toggle, target: {entity_id: !input down_double_action}}]
 
-              # UP triple
+          # UP triple
+          - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'ACTION_UP_TRIPLE' and action_up_triple_set }}"
+                    value_template: "{{ trigger.id == 'ACTION_UP_TRIPLE' and up_triple_action != [] }}"
                 sequence:
-                  - if: [{condition: template, value_template: "{{ debug_enabled }}"}]
-                    then:
-                      - action: system_log.write
-                        data: {message: "Up Triple Action", level: info}
                   - if:
                       - condition: template
-                        value_template: >
-                          {{ (eff_up_triple | string | trim) != '' and (led_target_light | string | trim) != '' }}
+                        value_template: "{{ (eff_up_triple | string | trim) != '' and (led_target_light | string | trim) != '' }}"
                     then:
                       - action: !input led_script
                         data:
@@ -846,43 +738,29 @@ actions:
                           duration: !input up_triple_duration
                           target: {entity_id: "{{ led_target_light }}"}
                   - choose:
-                      - conditions: [{condition: template, value_template: "{{ (action_up_triple | string)[:7] == 'script.' }}"}]
-                        sequence:
-                          - action: script.turn_on
-                            target: {entity_id: !input up_triple_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_up_triple | string)[:6] == 'scene.' }}"}]
-                        sequence:
-                          - action: scene.turn_on
-                            target: {entity_id: !input up_triple_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_up_triple | string)[:6] == 'light.' }}"}]
+                      - conditions: [{condition: template, value_template: "{{ (up_triple_action | string)[:7] == 'script.' }}"}]
+                        sequence: [{action: script.turn_on, target: {entity_id: !input up_triple_action}}]
+                      - conditions: [{condition: template, value_template: "{{ (up_triple_action | string)[:6] == 'scene.' }}"}]
+                        sequence: [{action: scene.turn_on, target: {entity_id: !input up_triple_action}}]
+                      - conditions: [{condition: template, value_template: "{{ (up_triple_action | string)[:6] == 'light.' }}"}]
                         sequence:
                           - choose:
-                              - conditions: [{condition: template, value_template: "{{ mode_up_triple == 'on' }}"}]
-                                sequence:
-                                  - action: light.turn_on
-                                    target: {entity_id: !input up_triple_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_up_triple == 'off' }}"}]
-                                sequence:
-                                  - action: light.turn_off
-                                    target: {entity_id: !input up_triple_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_up_triple == 'toggle' }}"}]
-                                sequence:
-                                  - action: light.toggle
-                                    target: {entity_id: !input up_triple_action}
+                              - conditions: [{condition: template, value_template: "{{ up_triple_light_mode == 'on' }}"}]
+                                sequence: [{action: light.turn_on, target: {entity_id: !input up_triple_action}}]
+                              - conditions: [{condition: template, value_template: "{{ up_triple_light_mode == 'off' }}"}]
+                                sequence: [{action: light.turn_off, target: {entity_id: !input up_triple_action}}]
+                              - conditions: [{condition: template, value_template: "{{ up_triple_light_mode == 'toggle' }}"}]
+                                sequence: [{action: light.toggle, target: {entity_id: !input up_triple_action}}]
 
-              # DOWN triple
+          # DOWN triple
+          - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'ACTION_DOWN_TRIPLE' and action_down_triple_set }}"
+                    value_template: "{{ trigger.id == 'ACTION_DOWN_TRIPLE' and down_triple_action != [] }}"
                 sequence:
-                  - if: [{condition: template, value_template: "{{ debug_enabled }}"}]
-                    then:
-                      - action: system_log.write
-                        data: {message: "Down Triple Action", level: info}
                   - if:
                       - condition: template
-                        value_template: >
-                          {{ (eff_down_triple | string | trim) != '' and (led_target_light | string | trim) != '' }}
+                        value_template: "{{ (eff_down_triple | string | trim) != '' and (led_target_light | string | trim) != '' }}"
                     then:
                       - action: !input led_script
                         data:
@@ -893,29 +771,19 @@ actions:
                           duration: !input down_triple_duration
                           target: {entity_id: "{{ led_target_light }}"}
                   - choose:
-                      - conditions: [{condition: template, value_template: "{{ (action_down_triple | string)[:7] == 'script.' }}"}]
-                        sequence:
-                          - action: script.turn_on
-                            target: {entity_id: !input down_triple_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_down_triple | string)[:6] == 'scene.' }}"}]
-                        sequence:
-                          - action: scene.turn_on
-                            target: {entity_id: !input down_triple_action}
-                      - conditions: [{condition: template, value_template: "{{ (action_down_triple | string)[:6] == 'light.' }}"}]
+                      - conditions: [{condition: template, value_template: "{{ (down_triple_action | string)[:7] == 'script.' }}"}]
+                        sequence: [{action: script.turn_on, target: {entity_id: !input down_triple_action}}]
+                      - conditions: [{condition: template, value_template: "{{ (down_triple_action | string)[:6] == 'scene.' }}"}]
+                        sequence: [{action: scene.turn_on, target: {entity_id: !input down_triple_action}}]
+                      - conditions: [{condition: template, value_template: "{{ (down_triple_action | string)[:6] == 'light.' }}"}]
                         sequence:
                           - choose:
-                              - conditions: [{condition: template, value_template: "{{ mode_down_triple == 'on' }}"}]
-                                sequence:
-                                  - action: light.turn_on
-                                    target: {entity_id: !input down_triple_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_down_triple == 'off' }}"}]
-                                sequence:
-                                  - action: light.turn_off
-                                    target: {entity_id: !input down_triple_action}
-                              - conditions: [{condition: template, value_template: "{{ mode_down_triple == 'toggle' }}"}]
-                                sequence:
-                                  - action: light.toggle
-                                    target: {entity_id: !input down_triple_action}
+                              - conditions: [{condition: template, value_template: "{{ down_triple_light_mode == 'on' }}"}]
+                                sequence: [{action: light.turn_on, target: {entity_id: !input down_triple_action}}]
+                              - conditions: [{condition: template, value_template: "{{ down_triple_light_mode == 'off' }}"}]
+                                sequence: [{action: light.turn_off, target: {entity_id: !input down_triple_action}}]
+                              - conditions: [{condition: template, value_template: "{{ down_triple_light_mode == 'toggle' }}"}]
+                                sequence: [{action: light.toggle, target: {entity_id: !input down_triple_action}}]
 
 mode: queued
 max: 3
