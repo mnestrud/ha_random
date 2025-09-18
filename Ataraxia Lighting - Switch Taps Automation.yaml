@@ -698,9 +698,9 @@ actions:
                       timeout: "{{ held_interval }}"
                       continue_on_timeout: true
 
-                    # Enforce a 5% minimum when dimming DOWN
+                    # Enforce a 15% minimum when dimming DOWN
                     - variables:
-                        _min_bri_raw: 13   # ~5% of 255
+                        _min_bri_raw: 39   # ~15% of 255
                         _any_at_or_below_min: >-
                           {{
                             expand(_targets)
@@ -723,7 +723,7 @@ actions:
                               target:
                                 entity_id: "{{ _targets }}"
                               data:
-                                brightness_pct: 5
+                                brightness_pct: 15
                                 transition: "{{ held_transition }}"
 
                         # Otherwise, keep stepping smoothly
