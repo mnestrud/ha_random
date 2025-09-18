@@ -1,1 +1,277 @@
+blueprint:
+  name: Ataraxia Lighting - Occupancy Lighting (v0.1)
+  description: >
+    Turn on a light when occupancy goes ON, then periodically re-check occupancy
+    on the schedule defined by your **Re-check timer** helper (this automation
+    restarts it without specifying a duration). If the area is clear when the
+    timer idles, turn the light off with a smooth transition; if still occupied,
+    restart the timer and keep the light on.
+
+    • Re-check timer helper: defines the **maximum extension** period after
+      motion is no longer detected. Example: if set to 45s, the light will be
+      re-validated every 45s.
+    • Occupancy device guidance: set the sensor’s inactivity/occupancy timeout
+      to any value **less than the re-check timer**. The effective maximum time
+      that lights will remain on after motion clears is approximately
+      **occupancy device timeout + re-check timer**.
+
+    Helpers required:
+    • Timer — Re-check timer (its **own configured duration** controls cadence)
+
+    Inputs:
+    • Occupancy sensor — binary_sensor that turns 'on' when occupied
+    • Light target — light or group to control
+    • Re-check timer — Timer helper restarted by this automation (no duration specified)
+    • Optional switch device — **any** tap/hold/release on this device cancels the
+      re-check timer immediately (manual intent wins)
+    • Brightness on turn-on and off transition seconds
+
+  domain: automation
+  author: mnestrud
+  source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Occupancy%20Lighting.yaml
+
+  input:
+    occupancy_sensor:
+      name: Occupancy sensor (binary_sensor)
+      description: Triggers ON when area becomes occupied; OFF when clear.
+      selector:
+        entity:
+          domain: binary_sensor
+
+    light_target:
+      name: Light (or light group)
+      selector:
+        entity:
+          domain: light
+
+    recheck_timer:
+      name: Re-check timer
+      description: Timer helper defining how often to re-validate occupancy. Its own configured duration is used.
+      selector:
+        entity:
+          domain: timer
+
+    turn_on_brightness_pct:
+      name: Turn-on brightness (%)
+      default: 80
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+
+    off_transition_seconds:
+      name: Off transition (seconds)
+      default: 5
+      selector:
+        number:
+          min: 0
+          max: 30
+          step: 1
+          unit_of_measurement: s
+
+    enable_switch_off:
+      name: Enable “cancel on any switch tap”
+      description: If enabled, **any** action from the selected switch device cancels the re-check timer immediately.
+      default: true
+      selector:
+        boolean: {}
+
+    switch_device:
+      name: Switch with action events (Zigbee2MQTT)
+      description: Device that emits action events (e.g., Inovelli Blue). Any tap/hold/release will cancel the timer if enabled.
+      selector:
+        device:
+          filter:
+            - integration: mqtt
+          multiple: false
+
+# ========== Triggers ==========
+triggers:
+  # Occupancy ON -> start (or restart) the re-check timer and turn on lights if off
+  - trigger: state
+    id: Occupied
+    entity_id: !input occupancy_sensor
+    from: "off"
+    to: "on"
+
+  # Re-check timer idled -> evaluate occupancy again
+  - trigger: state
+    id: occupancy_check
+    entity_id: !input recheck_timer
+    from: active
+    to: idle
+
+  # ================= ANY switch action cancels the timer =================
+  # Singles
+  - trigger: device
+    id: sw_up_single
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: up_single
+  - trigger: device
+    id: sw_down_single
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: down_single
+
+  # Doubles
+  - trigger: device
+    id: sw_up_double
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: up_double
+  - trigger: device
+    id: sw_down_double
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: down_double
+
+  # Triples
+  - trigger: device
+    id: sw_up_triple
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: up_triple
+  - trigger: device
+    id: sw_down_triple
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: down_triple
+
+  # Held + release (both spellings)
+  - trigger: device
+    id: sw_up_held
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: up_held
+  - trigger: device
+    id: sw_down_held
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: down_held
+  - trigger: device
+    id: sw_up_release
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: up_release
+  - trigger: device
+    id: sw_up_released
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: up_released
+  - trigger: device
+    id: sw_down_release
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: down_release
+  - trigger: device
+    id: sw_down_released
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: down_released
+
+  # Config button taps
+  - trigger: device
+    id: sw_config_single
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: config_single
+  - trigger: device
+    id: sw_config_double
+    domain: mqtt
+    device_id: !input switch_device
+    type: action
+    subtype: config_double
+
+conditions: []
+
+# ========== Actions ==========
+actions:
+  - choose:
+
+      # ---- Occupied: (re)start re-check timer; turn on light if off
+      - conditions:
+          - condition: trigger
+            id: Occupied
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: !input recheck_timer
+          - if:
+              - condition: state
+                entity_id: !input light_target
+                state: "off"
+            then:
+              - action: light.turn_on
+                target:
+                  entity_id: !input light_target
+                data:
+                  brightness_pct: !input turn_on_brightness_pct
+
+      # ---- Any switch action: cancel the re-check timer (only if enabled)
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: trigger
+                id:
+                  - sw_up_single
+                  - sw_down_single
+                  - sw_up_double
+                  - sw_down_double
+                  - sw_up_triple
+                  - sw_down_triple
+                  - sw_up_held
+                  - sw_down_held
+                  - sw_up_release
+                  - sw_up_released
+                  - sw_down_release
+                  - sw_down_released
+                  - sw_config_single
+                  - sw_config_double
+          - condition: template
+            value_template: "{{ enable_switch_off | default(true) }}"
+        sequence:
+          - action: timer.cancel
+            target:
+              entity_id: !input recheck_timer
+
+      # ---- Re-check fired: if not occupied, turn off & cancel; else restart re-check timer
+      - conditions:
+          - condition: trigger
+            id: occupancy_check
+        sequence:
+          - if:
+              - condition: state
+                entity_id: !input occupancy_sensor
+                state: "off"
+            then:
+              - action: light.turn_off
+                target:
+                  entity_id: !input light_target
+                data:
+                  transition: !input off_transition_seconds
+              - action: timer.cancel
+                target:
+                  entity_id: !input recheck_timer
+            else:
+              - action: timer.start
+                target:
+                  entity_id: !input recheck_timer
+
+mode: single
 
