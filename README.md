@@ -12,7 +12,7 @@ A curated set of Home Assistant blueprints keeps Ataraxia's Zigbee lighting resp
 | [`Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint`](./Ataraxia%20Lighting%20-%20Inovelli%20Blue%20Defaults%20+%20Reporting%20Script%20Blueprint) | Script blueprint | Zigbee2MQTT-focused switch configurator that pushes bundled Inovelli parameters, configures attribute reporting, publishes device options, and enforces `execute_if_off` safeguards with controlled pacing. |
 | [`Ataraxia Lighting - Hue Defaults.yaml`](./Ataraxia%20Lighting%20-%20Hue%20Defaults.yaml) | Script blueprint | Hue bulb configurator that publishes reporting, device options, and per-key light defaults (including execute-if-off flags) to Zigbee2MQTT with a throttle between MQTT calls. |
 | [`INOVELLI_PARAMETERS.md`](./INOVELLI_PARAMETERS.md) | Documentation | Tabulates every hard-coded switch parameter, device option, and reporting setting applied by the Inovelli defaults script to aid auditing and customization. |
-| [`HUE_PARAMETERS.md`](./HUE_PARAMETERS.md) | Documentation | Mirrors the Hue defaults blueprint inputs, reporting definitions, and always-on payloads so you can track what will be sent before executing the script. |
+| [`HUE_PARAMETERS.md`](./HUE_PARAMETERS.md) | Documentation | Mirrors the Hue defaults blueprint inputs, reporting definitions, and always-on payloads so you can track what will be sent before executing the script. |\ |
 
 ## How the pieces fit together
 
@@ -39,5 +39,6 @@ The multi-tap automation blueprint listens for tap events from a single Inovelli
 7. **Align Inovelli defaults.** Run the [`Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint`](./Ataraxia%20Lighting%20-%20Inovelli%20Blue%20Defaults%20+%20Reporting%20Script%20Blueprint) against batches of switches to push the curated parameter set, reporting, and execute-if-off safeguards. Refer to [`INOVELLI_PARAMETERS.md`](./INOVELLI_PARAMETERS.md) if you plan to tweak or verify any values. Allow enough time between runs for Zigbee2MQTT to process the publishes.
 8. **Align Hue defaults.** Execute [`Ataraxia Lighting - Hue Defaults.yaml`](./Ataraxia%20Lighting%20-%20Hue%20Defaults.yaml) for your Hue bulbs to apply consistent reporting, device options, and startup behavior, using [`HUE_PARAMETERS.md`](./HUE_PARAMETERS.md) as a checklist. Schedule periodic re-runs after firmware updates or major changes.
 9. **Smoke test the stack.** Finish the timer to observe room-by-room updates, toggle switches to ensure manual control stays synchronized, and review MQTT logs for unexpected traffic. Confirm the defaults scripts no longer log invalid values such as `minimumLevel=0` thanks to the enforced parameter set.
+=======
 
 With these steps complete you have an end-to-end Ataraxia Lighting deployment: adaptive brightness and color ripple across rooms, manual taps feed the same logic, and vendor defaults stay locked to values that keep MQTT traffic lean and lights predictable.
