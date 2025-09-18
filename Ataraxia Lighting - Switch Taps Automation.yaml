@@ -1,5 +1,5 @@
 blueprint:
-  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.14)"
+  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.15)"
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap automation.
 
@@ -11,6 +11,7 @@ blueprint:
       • Disables Adaptive helper on hold start
       • Repeats brightness_step_pct with short transition until release
       • If no held targets are set, held behavior is disabled (does nothing)
+      • Dimming down clamps at a minimum brightness of 15%
 
     Uses Home Assistant 2024.8+ “actions” style (service calls are now actions).
 
@@ -95,7 +96,7 @@ blueprint:
         entity:
           filter: {domain: script}
 
-    # ---- Single tap optional actions (RESTORED)
+    # ---- Single tap optional actions
     up_single_action:
       name: Up Single Action
       description: Optional action to run on up_single (scene/script/light).
@@ -120,7 +121,7 @@ blueprint:
       default: "toggle"
       selector: {select: {options: ["on","off","toggle"]}}
 
-    # ---- Double / Triple actions + per-action Light mode (unchanged)
+    # ---- Double / Triple actions + per-action Light mode
     up_double_action:
       name: Up Double Action
       default: []
@@ -165,7 +166,7 @@ blueprint:
       default: "toggle"
       selector: {select: {options: ["on","off","toggle"]}}
 
-    # ---- LED script & per-action LED effects (unchanged)
+    # ---- LED script & per-action LED effects
     led_script:
       name: Inovelli LED effect script
       description: "Must accept: led, color, level, effect, duration, target"
@@ -206,7 +207,7 @@ blueprint:
 
     up_single_color:
       name: up_single • Color
-      default: Pink
+      default: Light Pink
       selector: {select: {custom_value: true, options: &color_opts [Red, Orange, Yellow, Green, Cyan, Teal, Blue, Purple, Light Pink, Pink, White]}}
 
     up_single_level:
@@ -231,7 +232,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *effects_opts}}
     down_single_color:
       name: down_single • Color
-      default: Pink
+      default: Light Pink
       selector: {select: {custom_value: true, options: *color_opts}}
     down_single_level:
       name: down_single • LED level (1–100)
@@ -248,7 +249,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *effects_opts}}
     up_double_color:
       name: up_double • Color
-      default: Pink
+      default: Light Pink
       selector: {select: {custom_value: true, options: *color_opts}}
     up_double_level:
       name: up_double • LED level (1–100)
@@ -265,7 +266,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *effects_opts}}
     down_double_color:
       name: down_double • Color
-      default: Pink
+      default: Light Pink
       selector: {select: {custom_value: true, options: *color_opts}}
     down_double_level:
       name: down_double • LED level (1–100)
@@ -282,7 +283,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *effects_opts}}
     up_triple_color:
       name: up_triple • Color
-      default: Pink
+      default: Light Pink
       selector: {select: {custom_value: true, options: *color_opts}}
     up_triple_level:
       name: up_triple • LED level (1–100)
@@ -299,7 +300,7 @@ blueprint:
       selector: {select: {custom_value: true, options: *effects_opts}}
     down_triple_color:
       name: down_triple • Color
-      default: Pink
+      default: Light Pink
       selector: {select: {custom_value: true, options: *color_opts}}
     down_triple_level:
       name: down_triple • LED level (1–100)
@@ -366,7 +367,7 @@ variables:
   adaptive_helper_entity: !input adaptive_helper
   adaptive_script_entity: !input adaptive_script
 
-  # Single optional actions (restored)
+  # Single optional actions
   up_single_action: !input up_single_action
   down_single_action: !input down_single_action
   up_single_light_mode: !input up_single_light_mode
@@ -526,7 +527,7 @@ actions:
                   color_temp_kelvin: !input night_color_temp_k
                   transition: !input night_transition
 
-      # ========== SINGLE TAPS: LED + Adaptive + (RESTORED) Optional Actions ==========
+      # ========== SINGLE TAPS: LED + Adaptive + Optional Actions ==========
       - conditions:
           - condition: trigger
             id:
@@ -598,7 +599,7 @@ actions:
                         data:
                           variables: {target_state: "OFF"}
 
-          # (RESTORED) Optional Action for Single Taps
+          # Optional Action for Single Taps
           - choose:
               # UP single optional action
               - conditions: [{condition: trigger, id: ACTION_UP_SINGLE_AL_LIVE}]
@@ -700,7 +701,7 @@ actions:
 
                     # Enforce a 15% minimum when dimming DOWN
                     - variables:
-                        _min_bri_raw: 39   # ~15% of 255
+                        _min_bri_raw: 38   # ~15% of 255
                         _any_at_or_below_min: >-
                           {{
                             expand(_targets)
@@ -712,7 +713,7 @@ actions:
                           }}
 
                     - choose:
-                        # If we're dimming DOWN and any target is <= 5%, clamp to exactly 5%
+                        # If we're dimming DOWN and any target is <= 15%, clamp to exactly 15%
                         - conditions:
                             - condition: template
                               value_template: "{{ _step < 0 }}"
@@ -735,11 +736,12 @@ actions:
                               data:
                                 brightness_step_pct: "{{ _step }}"
                                 transition: "{{ held_transition }}"
+                      default: []
                   until:
                     - condition: template
                       value_template: "{{ wait.completed }}"
 
-      # ========== Double/Triple actions (unchanged) ==========
+      # ========== Double/Triple actions ==========
       - conditions:
           - condition: trigger
             id: [ACTION_UP_DOUBLE, ACTION_DOWN_DOUBLE, ACTION_UP_TRIPLE, ACTION_DOWN_TRIPLE]
