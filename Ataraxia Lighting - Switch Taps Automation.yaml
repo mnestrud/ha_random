@@ -1,5 +1,5 @@
 blueprint:
-  name: "Ataraxia Lighting - Inovelli Switch Taps (v1.0.RC1)"
+  name: "Ataraxia Lighting - Inovelli Switch Taps (v1.00rc2)"
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap automation.
 
@@ -367,11 +367,23 @@ variables:
   adaptive_helper_entity: !input adaptive_helper
   adaptive_script_entity: !input adaptive_script
 
-  # Single optional actions
+  # Optional single actions
   up_single_action: !input up_single_action
   down_single_action: !input down_single_action
   up_single_light_mode: !input up_single_light_mode
   down_single_light_mode: !input down_single_light_mode
+
+  # Optional double actions (MAPPED)
+  up_double_action_var: !input up_double_action
+  down_double_action_var: !input down_double_action
+  up_double_light_mode_var: !input up_double_light_mode
+  down_double_light_mode_var: !input down_double_light_mode
+
+  # Optional triple actions (MAPPED)
+  up_triple_action_var: !input up_triple_action
+  down_triple_action_var: !input down_triple_action
+  up_triple_light_mode_var: !input up_triple_light_mode
+  down_triple_light_mode_var: !input down_triple_light_mode
 
   led_script_entity: !input led_script
   debug_enabled: !input enable_debug_logging
@@ -415,7 +427,7 @@ triggers:
     subtype: config_double
     id: SCENE_DAY
 
-  # Adaptive: singles
+  # Singles
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
@@ -429,6 +441,36 @@ triggers:
     type: action
     subtype: down_single
     id: ACTION_DOWN_SINGLE_AL_PRESTAGE
+
+  # Doubles
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_double
+    id: ACTION_UP_DOUBLE
+
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_double
+    id: ACTION_DOWN_DOUBLE
+
+  # Triples
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_triple
+    id: ACTION_UP_TRIPLE
+
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_triple
+    id: ACTION_DOWN_TRIPLE
 
   # Held start
   - trigger: device
@@ -473,37 +515,6 @@ triggers:
     type: action
     subtype: down_released
     id: ACTION_DOWN_RELEASE_B
-
-  # Double taps
-  - trigger: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: up_double
-    id: ACTION_UP_DOUBLE
-
-  - trigger: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: down_double
-    id: ACTION_DOWN_DOUBLE
-
-  # Triple taps
-  - trigger: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: up_triple
-    id: ACTION_UP_TRIPLE
-
-  - trigger: device
-    domain: mqtt
-    device_id: !input inovelli_device
-    type: action
-    subtype: down_triple
-    id: ACTION_DOWN_TRIPLE
-
 
 conditions: []
 
@@ -675,7 +686,6 @@ actions:
               - ACTION_UP_HELD
               - ACTION_DOWN_HELD
         sequence:
-          # Determine targets and step from direction (NO fallback to light_group)
           - variables:
               _targets: >-
                 {% if trigger.id == 'ACTION_UP_HELD' %}
@@ -690,12 +700,10 @@ actions:
                   {{ (held_step_pct | int) * -1 }}
                 {% endif %}
 
-          # If no targets defined, do nothing (held disabled)
           - if:
               - condition: template
                 value_template: "{{ _targets != [] }}"
             then:
-              # Stop adaptive on hold start (only if we're actually dimming)
               - if:
                   - condition: template
                     value_template: "{{ adaptive_helper_entity != [] }}"
@@ -703,7 +711,6 @@ actions:
                   - action: input_boolean.turn_off
                     target: {entity_id: !input adaptive_helper}
 
-              # Repeat until release; on each timeout (no release yet), apply brightness step
               - repeat:
                   sequence:
                     - wait_for_trigger:
@@ -730,7 +737,6 @@ actions:
                       timeout: "{{ held_interval }}"
                       continue_on_timeout: true
 
-                    # Enforce a 15% minimum when dimming DOWN
                     - variables:
                         _min_bri_raw: 38   # ~15% of 255
                         _any_at_or_below_min: >-
@@ -744,7 +750,6 @@ actions:
                           }}
 
                     - choose:
-                        # If we're dimming DOWN and any target is <= 15%, clamp to exactly 15%
                         - conditions:
                             - condition: template
                               value_template: "{{ _step < 0 }}"
@@ -757,8 +762,6 @@ actions:
                               data:
                                 brightness_pct: 15
                                 transition: "{{ held_transition }}"
-
-                        # Otherwise, keep stepping smoothly
                         - conditions: []
                           sequence:
                             - action: light.turn_on
@@ -781,7 +784,7 @@ actions:
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'ACTION_UP_DOUBLE' and up_double_action != [] }}"
+                    value_template: "{{ trigger.id == 'ACTION_UP_DOUBLE' and up_double_action_var != [] }}"
                 sequence:
                   - if:
                       - condition: template
@@ -796,25 +799,25 @@ actions:
                           duration: !input up_double_duration
                           target: {entity_id: "{{ led_target_light }}"}
                   - choose:
-                      - conditions: [{condition: template, value_template: "{{ (up_double_action | string)[:7] == 'script.' }}"}]
-                        sequence: [{action: script.turn_on, target: {entity_id: !input up_double_action}}]
-                      - conditions: [{condition: template, value_template: "{{ (up_double_action | string)[:6] == 'scene.' }}"}]
-                        sequence: [{action: scene.turn_on, target: {entity_id: !input up_double_action}}]
-                      - conditions: [{condition: template, value_template: "{{ (up_double_action | string)[:6] == 'light.' }}"}]
+                      - conditions: [{condition: template, value_template: "{{ (up_double_action_var | string)[:7] == 'script.' }}"}]
+                        sequence: [{action: script.turn_on, target: {entity_id: "{{ up_double_action_var }}"}}]
+                      - conditions: [{condition: template, value_template: "{{ (up_double_action_var | string)[:6] == 'scene.' }}"}]
+                        sequence: [{action: scene.turn_on, target: {entity_id: "{{ up_double_action_var }}"}}]
+                      - conditions: [{condition: template, value_template: "{{ (up_double_action_var | string)[:6] == 'light.' }}"}]
                         sequence:
                           - choose:
-                              - conditions: [{condition: template, value_template: "{{ up_double_light_mode == 'on' }}"}]
-                                sequence: [{action: light.turn_on, target: {entity_id: !input up_double_action}}]
-                              - conditions: [{condition: template, value_template: "{{ up_double_light_mode == 'off' }}"}]
-                                sequence: [{action: light.turn_off, target: {entity_id: !input up_double_action}}]
-                              - conditions: [{condition: template, value_template: "{{ up_double_light_mode == 'toggle' }}"}]
-                                sequence: [{action: light.toggle, target: {entity_id: !input up_double_action}}]
+                              - conditions: [{condition: template, value_template: "{{ up_double_light_mode_var == 'on' }}"}]
+                                sequence: [{action: light.turn_on, target: {entity_id: "{{ up_double_action_var }}"}}]
+                              - conditions: [{condition: template, value_template: "{{ up_double_light_mode_var == 'off' }}"}]
+                                sequence: [{action: light.turn_off, target: {entity_id: "{{ up_double_action_var }}"}}]
+                              - conditions: [{condition: template, value_template: "{{ up_double_light_mode_var == 'toggle' }}"}]
+                                sequence: [{action: light.toggle, target: {entity_id: "{{ up_double_action_var }}"}}]
 
           # DOWN double
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'ACTION_DOWN_DOUBLE' and down_double_action != [] }}"
+                    value_template: "{{ trigger.id == 'ACTION_DOWN_DOUBLE' and down_double_action_var != [] }}"
                 sequence:
                   - if:
                       - condition: template
@@ -829,25 +832,25 @@ actions:
                           duration: !input down_double_duration
                           target: {entity_id: "{{ led_target_light }}"}
                   - choose:
-                      - conditions: [{condition: template, value_template: "{{ (down_double_action | string)[:7] == 'script.' }}"}]
-                        sequence: [{action: script.turn_on, target: {entity_id: !input down_double_action}}]
-                      - conditions: [{condition: template, value_template: "{{ (down_double_action | string)[:6] == 'scene.' }}"}]
-                        sequence: [{action: scene.turn_on, target: {entity_id: !input down_double_action}}]
-                      - conditions: [{condition: template, value_template: "{{ (down_double_action | string)[:6] == 'light.' }}"}]
+                      - conditions: [{condition: template, value_template: "{{ (down_double_action_var | string)[:7] == 'script.' }}"}]
+                        sequence: [{action: script.turn_on, target: {entity_id: "{{ down_double_action_var }}"}}]
+                      - conditions: [{condition: template, value_template: "{{ (down_double_action_var | string)[:6] == 'scene.' }}"}]
+                        sequence: [{action: scene.turn_on, target: {entity_id: "{{ down_double_action_var }}"}}]
+                      - conditions: [{condition: template, value_template: "{{ (down_double_action_var | string)[:6] == 'light.' }}"}]
                         sequence:
                           - choose:
-                              - conditions: [{condition: template, value_template: "{{ down_double_light_mode == 'on' }}"}]
-                                sequence: [{action: light.turn_on, target: {entity_id: !input down_double_action}}]
-                              - conditions: [{condition: template, value_template: "{{ down_double_light_mode == 'off' }}"}]
-                                sequence: [{action: light.turn_off, target: {entity_id: !input down_double_action}}]
-                              - conditions: [{condition: template, value_template: "{{ down_double_light_mode == 'toggle' }}"}]
-                                sequence: [{action: light.toggle, target: {entity_id: !input down_double_action}}]
+                              - conditions: [{condition: template, value_template: "{{ down_double_light_mode_var == 'on' }}"}]
+                                sequence: [{action: light.turn_on, target: {entity_id: "{{ down_double_action_var }}"}}]
+                              - conditions: [{condition: template, value_template: "{{ down_double_light_mode_var == 'off' }}"}]
+                                sequence: [{action: light.turn_off, target: {entity_id: "{{ down_double_action_var }}"}}]
+                              - conditions: [{condition: template, value_template: "{{ down_double_light_mode_var == 'toggle' }}"}]
+                                sequence: [{action: light.toggle, target: {entity_id: "{{ down_double_action_var }}"}}]
 
           # UP triple
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'ACTION_UP_TRIPLE' and up_triple_action != [] }}"
+                    value_template: "{{ trigger.id == 'ACTION_UP_TRIPLE' and up_triple_action_var != [] }}"
                 sequence:
                   - if:
                       - condition: template
@@ -862,25 +865,25 @@ actions:
                           duration: !input up_triple_duration
                           target: {entity_id: "{{ led_target_light }}"}
                   - choose:
-                      - conditions: [{condition: template, value_template: "{{ (up_triple_action | string)[:7] == 'script.' }}"}]
-                        sequence: [{action: script.turn_on, target: {entity_id: !input up_triple_action}}]
-                      - conditions: [{condition: template, value_template: "{{ (up_triple_action | string)[:6] == 'scene.' }}"}]
-                        sequence: [{action: scene.turn_on, target: {entity_id: !input up_triple_action}}]
-                      - conditions: [{condition: template, value_template: "{{ (up_triple_action | string)[:6] == 'light.' }}"}]
+                      - conditions: [{condition: template, value_template: "{{ (up_triple_action_var | string)[:7] == 'script.' }}"}]
+                        sequence: [{action: script.turn_on, target: {entity_id: "{{ up_triple_action_var }}"}}]
+                      - conditions: [{condition: template, value_template: "{{ (up_triple_action_var | string)[:6] == 'scene.' }}"}]
+                        sequence: [{action: scene.turn_on, target: {entity_id: "{{ up_triple_action_var }}"}}]
+                      - conditions: [{condition: template, value_template: "{{ (up_triple_action_var | string)[:6] == 'light.' }}"}]
                         sequence:
                           - choose:
-                              - conditions: [{condition: template, value_template: "{{ up_triple_light_mode == 'on' }}"}]
-                                sequence: [{action: light.turn_on, target: {entity_id: !input up_triple_action}}]
-                              - conditions: [{condition: template, value_template: "{{ up_triple_light_mode == 'off' }}"}]
-                                sequence: [{action: light.turn_off, target: {entity_id: !input up_triple_action}}]
-                              - conditions: [{condition: template, value_template: "{{ up_triple_light_mode == 'toggle' }}"}]
-                                sequence: [{action: light.toggle, target: {entity_id: !input up_triple_action}}]
+                              - conditions: [{condition: template, value_template: "{{ up_triple_light_mode_var == 'on' }}"}]
+                                sequence: [{action: light.turn_on, target: {entity_id: "{{ up_triple_action_var }}"}}]
+                              - conditions: [{condition: template, value_template: "{{ up_triple_light_mode_var == 'off' }}"}]
+                                sequence: [{action: light.turn_off, target: {entity_id: "{{ up_triple_action_var }}"}}]
+                              - conditions: [{condition: template, value_template: "{{ up_triple_light_mode_var == 'toggle' }}"}]
+                                sequence: [{action: light.toggle, target: {entity_id: "{{ up_triple_action_var }}"}}]
 
           # DOWN triple
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'ACTION_DOWN_TRIPLE' and down_triple_action != [] }}"
+                    value_template: "{{ trigger.id == 'ACTION_DOWN_TRIPLE' and down_triple_action_var != [] }}"
                 sequence:
                   - if:
                       - condition: template
@@ -895,18 +898,18 @@ actions:
                           duration: !input down_triple_duration
                           target: {entity_id: "{{ led_target_light }}"}
                   - choose:
-                      - conditions: [{condition: template, value_template: "{{ (down_triple_action | string)[:7] == 'script.' }}"}]
-                        sequence: [{action: script.turn_on, target: {entity_id: !input down_triple_action}}]
-                      - conditions: [{condition: template, value_template: "{{ (down_triple_action | string)[:6] == 'scene.' }}"}]
-                        sequence: [{action: scene.turn_on, target: {entity_id: !input down_triple_action}}]
-                      - conditions: [{condition: template, value_template: "{{ (down_triple_action | string)[:6] == 'light.' }}"}]
+                      - conditions: [{condition: template, value_template: "{{ (down_triple_action_var | string)[:7] == 'script.' }}"}]
+                        sequence: [{action: script.turn_on, target: {entity_id: "{{ down_triple_action_var }}"}}]
+                      - conditions: [{condition: template, value_template: "{{ (down_triple_action_var | string)[:6] == 'scene.' }}"}]
+                        sequence: [{action: scene.turn_on, target: {entity_id: "{{ down_triple_action_var }}"}}]
+                      - conditions: [{condition: template, value_template: "{{ (down_triple_action_var | string)[:6] == 'light.' }}"}]
                         sequence:
                           - choose:
-                              - conditions: [{condition: template, value_template: "{{ down_triple_light_mode == 'on' }}"}]
-                                sequence: [{action: light.turn_on, target: {entity_id: !input down_triple_action}}]
-                              - conditions: [{condition: template, value_template: "{{ down_triple_light_mode == 'off' }}"}]
-                                sequence: [{action: light.turn_off, target: {entity_id: !input down_triple_action}}]
-                              - conditions: [{condition: template, value_template: "{{ down_triple_light_mode == 'toggle' }}"}]
-                                sequence: [{action: light.toggle, target: {entity_id: !input down_triple_action}}]
+                              - conditions: [{condition: template, value_template: "{{ down_triple_light_mode_var == 'on' }}"}]
+                                sequence: [{action: light.turn_on, target: {entity_id: "{{ down_triple_action_var }}"}}]
+                              - conditions: [{condition: template, value_template: "{{ down_triple_light_mode_var == 'off' }}"}]
+                                sequence: [{action: light.turn_off, target: {entity_id: "{{ down_triple_action_var }}"}}]
+                              - conditions: [{condition: template, value_template: "{{ down_triple_light_mode_var == 'toggle' }}"}]
+                                sequence: [{action: light.toggle, target: {entity_id: "{{ down_triple_action_var }}"}}]
 
 mode: restart
