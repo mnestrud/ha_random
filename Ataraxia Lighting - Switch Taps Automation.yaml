@@ -1,5 +1,5 @@
 blueprint:
-  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.13)"
+  name: "Ataraxia Lighting - Inovelli Switch Taps (v0.9.14)"
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap automation.
 
@@ -698,10 +698,36 @@ actions:
                       timeout: "{{ held_interval }}"
                       continue_on_timeout: true
 
+                    # Enforce a 5% minimum when dimming DOWN
+                    - variables:
+                        _min_bri_raw: 13   # ~5% of 255
+                        _any_at_or_below_min: >-
+                          {{
+                            expand(_targets)
+                            | selectattr('attributes.brightness','defined')
+                            | map(attribute='attributes.brightness')
+                            | select('le', _min_bri_raw)
+                            | list
+                            | count > 0
+                          }}
+
                     - choose:
+                        # If we're dimming DOWN and any target is <= 5%, clamp to exactly 5%
                         - conditions:
                             - condition: template
-                              value_template: "{{ not wait.completed }}"
+                              value_template: "{{ _step < 0 }}"
+                            - condition: template
+                              value_template: "{{ _any_at_or_below_min }}"
+                          sequence:
+                            - action: light.turn_on
+                              target:
+                                entity_id: "{{ _targets }}"
+                              data:
+                                brightness_pct: 5
+                                transition: "{{ held_transition }}"
+
+                        # Otherwise, keep stepping smoothly
+                        - conditions: []
                           sequence:
                             - action: light.turn_on
                               target:
@@ -709,7 +735,6 @@ actions:
                               data:
                                 brightness_step_pct: "{{ _step }}"
                                 transition: "{{ held_transition }}"
-                      default: []
                   until:
                     - condition: template
                       value_template: "{{ wait.completed }}"
