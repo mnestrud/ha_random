@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Occupancy Lighting (v0.1)
+  name: Ataraxia Lighting - Occupancy Lighting (v0.1.1)
   description: >
     Turn on a light when occupancy goes ON, then periodically re-check occupancy
     on the schedule defined by your **Re-check timer** helper (this automation
@@ -24,7 +24,10 @@ blueprint:
     • Re-check timer — Timer helper restarted by this automation (no duration specified)
     • Optional switch device — **any** tap/hold/release on this device cancels the
       re-check timer immediately (manual intent wins)
-    • Brightness on turn-on and off transition seconds
+    • Brightness on turn-on, **on transition seconds**, optional **color temperature (K)**,
+      and off transition seconds
+
+    Built for Home Assistant 2024.8+ (service calls are actions).
 
   domain: automation
   author: mnestrud
@@ -60,6 +63,28 @@ blueprint:
           max: 100
           step: 1
           unit_of_measurement: "%"
+
+    on_transition_seconds:
+      name: On transition (seconds)
+      description: Transition duration when turning the light on.
+      default: 0.4
+      selector:
+        number:
+          min: 0
+          max: 30
+          step: 0.1
+          unit_of_measurement: s
+
+    on_color_temp_k:
+      name: On color temperature (Kelvin) — optional
+      description: Set to a value in Kelvin to apply on turn-on, or leave at 0 to skip.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 6500
+          step: 50
+          unit_of_measurement: K
 
     off_transition_seconds:
       name: Off transition (seconds)
@@ -217,12 +242,26 @@ actions:
                 entity_id: !input light_target
                 state: "off"
             then:
-              - action: light.turn_on
-                target:
-                  entity_id: !input light_target
-                data:
-                  brightness_pct: !input turn_on_brightness_pct
-                  transition: 0.4
+              # If on_color_temp_k > 0, include it; else omit it
+              - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ (on_color_temp_k | int) > 0 }}"
+                    sequence:
+                      - action: light.turn_on
+                        target:
+                          entity_id: !input light_target
+                        data:
+                          brightness_pct: !input turn_on_brightness_pct
+                          transition: !input on_transition_seconds
+                          color_temp_kelvin: !input on_color_temp_k
+                default:
+                  - action: light.turn_on
+                    target:
+                      entity_id: !input light_target
+                    data:
+                      brightness_pct: !input turn_on_brightness_pct
+                      transition: !input on_transition_seconds
 
       # ---- Any switch action: cancel the re-check timer (only if enabled)
       - conditions:
@@ -275,4 +314,3 @@ actions:
                   entity_id: !input recheck_timer
 
 mode: single
-
