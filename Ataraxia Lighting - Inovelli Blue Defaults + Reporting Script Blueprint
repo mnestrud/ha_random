@@ -97,7 +97,7 @@ variables:
         'dimmingSpeedDownRemote': 127,
         'dimmingSpeedDownLocal': 127,
         'minimumLevel': 1,
-        'maximumLevel': 254,
+        'maximumLevel': 255,
         'invertSwitch': 'No',
         'autoTimerOff': 0,
         'stateAfterPowerRestored': 255,
