@@ -1,61 +1,43 @@
 # Ataraxia Lighting Blueprints
 
-This repository collects Home Assistant blueprints for managing Ataraxia's adaptive lighting setup.  They cover three major tasks:
+A curated set of Home Assistant blueprints keeps Ataraxia's Zigbee lighting responsive, coordinated, and easy to maintain. The collection now follows a four-part structure: a master automation that drives adaptive updates, a per-area script that talks to MQTT, device-default scripts for Hue bulbs and Inovelli switches, and a flexible multi-tap automation. Two supplemental Markdown files document every parameter pushed to each platform.
 
-* Driving per-room lighting updates on a reliable cadence.
-* Keeping Inovelli Blue switch defaults and Zigbee reporting aligned.
-* Maintaining Hue bulb startup defaults for a cohesive experience.
-* Exposing a highly configurable multi-tap automation for each Inovelli Blue switch.
+## Repository map
 
-All of the files are standard Home Assistant blueprints that can be imported with the **"Import Blueprint"** workflow in the UI or by copying the YAML into your `blueprints/` (automation/script) folders.  The sections below describe what each file does and how they work together.
+| File | Type | What it does |
+| --- | --- | --- |
+| `Ataraxia Lighting - Tick Blueprint.yaml` | Automation blueprint | Timer-driven "tick" automation that gathers Adaptive Lighting targets, evaluates area availability, and calls per-room scripts with staggered delays to avoid flooding Zigbee.【F:Ataraxia Lighting - Tick Blueprint.yaml†L1-L330】 |
+| `Ataraxia Lighting - Adaptive Push Script.yaml` | Script blueprint | Per-area MQTT publisher that normalizes brightness/color, skips redundant publishes when HA state already matches, and sequences switch/group updates with optional delays.【F:Ataraxia Lighting - Adaptive Push Script.yaml†L1-L210】 |
+| `Ataraxia Lighting - Switch Taps Automation.yaml` | Automation blueprint | Full-featured Inovelli Blue multi-tap handler that wires single taps to Adaptive Lighting helpers, exposes optional actions per gesture, and can trigger LED effects using HA 2024.8+ action syntax.【F:Ataraxia Lighting - Switch Taps Automation.yaml†L1-L214】【F:Ataraxia Lighting - Switch Taps Automation.yaml†L214-L720】 |
+| `Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint` | Script blueprint | Zigbee2MQTT-focused switch configurator that pushes bundled Inovelli parameters, configures attribute reporting, publishes device options, and enforces `execute_if_off` safeguards with controlled pacing.【F:Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint†L1-L236】 |
+| `Ataraxia Lighting - Hue Defaults.yaml` | Script blueprint | Hue bulb configurator that publishes reporting, device options, and per-key light defaults (including execute-if-off flags) to Zigbee2MQTT with a throttle between MQTT calls.【F:Ataraxia Lighting - Hue Defaults.yaml†L1-L142】 |
+| `INOVELLI_PARAMETERS.md` | Documentation | Tabulates every hard-coded switch parameter, device option, and reporting setting applied by the Inovelli defaults script to aid auditing and customization.【F:INOVELLI_PARAMETERS.md†L1-L86】 |
+| `HUE_PARAMETERS.md` | Documentation | Mirrors the Hue defaults blueprint inputs, reporting definitions, and always-on payloads so you can track what will be sent before executing the script.【F:HUE_PARAMETERS.md†L1-L82】 |
 
-## Repository layout
+## How the pieces fit together
 
-| File | Domain | Purpose |
-| ---- | ------ | ------- |
-| `AL_Tick_Automation_Blueprint.yaml` | Automation | Heartbeat automation that reads Adaptive Lighting values and fans them out to up to 15 areas via per-room scripts. |
-| `AL_MQTT_script_blueprint.yaml` | Script | Synchronizes brightness and color temperature between Adaptive Lighting, Inovelli switches, and Zigbee2MQTT light groups while avoiding redundant MQTT traffic. |
-| `Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint` | Script | Pushes a shared set of parameter defaults to multiple Inovelli Blue devices via HA config entities and optionally reconfigures Zigbee reporting through MQTT. |
-| `Ataraxia Lighting - Hue Defaults` | Script | Applies a consistent set of Zigbee2MQTT device options and startup defaults to Hue bulbs. |
-| `Ataraxia Inovelli Switch Automations` | Automation | Full-featured multi-tap automation for a single Inovelli Blue switch, including Adaptive Lighting integration, optional actions, and LED effects. |
+### Adaptive cadence and per-room fan-out
+The master tick automation reads the global Adaptive Lighting switch, optional overrides, and a Zigbee2MQTT availability sensor before iterating through up to fifteen rooms. Each enabled room invokes the Adaptive Push script with the resolved target brightness, color temperature, and power state while staggering calls to keep MQTT traffic smooth.【F:Ataraxia Lighting - Tick Blueprint.yaml†L1-L330】【F:Ataraxia Lighting - Adaptive Push Script.yaml†L58-L210】 The script normalizes values, compares them to current Home Assistant entities when provided, and only publishes to switch or group topics when changes are required.【F:Ataraxia Lighting - Adaptive Push Script.yaml†L32-L210】 Together they keep switches, light groups, and Adaptive Lighting synchronized without redundant chatter.
 
-## How the blueprints interact
+### Device defaults and reporting hygiene
+Separate scripts maintain vendor-specific defaults. The Inovelli defaults blueprint can configure up to twenty switches in parallel, pushing reporting, device options, and a comprehensive parameter set through Zigbee2MQTT configure calls while spacing each publish.【F:Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint†L1-L236】 The Hue defaults blueprint performs an analogous role for Philips Hue lights, applying reporting on endpoint 11, device options, and startup behavior per light with a programmable delay.【F:Ataraxia Lighting - Hue Defaults.yaml†L1-L142】 Running these scripts ensures hardware stays aligned with the expectations of the adaptive cadence.
 
-### Adaptive Lighting heartbeat and per-room updates
+### Manual control and scene layering
+The multi-tap automation blueprint listens for tap events from a single Inovelli switch and wires them to Adaptive Lighting helpers, optional day/night scenes, per-gesture HA actions, and LED effects—all using the modern Home Assistant action syntax.【F:Ataraxia Lighting - Switch Taps Automation.yaml†L1-L720】 Deploying it alongside the tick automation keeps manual interventions in step with the automated MQTT updates.
 
-1. **`AL_Tick_Automation_Blueprint.yaml`** listens for a Home Assistant timer or system start event to trigger a "tick".  On each tick it reads the global Adaptive Lighting switch and any per-area override switches, resolving a target brightness and color temperature for up to 15 areas.【F:AL_Tick_Automation_Blueprint.yaml†L1-L215】
-2. For each enabled area whose controlling light is available, the automation calls the corresponding **`AL_MQTT_script_blueprint.yaml`** script with the resolved state, brightness, and color temperature.  It staggers calls with a configurable delay to avoid flooding Zigbee.【F:AL_Tick_Automation_Blueprint.yaml†L215-L387】【F:AL_MQTT_script_blueprint.yaml†L8-L132】
-3. The script blueprint publishes MQTT payloads to the Inovelli switch `/set` topic and/or the Zigbee2MQTT light/group topic.  It first performs "already correct" checks using optional HA entities to skip redundant publishes, then issues the necessary MQTT commands and enforces an ordering delay when both switch and group targets are used.【F:AL_MQTT_script_blueprint.yaml†L16-L147】【F:AL_MQTT_script_blueprint.yaml†L147-L222】
+### Reference tables
+`INOVELLI_PARAMETERS.md` and `HUE_PARAMETERS.md` provide printable tables for every publish the defaults scripts will attempt, including hidden execute-if-off safeguards and reporting intervals, so you can verify settings or document overrides before running them.【F:INOVELLI_PARAMETERS.md†L1-L86】【F:HUE_PARAMETERS.md†L1-L82】 Keep these nearby when customizing payloads or double-checking devices after upgrades.
 
-Together, these two blueprints keep Inovelli switches, light groups, and Adaptive Lighting in sync without unnecessary traffic.
+## Step-by-step: Deploying the complete Ataraxia Lighting stack
 
-### Maintaining device defaults
+1. **Confirm prerequisites.** Ensure Home Assistant 2024.8 or later, the Adaptive Lighting integration (with a helper switch exposing `brightness_pct` and `color_temp_kelvin`), MQTT enabled, and Zigbee2MQTT online with consistent base topics for switches and bulbs.【F:Ataraxia Lighting - Tick Blueprint.yaml†L1-L330】【F:Ataraxia Lighting - Adaptive Push Script.yaml†L18-L44】
+2. **Import the blueprints.** In Home Assistant navigate to *Settings → Automations & Scenes → Blueprints → Import*, and import each YAML blueprint from this repository using the URLs in their `source_url` metadata.【F:Ataraxia Lighting - Adaptive Push Script.yaml†L8-L15】【F:Ataraxia Lighting - Tick Blueprint.yaml†L1-L9】【F:Ataraxia Lighting - Hue Defaults.yaml†L1-L28】【F:Ataraxia Lighting - Switch Taps Automation.yaml†L1-L16】【F:Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint†L1-L19】
+3. **Create required helpers.** Set up the heartbeat timer entity, global Adaptive Lighting helper switch, per-area boolean overrides if desired, and any input booleans or scripts referenced by the multi-tap automation (e.g., day/night scenes).【F:Ataraxia Lighting - Tick Blueprint.yaml†L12-L218】【F:Ataraxia Lighting - Switch Taps Automation.yaml†L27-L214】
+4. **Instantiate per-room Adaptive Push scripts.** For every room or light group, create a script from `Ataraxia Lighting - Adaptive Push Script.yaml`, pointing it at the relevant Adaptive Lighting switch, Zigbee2MQTT topics, and optional HA entities for "already correct" checks.【F:Ataraxia Lighting - Adaptive Push Script.yaml†L18-L210】 Test one script manually to verify MQTT publishes target the correct devices.
+5. **Deploy the master tick automation.** Create an automation from `Ataraxia Lighting - Tick Blueprint.yaml` that references your heartbeat timer, Zigbee2MQTT bridge availability sensor, global Adaptive Lighting switch, and the scripts instantiated in step 4. Configure per-area delays and overrides to suit your environment.【F:Ataraxia Lighting - Tick Blueprint.yaml†L12-L330】 Trigger the timer manually to confirm that each area updates in sequence.
+6. **Configure manual control.** For each Inovelli switch, instantiate `Ataraxia Lighting - Switch Taps Automation.yaml`, select the device, map single-tap actions to the Adaptive Lighting helper or per-room script, and optionally assign additional actions or LED effects for other gestures.【F:Ataraxia Lighting - Switch Taps Automation.yaml†L18-L720】 Validate that taps trigger the expected MQTT updates without conflicting with the tick automation.
+7. **Align Inovelli defaults.** Run the `Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint` against batches of switches to push the curated parameter set, reporting, and execute-if-off safeguards. Refer to `INOVELLI_PARAMETERS.md` if you plan to tweak or verify any values.【F:Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint†L1-L236】【F:INOVELLI_PARAMETERS.md†L1-L86】 Allow enough time between runs for Zigbee2MQTT to process the publishes.
+8. **Align Hue defaults.** Execute `Ataraxia Lighting - Hue Defaults.yaml` for your Hue bulbs to apply consistent reporting, device options, and startup behavior, using `HUE_PARAMETERS.md` as a checklist.【F:Ataraxia Lighting - Hue Defaults.yaml†L1-L142】【F:HUE_PARAMETERS.md†L1-L82】 Schedule periodic re-runs after firmware updates or major changes.
+9. **Smoke test the stack.** Finish the timer to observe room-by-room updates, toggle switches to ensure manual control stays synchronized, and review MQTT logs for unexpected traffic. Confirm the defaults scripts no longer log invalid values such as `minimumLevel=0` thanks to the enforced parameter set.【F:Ataraxia Lighting - Tick Blueprint.yaml†L215-L330】【F:Ataraxia Lighting - Adaptive Push Script.yaml†L152-L210】【F:Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint†L126-L236】
 
-* **`Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint`** reads the current configuration entities from a reference Inovelli Blue (or falls back to a hard-coded profile).  It can then push those values to up to 20 target devices by calling the appropriate `number.set_value` and `select.select_option` actions, and optionally resets/reapplies Zigbee reporting for key clusters via MQTT.【F:Ataraxia Lighting - Inovelli Blue Defaults + Reporting Script Blueprint†L1-L209】  Running this script before or after adding switches ensures the switches share a consistent configuration and reporting cadence.
-* **`Ataraxia Lighting - Hue Defaults`** performs a similar role for Hue bulbs: for each selected device it publishes bridge-level option updates and device `/set` payloads, pausing between publishes to avoid congestion.  This keeps state-action behavior, transition defaults, and power-on behavior aligned across the Hue fleet.【F:Ataraxia Lighting - Hue Defaults†L1-L115】
-
-These scripts complement the tick automation by keeping the underlying hardware configured with the expected defaults.
-
-### Switch interactions and user control
-
-* **`Ataraxia Inovelli Switch Automations`** is a per-device automation blueprint that reacts to Inovelli Blue multi-tap events.  It maps single taps to Adaptive Lighting helper/script interactions, offers dedicated day/night scenes on the config buttons, allows optional scene/script/light actions for single/double/triple taps, and drives LED effects through a helper script when configured.【F:Ataraxia Inovelli Switch Automations†L1-L209】【F:Ataraxia Inovelli Switch Automations†L209-L720】
-* When used alongside the tick automation and MQTT script, single up/down taps can toggle the Adaptive Lighting helper and call the same per-room script used by the heartbeat, ensuring manual interventions stay in sync with the automated cadence.【F:Ataraxia Inovelli Switch Automations†L480-L720】
-
-## Getting started
-
-1. Import the desired blueprints into Home Assistant (Settings → Automations & Scenes → Blueprints → Import) using the raw URLs listed in each file's `source_url` field where provided, or copy the YAML into your `blueprints/automation` or `blueprints/script` directories.
-2. Create helpers required by the blueprints (Adaptive Lighting dummy switch, per-area input_booleans, etc.) if they do not already exist.
-3. Instantiate:
-   * One automation from `AL_Tick_Automation_Blueprint.yaml`, wiring your heartbeat timer, Zigbee2MQTT bridge sensor, global Adaptive Lighting switch, and per-area entities/scripts.
-   * One script per area from `AL_MQTT_script_blueprint.yaml` to target the matching Inovelli switch/light group topics.
-   * Optional scripts from the defaults blueprints to initialize or periodically reapply device configurations.
-   * Automations from `Ataraxia Inovelli Switch Automations` for each Inovelli Blue device to expose the multi-tap behaviors you prefer.
-4. Test by manually triggering the timer finish event or a switch tap to confirm that the MQTT publishes and light behavior align with expectations.
-
-## Notes
-
-* All blueprints target Home Assistant 2024.8 or later, leveraging the new `action:` syntax for service calls where applicable.【F:Ataraxia Inovelli Switch Automations†L9-L15】
-* MQTT topic examples in the scripts assume a Zigbee2MQTT deployment; adjust to match your setup.
-* The defaults scripts run actions in parallel across selected devices but include pauses to remain friendly to Zigbee networks.
-
-These blueprints are designed to be modular: you can use the multi-tap automation on its own, or deploy the full stack for a highly coordinated Adaptive Lighting experience.
+With these steps complete you have an end-to-end Ataraxia Lighting deployment: adaptive brightness and color ripple across rooms, manual taps feed the same logic, and vendor defaults stay locked to values that keep MQTT traffic lean and lights predictable.
