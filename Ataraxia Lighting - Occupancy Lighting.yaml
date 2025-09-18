@@ -222,6 +222,7 @@ actions:
                   entity_id: !input light_target
                 data:
                   brightness_pct: !input turn_on_brightness_pct
+                  transition: 0.4
 
       # ---- Any switch action: cancel the re-check timer (only if enabled)
       - conditions:
