@@ -474,6 +474,37 @@ triggers:
     subtype: down_released
     id: ACTION_DOWN_RELEASE_B
 
+  # Double taps
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_double
+    id: ACTION_UP_DOUBLE
+
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_double
+    id: ACTION_DOWN_DOUBLE
+
+  # Triple taps
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: up_triple
+    id: ACTION_UP_TRIPLE
+
+  - trigger: device
+    domain: mqtt
+    device_id: !input inovelli_device
+    type: action
+    subtype: down_triple
+    id: ACTION_DOWN_TRIPLE
+
+
 conditions: []
 
 actions:
