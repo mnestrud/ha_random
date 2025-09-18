@@ -851,5 +851,4 @@ actions:
                               - conditions: [{condition: template, value_template: "{{ down_triple_light_mode == 'toggle' }}"}]
                                 sequence: [{action: light.toggle, target: {entity_id: !input down_triple_action}}]
 
-mode: queued
-max: 3
+mode: restart
