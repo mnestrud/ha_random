@@ -101,7 +101,7 @@ blueprint:
     # ---- NEW: Accent Lights
     accent_lights:
       name: Accent Lights (optional, multiple)
-      description: Lights to toggle as accent: ON with up_single, OFF with down_single and on config taps. No brightness/color/transition sent.
+      description: "Lights to toggle as accent: ON with up_single, OFF with down_single and on config taps. No brightness/color/transition sent."
       default: []
       selector:
         entity:
