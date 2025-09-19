@@ -1,17 +1,19 @@
 blueprint:
-  name: "Ataraxia Lighting - Inovelli Switch Taps (v1.00rc2)"
+  name: "Ataraxia Lighting - Inovelli Switch Taps (v1.00rc3)"
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap automation.
 
     - Config single = Night (optional light target)
     - Config double = Day (optional light target)
     - Up/Down single = Adaptive helper control + optional LED + optional Action (scene/script/light)
+      • NEW: optional Accent Lights → ON with up_single, OFF with down_single (and OFF on config taps)
+      • Accent Lights never receive brightness/color/transition in commands
     - Up/Down double & triple = optional Action (scene/script/light) + optional LED
     - Up Held / Down Held = smooth brightness ramp for assigned light targets
       • Disables Adaptive helper on hold start
       • Repeats brightness_step_pct with short transition until release
-      • If no held targets are set, held behavior is disabled (does nothing)
-      • Dimming down clamps at a minimum brightness of 15%
+      • Dimming down clamps at a configurable minimum (default 15%)
+      • Brightening up clamps at a configurable maximum (default 95%)
 
     Uses Home Assistant 2024.8+ “actions” style (service calls are now actions).
 
@@ -95,6 +97,16 @@ blueprint:
       selector:
         entity:
           filter: {domain: script}
+
+    # ---- NEW: Accent Lights
+    accent_lights:
+      name: Accent Lights (optional, multiple)
+      description: Lights to toggle as accent: ON with up_single, OFF with down_single and on config taps. No brightness/color/transition sent.
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter: {domain: light}
 
     # ---- Single tap optional actions
     up_single_action:
@@ -351,6 +363,20 @@ blueprint:
       selector:
         number: {min: 0, max: 1, step: 0.05, unit_of_measurement: s, mode: slider}
 
+    up_max_brightness_pct:
+      name: Up Held • maximum brightness (%)
+      description: Clamp for brightening while held. 95 by default.
+      default: 95
+      selector:
+        number: {min: 1, max: 100, step: 1, unit_of_measurement: "%"}
+
+    down_min_brightness_pct:
+      name: Down Held • minimum brightness (%)
+      description: Clamp for dimming while held. 15 by default.
+      default: 15
+      selector:
+        number: {min: 1, max: 100, step: 1, unit_of_measurement: "%"}
+
     # ---- Optional debug logging
     enable_debug_logging:
       name: Enable system log line (debug)
@@ -367,19 +393,22 @@ variables:
   adaptive_helper_entity: !input adaptive_helper
   adaptive_script_entity: !input adaptive_script
 
+  # Accent Lights
+  accent_lights: !input accent_lights
+
   # Optional single actions
   up_single_action: !input up_single_action
   down_single_action: !input down_single_action
   up_single_light_mode: !input up_single_light_mode
   down_single_light_mode: !input down_single_light_mode
 
-  # Optional double actions (MAPPED)
+  # Optional double actions
   up_double_action_var: !input up_double_action
   down_double_action_var: !input down_double_action
   up_double_light_mode_var: !input up_double_light_mode
   down_double_light_mode_var: !input down_double_light_mode
 
-  # Optional triple actions (MAPPED)
+  # Optional triple actions
   up_triple_action_var: !input up_triple_action
   down_triple_action_var: !input down_triple_action
   up_triple_light_mode_var: !input up_triple_light_mode
@@ -401,6 +430,8 @@ variables:
   held_step_pct: !input held_step_pct
   held_interval: !input held_interval
   held_transition: !input held_transition
+  up_max_brightness_pct: !input up_max_brightness_pct
+  down_min_brightness_pct: !input down_min_brightness_pct
 
   # derived
   led_target_light: >
@@ -411,6 +442,9 @@ variables:
 
   has_light_target: >
     {{ light_target != [] }}
+
+  has_accent: >
+    {{ accent_lights != [] }}
 
 triggers:
   - trigger: device
@@ -544,6 +578,14 @@ actions:
                   brightness_pct: !input day_brightness
                   color_temp_kelvin: !input day_color_temp_k
                   transition: !input day_transition
+          # Accent lights OFF on config
+          - if:
+              - condition: template
+                value_template: "{{ has_accent }}"
+            then:
+              - action: light.turn_off
+                target:
+                  entity_id: "{{ accent_lights }}"
 
       # ========== CONFIG BUTTON: NIGHT ==========
       - conditions:
@@ -568,8 +610,16 @@ actions:
                   brightness_pct: !input night_brightness
                   color_temp_kelvin: !input night_color_temp_k
                   transition: !input night_transition
+          # Accent lights OFF on config
+          - if:
+              - condition: template
+                value_template: "{{ has_accent }}"
+            then:
+              - action: light.turn_off
+                target:
+                  entity_id: "{{ accent_lights }}"
 
-      # ========== SINGLE TAPS: LED + Adaptive + Optional Actions ==========
+      # ========== SINGLE TAPS: LED + Adaptive + Optional Actions + ACCENT ==========
       - conditions:
           - condition: trigger
             id:
@@ -640,6 +690,27 @@ actions:
                         target: {entity_id: !input adaptive_script}
                         data:
                           variables: {target_state: "OFF"}
+
+          # (NEW) Accent Lights toggle: ON for up_single, OFF for down_single (no brightness/color/transition)
+          - choose:
+              - conditions: [{condition: trigger, id: ACTION_UP_SINGLE_AL_LIVE}]
+                sequence:
+                  - if:
+                      - condition: template
+                        value_template: "{{ has_accent }}"
+                    then:
+                      - action: light.turn_on
+                        target:
+                          entity_id: "{{ accent_lights }}"
+              - conditions: [{condition: trigger, id: ACTION_DOWN_SINGLE_AL_PRESTAGE}]
+                sequence:
+                  - if:
+                      - condition: template
+                        value_template: "{{ has_accent }}"
+                    then:
+                      - action: light.turn_off
+                        target:
+                          entity_id: "{{ accent_lights }}"
 
           # Optional Action for Single Taps
           - choose:
@@ -737,19 +808,31 @@ actions:
                       timeout: "{{ held_interval }}"
                       continue_on_timeout: true
 
+                    # Compute raw brightness thresholds from % (0–255 scale)
                     - variables:
-                        _min_bri_raw: 38   # ~15% of 255
+                        _min_raw: >-
+                          {{ ((down_min_brightness_pct | int) * 255 / 100) | round(0) | int }}
+                        _max_raw: >-
+                          {{ ((up_max_brightness_pct | int) * 255 / 100) | round(0) | int }}
                         _any_at_or_below_min: >-
                           {{
                             expand(_targets)
                             | selectattr('attributes.brightness','defined')
                             | map(attribute='attributes.brightness')
-                            | select('le', _min_bri_raw)
-                            | list
-                            | count > 0
+                            | select('le', _min_raw)
+                            | list | count > 0
+                          }}
+                        _any_at_or_above_max: >-
+                          {{
+                            expand(_targets)
+                            | selectattr('attributes.brightness','defined')
+                            | map(attribute='attributes.brightness')
+                            | select('ge', _max_raw)
+                            | list | count > 0
                           }}
 
                     - choose:
+                        # Clamp when dimming DOWN and any target is <= min
                         - conditions:
                             - condition: template
                               value_template: "{{ _step < 0 }}"
@@ -760,8 +843,24 @@ actions:
                               target:
                                 entity_id: "{{ _targets }}"
                               data:
-                                brightness_pct: 15
+                                brightness_pct: "{{ down_min_brightness_pct | int }}"
                                 transition: "{{ held_transition }}"
+
+                        # Clamp when brightening UP and any target is >= max
+                        - conditions:
+                            - condition: template
+                              value_template: "{{ _step > 0 }}"
+                            - condition: template
+                              value_template: "{{ _any_at_or_above_max }}"
+                          sequence:
+                            - action: light.turn_on
+                              target:
+                                entity_id: "{{ _targets }}"
+                              data:
+                                brightness_pct: "{{ up_max_brightness_pct | int }}"
+                                transition: "{{ held_transition }}"
+
+                        # Otherwise, keep stepping smoothly
                         - conditions: []
                           sequence:
                             - action: light.turn_on
