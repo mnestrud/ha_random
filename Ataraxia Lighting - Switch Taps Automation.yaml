@@ -1,13 +1,14 @@
 blueprint:
-  name: "Ataraxia Lighting - Inovelli Switch Taps (v1.00rc3)"
+  name: "Ataraxia Lighting - Inovelli Switch Taps (v1.00rc4)"
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap automation.
 
     - Config single = Night (optional light target)
     - Config double = Day (optional light target)
     - Up/Down single = Adaptive helper control + optional LED + optional Action (scene/script/light)
-      • NEW: optional Accent Lights → ON with up_single, OFF with down_single (and OFF on config taps)
+      • Accent Lights (optional): ON with up_single, OFF with down_single (and OFF on config taps)
       • Accent Lights never receive brightness/color/transition in commands
+      • Accent Lights Occupancy Timer (optional): cancelled when accent lights turn ON via up_single
     - Up/Down double & triple = optional Action (scene/script/light) + optional LED
     - Up Held / Down Held = smooth brightness ramp for assigned light targets
       • Disables Adaptive helper on hold start
@@ -101,12 +102,20 @@ blueprint:
     # ---- NEW: Accent Lights
     accent_lights:
       name: Accent Lights (optional, multiple)
-      description: "Lights to toggle as accent: ON with up_single, OFF with down_single and on config taps. No brightness/color/transition sent."
+      description: Lights to toggle as accent: ON with up_single, OFF with down_single and on config taps. No brightness/color/transition sent.
       default: []
       selector:
         entity:
           multiple: true
           filter: {domain: light}
+
+    accent_occupancy_timer:
+      name: Accent Lights Occupancy Timer (optional)
+      description: If set, this timer will be cancelled whenever accent lights are turned ON by up_single.
+      default: []
+      selector:
+        entity:
+          domain: timer
 
     # ---- Single tap optional actions
     up_single_action:
@@ -395,6 +404,7 @@ variables:
 
   # Accent Lights
   accent_lights: !input accent_lights
+  accent_timer: !input accent_occupancy_timer
 
   # Optional single actions
   up_single_action: !input up_single_action
@@ -447,6 +457,7 @@ variables:
     {{ accent_lights != [] }}
 
 triggers:
+  # Config buttons
   - trigger: device
     domain: mqtt
     device_id: !input inovelli_device
@@ -702,6 +713,13 @@ actions:
                       - action: light.turn_on
                         target:
                           entity_id: "{{ accent_lights }}"
+                      - if:
+                          - condition: template
+                            value_template: "{{ accent_timer != [] }}"
+                        then:
+                          - action: timer.cancel
+                            target:
+                              entity_id: "{{ accent_timer }}"
               - conditions: [{condition: trigger, id: ACTION_DOWN_SINGLE_AL_PRESTAGE}]
                 sequence:
                   - if:
@@ -757,6 +775,7 @@ actions:
               - ACTION_UP_HELD
               - ACTION_DOWN_HELD
         sequence:
+          # Determine targets and step from direction (NO fallback to light_group)
           - variables:
               _targets: >-
                 {% if trigger.id == 'ACTION_UP_HELD' %}
@@ -771,10 +790,12 @@ actions:
                   {{ (held_step_pct | int) * -1 }}
                 {% endif %}
 
+          # If no targets defined, do nothing (held disabled)
           - if:
               - condition: template
                 value_template: "{{ _targets != [] }}"
             then:
+              # Stop adaptive on hold start (only if we're actually dimming)
               - if:
                   - condition: template
                     value_template: "{{ adaptive_helper_entity != [] }}"
@@ -782,6 +803,7 @@ actions:
                   - action: input_boolean.turn_off
                     target: {entity_id: !input adaptive_helper}
 
+              # Repeat until release; on each timeout (no release yet), apply brightness step
               - repeat:
                   sequence:
                     - wait_for_trigger:
