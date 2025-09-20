@@ -251,6 +251,12 @@ actions:
                       message: "Tick: bri={{ _g_bri }}, K={{ _g_kel }}, stagger={{ _stagger }}s"
                       entity_id: !input timer_entity
 
+
+          # ---------- Always re-arm timer ----------
+          - action: timer.start
+            target:
+              entity_id: !input timer_entity
+
           # ---------- Do work only when the bridge is online ----------
           - choose:
               - conditions:
@@ -307,8 +313,3 @@ actions:
                               sequence:
                                 - delay:
                                     seconds: "{{ _stagger | int(0) }}"
-
-          # ---------- Always re-arm timer ----------
-          - action: timer.start
-            target:
-              entity_id: !input timer_entity
