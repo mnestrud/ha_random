@@ -5,7 +5,7 @@
 # =============================================================================
 
 blueprint:
-  name: Ataraxia Lighting - Light and Switch MQTT Control Script (v1.0)
+  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc1)
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Adaptive%20Push%20Script.yaml
   author: mnestrud
@@ -68,6 +68,18 @@ blueprint:
         entity:
           multiple: false
           domain: light
+
+    # ⬇️ ADD under blueprint `input:` 
+    inovelli_group_delay:
+      name: "Inovelli → Group publish delay (s)"
+      description: "Delay between Inovelli publish and group publish when both need updates."
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 0.1
+          mode: slider
 
 # ---------- Script body ----------
 alias: AL Bedroom Overhead
@@ -176,6 +188,13 @@ sequence:
              and (grp_ct is number and grp_ct == mired) }}
         {% endif %}
 
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ inovelli_already_correct and group_already_correct }}"
+        sequence:
+          - stop: "Adaptive Push: No changes needed"
+
   # ---------- Actions ----------
   # Publish to Inovelli only if topic is non-blank AND values are not already correct
   - choose:
@@ -199,8 +218,13 @@ sequence:
                     "state": state_for_inovelli
                   } | tojson
                 }}
-          # Delay runs only if the above publish executes
-          - delay: "00:00:01"
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ not inovelli_already_correct and not group_already_correct }}"
+        sequence:
+          - delay:
+              seconds: "{{ publish_delay | float(1) }}"
 
   # Publish to Zigbee2MQTT group only if topic is non-blank AND values are not already correct
   - choose:
@@ -223,5 +247,6 @@ sequence:
                     "color_temp": mired
                   } | tojson
                 }}
+
 
 
