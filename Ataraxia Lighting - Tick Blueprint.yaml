@@ -1,5 +1,5 @@
 blueprint:
-  name: "Ataraxia Lighting – Master Tick Automation (v0.7)"
+  name: "Ataraxia Lighting – Master Tick Automation (v1.0rc1)"
   description: >
     Timer-driven fan-out to up to 15 areas. Uses a global AL switch (optional per-area overrides).
     Reads values once per tick, applies to active areas only. Always re-arms. Includes availability
@@ -299,9 +299,14 @@ actions:
                               brightness_pct: "{{ repeat.item.bri }}"
                               color_temp_kelvin: "{{ repeat.item.kel }}"
                               transition: "{{ _transition }}"
-
-                        - delay:
-                            seconds: "{{ _stagger | int(0) }}"
+                    
+                        - choose:
+                            - conditions:
+                                - condition: template
+                                  value_template: "{{ not repeat.last }}"
+                              sequence:
+                                - delay:
+                                    seconds: "{{ _stagger | int(0) }}"
 
           # ---------- Always re-arm timer ----------
           - action: timer.start
