@@ -5,7 +5,7 @@
 # =============================================================================
 
 blueprint:
-  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc1)
+  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc2)
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Adaptive%20Push%20Script.yaml
   author: mnestrud
@@ -73,7 +73,7 @@ blueprint:
     inovelli_group_delay:
       name: "Inovelli → Group publish delay (s)"
       description: "Delay between Inovelli publish and group publish when both need updates."
-      default: 1
+      default: 0.5
       selector:
         number:
           min: 0
@@ -224,7 +224,7 @@ sequence:
             value_template: "{{ not inovelli_already_correct and not group_already_correct }}"
         sequence:
           - delay:
-              seconds: "{{ publish_delay | float(1) }}"
+              seconds: !input inovelli_group_delay
 
   # Publish to Zigbee2MQTT group only if topic is non-blank AND values are not already correct
   - choose:
@@ -247,6 +247,7 @@ sequence:
                     "color_temp": mired
                   } | tojson
                 }}
+
 
 
 
