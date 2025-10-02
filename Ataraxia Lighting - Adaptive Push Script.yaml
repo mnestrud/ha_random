@@ -212,8 +212,6 @@ sequence:
               payload: |-
                 {{
                   {
-                    "defaultLevelLocal": bri,
-                    "defaultLevelRemote": bri,
                     "brightness": bri,
                     "state": state_for_inovelli
                   } | tojson
@@ -247,6 +245,7 @@ sequence:
                     "color_temp": mired
                   } | tojson
                 }}
+
 
 
 
