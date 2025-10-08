@@ -226,7 +226,6 @@ sequence:
                   "brightness": {{ bri }},
                   "defaultLevelLocal": {{ bri }},
                   "defaultLevelRemote": {{ bri }},
-                  "transition": 1,
                   "state": "{{ state_for_inovelli }}"
                 }
 
@@ -255,8 +254,10 @@ sequence:
               payload: >-
                 {
                   "state": "{{ state_for_inovelli }}",
+                  "brightness": {{ bri }},
                   "color_temp": {{ mired }}
                 }
+
 
 
 
