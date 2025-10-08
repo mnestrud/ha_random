@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.14)
+  name: Ataraxia Lighting - Inovelli Blue Defaults (v1.15)
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Inovelli%20Blue%20Defaults%20%2B%20Reporting%20Script%20Blueprint
 
@@ -77,15 +77,17 @@ variables:
       {
         'dimmingSpeedUpRemote': 0,
         'dimmingSpeedUpLocal': 20,
-        'rampRateOffToOnRemote': 1,
-        'rampRateOffToOnLocal': 1,
+        'rampRateOffToOnRemote': 5,
+        'rampRateOffToOnLocal': 5,
+        'rampRateOnToOffRemote': 127,
+        'rampRateOnToOffLocal': 127,
         'dimmingSpeedDownRemote': 127,
         'dimmingSpeedDownLocal': 127,
         'minimumLevel': 1,
         'maximumLevel': 255,
         'invertSwitch': 'No',
         'autoTimerOff': 0,
-        'stateAfterPowerRestored': 255,
+        'stateAfterPowerRestored': 200,
         'loadLevelIndicatorTimeout': 'Stay On',
         'smartBulbMode': 'Smart Bulb Mode',
         'doubleTapUpToParam55': 'Disabled',
