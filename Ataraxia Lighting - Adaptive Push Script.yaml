@@ -205,17 +205,16 @@ sequence:
             value_template: "{{ not inovelli_already_correct }}"
         sequence:
           - action: mqtt.publish
+          - action: mqtt.publish
             data:
               topic: "{{ inovelli_topic }}"
               qos: 0
               retain: false
               payload: |-
-                {{
-                  {
-                    "brightness": bri,
-                    "state": state_for_inovelli
-                  } | tojson
-                }}
+                {
+                  "brightness": {{ bri }},
+                  "state": "{{ state_for_inovelli }}"
+                }
   - choose:
       - conditions:
           - condition: template
@@ -245,6 +244,7 @@ sequence:
                     "color_temp": mired
                   } | tojson
                 }}
+
 
 
 
