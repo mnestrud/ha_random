@@ -1,18 +1,19 @@
 # =============================================================================
 # Changelog
 # v1.0 (current)
-# - Removed level_config and color_options.  These seem to be persistent.
+# - Removed level_config and color_options. These seem to be persistent.
 # =============================================================================
 
 blueprint:
-  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc4.3)
+  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc4.35)
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Adaptive%20Push%20Script.yaml
   author: mnestrud
   description: >
-    Syncs Adaptive Lighting values to Inovelli switches and/or Zigbee2MQTT light groups.
-    Skips MQTT publishes when targets already match. Optional HA entity inputs enable
-    precise comparisons. Delay before group publish runs only if the Inovelli publish ran.
+    Syncs Adaptive Lighting values to Inovelli switches and/or Zigbee2MQTT light
+    groups. Skips MQTT publishes when targets already match. Optional HA entity
+    inputs enable precise comparisons. Delay before group publish runs only if
+    the Inovelli publish ran.
 
   input:
     al_switch:
@@ -48,8 +49,8 @@ blueprint:
     inovelli_entity:
       name: Inovelli HA entity
       description: >
-        Home Assistant entity representing the Inovelli switch/light. Used to
-        compare current brightness & default levels.
+        Home Assistant entity representing the Inovelli switch/light.
+        Used to compare current brightness & default levels.
         Leave blank to skip state checks (always publishes).
       default: ""
       selector:
@@ -61,15 +62,14 @@ blueprint:
       name: Light group HA entity
       description: >
         Home Assistant light group (or single light). Used to compare current
-        brightness & color temperature.
-        Leave blank to skip state checks (always publishes).
+        brightness & color temperature. Leave blank to skip state checks
+        (always publishes).
       default: ""
       selector:
         entity:
           multiple: false
           domain: light
 
-    # ⬇️ ADD under blueprint `input:` 
     inovelli_group_delay:
       name: "Inovelli → Group publish delay (s)"
       description: "Delay between Inovelli publish and group publish when both need updates."
@@ -84,23 +84,24 @@ blueprint:
 # ---------- Script body ----------
 alias: AL Bedroom Overhead
 mode: single
+
 fields:
   target_state:
     description: >
-      Target power state ("ON" or "OFF").
-      Required: ensures devices turn on/off as expected.
+      Target power state ("ON" or "OFF"). Required: ensures devices
+      turn on/off as expected.
     example: "ON"
 
   brightness_pct:
     description: >
-      Optional brightness percent (0–100).
-      If omitted, falls back to brightness from the Adaptive Lighting switch.
+      Optional brightness percent (0–100). If omitted, falls back to brightness
+      from the Adaptive Lighting switch.
     example: 72
 
   color_temp_kelvin:
     description: >
-      Optional color temperature in Kelvin.
-      If omitted, falls back to the Adaptive Lighting switch value.
+      Optional color temperature in Kelvin. If omitted, falls back to the
+      Adaptive Lighting switch value.
     example: 2700
 
 sequence:
@@ -118,6 +119,7 @@ sequence:
         {% if p is number %}{{ p | int }}
         {% else %}{{ state_attr(al_sw,'brightness_pct') | int(50) }}
         {% endif %}
+
       kelvin: >-
         {% set k = color_temp_kelvin | default(None) %}
         {% if k is number %}{{ k | float }}
@@ -141,11 +143,13 @@ sequence:
           {{ state_attr(inovelli_ent, 'brightness')
              | default(state_attr(inovelli_ent, 'brightness_pct'), true) }}
         {% else %}{{ None }}{% endif %}
+
       _inv_dll: >-
         {% if inovelli_ent | string | length > 0 %}
           {{ state_attr(inovelli_ent, 'defaultLevelLocal')
              | default(state_attr(inovelli_ent, 'default_level_local'), true) }}
         {% else %}{{ None }}{% endif %}
+
       _inv_dlr: >-
         {% if inovelli_ent | string | length > 0 %}
           {{ state_attr(inovelli_ent, 'defaultLevelRemote')
@@ -155,8 +159,10 @@ sequence:
       # Normalize brightness scale (HA % → Z2M 0–254 if needed)
       inv_bri_norm: >-
         {% set v = _inv_bri %}
-        {% if v is number and v <= 1 %}{{ (v * 254) | round(0) | int }}
-        {% elif v is number and v <= 100 and v == v | int %}{{ (v * 254 / 100) | round(0) | int }}
+        {% if v is number and v <= 1 %}
+          {{ (v * 254) | round(0) | int }}
+        {% elif v is number and v <= 100 and v == v | int %}
+          {{ (v * 254 / 100) | round(0) | int }}
         {% else %}{{ v }}{% endif %}
 
       # Check: all three match → skip Inovelli publish
@@ -164,9 +170,11 @@ sequence:
         {% if inovelli_ent | string | length == 0 %}
           false
         {% else %}
-          {{ (inv_bri_norm is number and inv_bri_norm == bri)
-             and (_inv_dll is number and _inv_dll == bri)
-             and (_inv_dlr is number and _inv_dlr == bri) }}
+          {{
+            (inv_bri_norm is number and inv_bri_norm == bri) and
+            (_inv_dll is number and _inv_dll == bri) and
+            (_inv_dlr is number and _inv_dlr == bri)
+          }}
         {% endif %}
 
       # Group/light current values
@@ -174,6 +182,7 @@ sequence:
         {% if group_ent | string | length > 0 %}
           {{ state_attr(group_ent, 'brightness') }}
         {% else %}{{ None }}{% endif %}
+
       grp_ct: >-
         {% if group_ent | string | length > 0 %}
           {{ state_attr(group_ent, 'color_temp') }}
@@ -184,10 +193,13 @@ sequence:
         {% if group_ent | string | length == 0 %}
           false
         {% else %}
-          {{ (grp_bri is number and grp_bri == bri)
-             and (grp_ct is number and grp_ct == mired) }}
+          {{
+            (grp_bri is number and grp_bri == bri) and
+            (grp_ct  is number and grp_ct  == mired)
+          }}
         {% endif %}
 
+  # Early exit if *both* are already correct
   - choose:
       - conditions:
           - condition: template
@@ -209,11 +221,13 @@ sequence:
               topic: "{{ inovelli_topic }}"
               qos: 0
               retain: false
-              payload: |-
+              payload: >-
                 {
                   "brightness": {{ bri }},
                   "state": "{{ state_for_inovelli }}"
                 }
+
+  # If we did the Inovelli publish and the group also needs an update, wait a bit
   - choose:
       - conditions:
           - condition: template
@@ -222,27 +236,22 @@ sequence:
           - delay:
               seconds: !input inovelli_group_delay
 
-# Publish to Zigbee2MQTT group only if topic is non-blank AND values are not already correct
-- choose:
-    - conditions:
-        - condition: template
-          value_template: "{{ (group_topic | string | trim) | length > 0 }}"
-        - condition: template
-          value_template: "{{ not group_already_correct }}"
-      sequence:
-        - action: mqtt.publish
-          data:
-            topic: "{{ group_topic }}"
-            qos: 0
-            retain: false
-            payload: |-
-              {
-                "state": "{{ state_for_inovelli }}",
-                "brightness": {{ bri }},
-                "color_temp": {{ mired }}
-              }
-
-
-
-
-
+  # Publish to Zigbee2MQTT group only if topic is non-blank AND values are not already correct
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ (group_topic | string | trim) | length > 0 }}"
+          - condition: template
+            value_template: "{{ not group_already_correct }}"
+        sequence:
+          - action: mqtt.publish
+            data:
+              topic: "{{ group_topic }}"
+              qos: 0
+              retain: false
+              payload: >-
+                {
+                  "state": "{{ state_for_inovelli }}",
+                  "brightness": {{ bri }},
+                  "color_temp": {{ mired }}
+                }
