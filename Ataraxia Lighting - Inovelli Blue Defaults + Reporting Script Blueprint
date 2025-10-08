@@ -1,19 +1,6 @@
 blueprint:
   name: Ataraxia Lighting - Inovelli Blue Defaults (v1.14)
-    Apply consistent Inovelli Blue (and compatible) device defaults using direct
-    Zigbee2MQTT `configure` commands. 
-
-    What it does per device:
-      • Configure Switch Options: pushes bundled hard-coded defaults via Z2M `device/configure`
-      • Configure Switch State Reporting: sets reporting for on/off, level, and Inovelli default-levels
-      • Publish Zigbee2MQTT device options (transition/state_action/optimistic/qos)
-      • Send `level_config.execute_if_off=true` to each device
-      • Wait a short delay between MQTT publishes (default 0.5s) to avoid flooding
-
-    MQTT base topic is configurable (default: "zigbee2mqtt").
-
     Author: mnestrud
-
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Inovelli%20Blue%20Defaults%20%2B%20Reporting%20Script%20Blueprint
 
