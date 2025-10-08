@@ -5,7 +5,7 @@
 # =============================================================================
 
 blueprint:
-  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc4.2)
+  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc4.3)
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Adaptive%20Push%20Script.yaml
   author: mnestrud
@@ -222,26 +222,25 @@ sequence:
           - delay:
               seconds: !input inovelli_group_delay
 
-  # Publish to Zigbee2MQTT group only if topic is non-blank AND values are not already correct
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ (group_topic | string | trim) | length > 0 }}"
-          - condition: template
-            value_template: "{{ not group_already_correct }}"
-        sequence:
-          - action: mqtt.publish
-            data:
-              topic: "{{ group_topic }}"
-              qos: 0
-              retain: false
-              payload: |-
-              payload: |-
-                {
-                  "state": {{ state_for_inovelli }},
-                  "brightness": {{ bri }},
-                  "color_temp": {{ mired }}
-                }
+# Publish to Zigbee2MQTT group only if topic is non-blank AND values are not already correct
+- choose:
+    - conditions:
+        - condition: template
+          value_template: "{{ (group_topic | string | trim) | length > 0 }}"
+        - condition: template
+          value_template: "{{ not group_already_correct }}"
+      sequence:
+        - action: mqtt.publish
+          data:
+            topic: "{{ group_topic }}"
+            qos: 0
+            retain: false
+            payload: |-
+              {
+                "state": "{{ state_for_inovelli }}",
+                "brightness": {{ bri }},
+                "color_temp": {{ mired }}
+              }
 
 
 
