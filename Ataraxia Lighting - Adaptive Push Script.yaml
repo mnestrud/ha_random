@@ -238,10 +238,11 @@ sequence:
               payload: |-
               payload: |-
                 {
-                  "state": {% if state_for_lights is none %}null{% else %}"{{ state_for_lights }}"{% endif %},
+                  "state": {{ state_for_inovelli }},
                   "brightness": {{ bri }},
                   "color_temp": {{ mired }}
                 }
+
 
 
 
