@@ -49,13 +49,13 @@ blueprint:
 
     day_brightness:
       name: Daytime brightness (%)
-      default: 80
+      default: 100
       selector:
         number: {min: 1, max: 100, mode: slider, unit_of_measurement: "%"}
 
     day_color_temp_k:
       name: Daytime color temperature (K)
-      default: 4000
+      default: 6500
       selector:
         number: {min: 2000, max: 6500, step: 50, unit_of_measurement: "K"}
 
