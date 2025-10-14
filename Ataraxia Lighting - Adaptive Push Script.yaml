@@ -5,7 +5,7 @@
 # =============================================================================
 
 blueprint:
-  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc5)
+  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc6)
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Adaptive%20Push%20Script.yaml
   author: mnestrud
@@ -253,10 +253,11 @@ sequence:
               retain: false
               payload: >-
                 {
-                  "state": "{{ state_for_inovelli }}",
+                  "state": {% if state_for_lights is none %}null{% else %}"{{ state_for_lights }}"{% endif %},
                   "brightness": {{ bri }},
                   "color_temp": {{ mired }}
                 }
+
 
 
 
