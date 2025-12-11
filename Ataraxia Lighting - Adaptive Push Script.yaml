@@ -126,8 +126,7 @@ sequence:
         {% else %}{{ state_attr(al_sw,'color_temp_kelvin') | float(2700) }}
         {% endif %}
 
-      bri_raw: "{{ (pct * 254 / 100) | round(0) | int }}"
-      bri: "{{ [ [ bri_raw, 1 ] | max, 254 ] | min }}"
+      bri: "{{ (pct * 254 / 100) | round(0) | int }}"
       mired_raw: "{{ (1000000 / kelvin) | round(0) | int }}"
       mired: "{{ [ [ mired_raw, 153 ] | max, 500 ] | min }}"
 
