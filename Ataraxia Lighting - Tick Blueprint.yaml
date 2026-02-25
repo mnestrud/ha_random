@@ -1,5 +1,5 @@
 blueprint:
-  name: "Ataraxia Lighting – Master Tick Automation (v1.0rc3)"
+  name: "Ataraxia Lighting – Master Tick Automation (v1.0rc4)"
   description: >
     Timer-driven fan-out to up to 15 areas. Uses a global AL switch (optional per-area overrides).
     Reads values once per tick, applies to active areas only. Always re-arms. Includes availability
@@ -186,39 +186,39 @@ actions:
               ov15: !input a15_al_switch_override
 
               # Global AL values (single read)
-              _g_bri: "{{ state_attr(g_sw, 'brightness_pct') | float(50) | round(0) | int,1] | max }}"
+              _g_bri: "{{ [state_attr(g_sw, 'brightness_pct') | float(50) | round(0) | int,1] | max }}"
               _g_kel: "{{ state_attr(g_sw, 'color_temp_kelvin') | float(2700) }}"
 
               # Per-area resolved values: override if provided, else global
-              _a1_bri:  "{{ state_attr(ov1, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov1 else _g_bri }}"
+              _a1_bri:  "{{ [state_attr(ov1, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov1 else _g_bri }}"
               _a1_kel:  "{{ state_attr(ov1, 'color_temp_kelvin') | float(_g_kel) if ov1 else _g_kel }}"
-              _a2_bri:  "{{ state_attr(ov2, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov2 else _g_bri }}"
+              _a2_bri:  "{{ [state_attr(ov2, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov2 else _g_bri }}"
               _a2_kel:  "{{ state_attr(ov2, 'color_temp_kelvin') | float(_g_kel) if ov2 else _g_kel }}"
-              _a3_bri:  "{{ state_attr(ov3, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov3 else _g_bri }}"
+              _a3_bri:  "{{ [state_attr(ov3, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov3 else _g_bri }}"
               _a3_kel:  "{{ state_attr(ov3, 'color_temp_kelvin') | float(_g_kel) if ov3 else _g_kel }}"
-              _a4_bri:  "{{ state_attr(ov4, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov4 else _g_bri }}"
+              _a4_bri:  "{{ [state_attr(ov4, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov4 else _g_bri }}"
               _a4_kel:  "{{ state_attr(ov4, 'color_temp_kelvin') | float(_g_kel) if ov4 else _g_kel }}"
-              _a5_bri:  "{{ state_attr(ov5, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov5 else _g_bri }}"
+              _a5_bri:  "{{ [state_attr(ov5, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov5 else _g_bri }}"
               _a5_kel:  "{{ state_attr(ov5, 'color_temp_kelvin') | float(_g_kel) if ov5 else _g_kel }}"
-              _a6_bri:  "{{ state_attr(ov6, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov6 else _g_bri }}"
+              _a6_bri:  "{{ [state_attr(ov6, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov6 else _g_bri }}"
               _a6_kel:  "{{ state_attr(ov6, 'color_temp_kelvin') | float(_g_kel) if ov6 else _g_kel }}"
-              _a7_bri:  "{{ state_attr(ov7, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov7 else _g_bri }}"
+              _a7_bri:  "{{ [state_attr(ov7, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov7 else _g_bri }}"
               _a7_kel:  "{{ state_attr(ov7, 'color_temp_kelvin') | float(_g_kel) if ov7 else _g_kel }}"
-              _a8_bri:  "{{ state_attr(ov8, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov8 else _g_bri }}"
+              _a8_bri:  "{{ [state_attr(ov8, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov8 else _g_bri }}"
               _a8_kel:  "{{ state_attr(ov8, 'color_temp_kelvin') | float(_g_kel) if ov8 else _g_kel }}"
-              _a9_bri:  "{{ state_attr(ov9, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov9 else _g_bri }}"
+              _a9_bri:  "{{ [state_attr(ov9, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov9 else _g_bri }}"
               _a9_kel:  "{{ state_attr(ov9, 'color_temp_kelvin') | float(_g_kel) if ov9 else _g_kel }}"
-              _a10_bri: "{{ state_attr(ov10, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov10 else _g_bri }}"
+              _a10_bri: "{{ [state_attr(ov10, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov10 else _g_bri }}"
               _a10_kel: "{{ state_attr(ov10, 'color_temp_kelvin') | float(_g_kel) if ov10 else _g_kel }}"
-              _a11_bri: "{{ state_attr(ov11, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov11 else _g_bri }}"
+              _a11_bri: "{{ [state_attr(ov11, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov11 else _g_bri }}"
               _a11_kel: "{{ state_attr(ov11, 'color_temp_kelvin') | float(_g_kel) if ov11 else _g_kel }}"
-              _a12_bri: "{{ state_attr(ov12, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov12 else _g_bri }}"
+              _a12_bri: "{{ [state_attr(ov12, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov12 else _g_bri }}"
               _a12_kel: "{{ state_attr(ov12, 'color_temp_kelvin') | float(_g_kel) if ov12 else _g_kel }}"
-              _a13_bri: "{{ state_attr(ov13, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov13 else _g_bri }}"
+              _a13_bri: "{{ [state_attr(ov13, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov13 else _g_bri }}"
               _a13_kel: "{{ state_attr(ov13, 'color_temp_kelvin') | float(_g_kel) if ov13 else _g_kel }}"
-              _a14_bri: "{{ state_attr(ov14, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov14 else _g_bri }}"
+              _a14_bri: "{{ [state_attr(ov14, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov14 else _g_bri }}"
               _a14_kel: "{{ state_attr(ov14, 'color_temp_kelvin') | float(_g_kel) if ov14 else _g_kel }}"
-              _a15_bri: "{{ state_attr(ov15, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov15 else _g_bri }}"
+              _a15_bri: "{{ [state_attr(ov15, 'brightness_pct') | float(_g_bri) | round(0) | int,1] | max if ov15 else _g_bri }}"
               _a15_kel: "{{ state_attr(ov15, 'color_temp_kelvin') | float(_g_kel) if ov15 else _g_kel }}"
 
               # Areas table for the loop
