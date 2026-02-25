@@ -1,5 +1,5 @@
 blueprint:
-  name: "Ataraxia Lighting – Master Tick Automation (v1.0rc1)"
+  name: "Ataraxia Lighting – Master Tick Automation (v1.0rc2)"
   description: >
     Timer-driven fan-out to up to 15 areas. Uses a global AL switch (optional per-area overrides).
     Reads values once per tick, applies to active areas only. Always re-arms. Includes availability
