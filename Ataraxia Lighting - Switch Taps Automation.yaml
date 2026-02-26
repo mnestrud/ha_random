@@ -1,5 +1,5 @@
 blueprint:
-  name: "Ataraxia Lighting - Inovelli Switch Taps (v1.00rc6)"
+  name: "Ataraxia Lighting - Inovelli Switch Taps (v1.00rc7)"
   description: >
     Inovelli Blue 2-in-1 (Zigbee2MQTT) multi-tap automation.
 
@@ -694,12 +694,23 @@ actions:
                         value_template: >-
                           {{ trigger.id == 'ACTION_DOWN_SINGLE_AL_PRESTAGE' and is_state(adaptive_helper_entity, 'off') }}
                     sequence:
-                      - action: script.turn_on
-                        target: {entity_id: !input adaptive_script}
-                        data:
-                          variables: {target_state: "OFF"}
-                      - action: input_boolean.turn_on
-                        target: {entity_id: !input adaptive_helper}
+                    - action: script.turn_on
+                      target:
+                        entity_id: !input adaptive_script
+                      data:
+                        variables:
+                          target_state: 'OFF'
+                    - delay:
+                        milliseconds: 200
+                    - wait_for_trigger:
+                      - trigger: state
+                        entity_id: !input adaptive_script
+                        to: 'off'
+                      timeout:
+                        seconds: 10
+                    - action: input_boolean.turn_on
+                      target:
+                        entity_id: !input adaptive_helper
 
           # (NEW) Accent Lights toggle: ON for up_single, OFF for down_single (no brightness/color/transition)
           - choose:
