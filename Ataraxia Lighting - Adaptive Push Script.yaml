@@ -5,7 +5,7 @@
 # =============================================================================
 
 blueprint:
-  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc10)
+  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc11)
   domain: script
   source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Adaptive%20Push%20Script.yaml
   author: mnestrud
@@ -248,8 +248,7 @@ sequence:
               topic: "{{ group_topic }}"
               qos: 0
               retain: false
-              payload: "{% if state_for_lights is none %}{\"brightness\": {{ bri }}, \"level_config\": {\"execute_if_off\": true}, \"color_options\":
-                {\"execute_if_off\": true}}{% else %}{\"state\": \"{{ state_for_lights }}\",
+              payload: "{% if state_for_lights is none %}{\"brightness\": {{ bri }}, \"level_config\": {\"execute_if_off\": true}}{% else %}{\"state\": \"{{ state_for_lights }}\",
                 \"brightness\": {{ bri }}, \"color_temp\": {{ mired }}}{% endif %}"
               #payload: >-
               #  {
@@ -257,6 +256,7 @@ sequence:
               #    "brightness": {{ bri }},
               #    "color_temp": {{ mired }}
               #  }
+
 
 
 
