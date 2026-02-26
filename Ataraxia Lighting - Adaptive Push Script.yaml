@@ -165,16 +165,16 @@ sequence:
         {% else %}{{ v }}{% endif %}
 
       # Check: all three match → skip Inovelli publish
-      inovelli_already_correct: >-
-        {% if inovelli_ent | string | length == 0 %}
-          false
-        {% else %}
-          {{
-            (inv_bri_norm is number and inv_bri_norm == bri) and
-            (_inv_dll is number and _inv_dll == bri) and
-            (_inv_dlr is number and _inv_dlr == bri)
-          }}
-        {% endif %}
+      inovelli_already_correct: "{% if inovelli_ent | string | length == 0 %}
+        false
+      {% else %}
+        {{
+          is_state(inovelli_ent, target_state_norm | lower) and
+          (inv_bri_norm is number and inv_bri_norm == bri) and
+          (_inv_dll is number and _inv_dll == bri) and
+          (_inv_dlr is number and _inv_dlr == bri)
+        }}
+      {% endif %}"
 
       # Group/light current values
       grp_bri: >-
@@ -258,6 +258,7 @@ sequence:
               #    "brightness": {{ bri }},
               #    "color_temp": {{ mired }}
               #  }
+
 
 
 
