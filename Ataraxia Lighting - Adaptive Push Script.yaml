@@ -1,114 +1,106 @@
-  blueprint:
-    name: Ataraxia Lighting - Adaptive Push Script (v1.0rc13)
-    domain: script                                                                                                                                                                                                                                                                            source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Adaptive%20Push%20Script.yaml
-    author: mnestrud                                                                                                                                                                                                                                                                          description: >
-      Syncs Adaptive Lighting values to Inovelli switches and/or Zigbee2MQTT
-      light groups. Always publishes on every tick. Inovelli OFF payload omits
-      state to avoid triggering a ZCL group recall.
-    input:
-      al_switch:
-        name: Adaptive Lighting switch
-        description: >
-          Adaptive Lighting dummy switch entity. Provides brightness_pct
-          and color_temp_kelvin attributes.
-        selector:
-          entity:
-            domain:
-            - switch
-            reorder: false
-            multiple: false
-      inovelli_set_topic:
-        name: Inovelli switch MQTT topic
-        description: >
-          Zigbee2MQTT /set topic for the Inovelli Blue switch. Example:
-          "zigbee2mqtt/Primary Bedroom Overhead Light Switch/set".
-          Leave blank to disable Inovelli publishing.
-        default: ''
-        selector:
-          text:
-            multiple: false
-            multiline: false
-      group_set_topic:
-        name: Light group / light MQTT topic
-        description: >
-          Zigbee2MQTT /set topic for a light group or individual light. Example:
-          "zigbee2mqtt/zgb_primary_bedroom/set".
-          Leave blank to disable group publishing.
-        default: ''
-        selector:
-          text:
-            multiple: false
-            multiline: false
-      inovelli_group_delay:
-        name: Inovelli → Group publish delay (s)
-        description: Delay between Inovelli publish and group publish when both topics are set.
-        default: 0.5
-        selector:
-          number:
-            min: 0.0
-            max: 5.0
-            step: 0.1
-            mode: slider
-  alias: AL Bedroom Overhead
-  mode: single
-  fields:
-    target_state:
-      description: 'Target power state ("ON" or "OFF").'
-      example: 'ON'
-    brightness_pct:
-      description: 'Optional brightness percent (0–100). Falls back to the AL switch value.'
-      example: 72
-    color_temp_kelvin:
-      description: 'Optional color temperature in Kelvin. Falls back to the AL switch value.'
-      example: 2700
-  sequence:
-  - variables:
-      al_sw: !input al_switch
-      inovelli_topic: !input inovelli_set_topic
-      group_topic: !input group_set_topic
-      pct: "{% set p = brightness_pct | default(None) %}\
-        {% if p is number %}{{ p | int }}\
-        {% else %}{{ state_attr(al_sw, 'brightness_pct') | int(50) }}{% endif %}"
-      kelvin: "{% set k = color_temp_kelvin | default(None) %}\
-        {% if k is number %}{{ k | float }}\
-        {% else %}{{ state_attr(al_sw, 'color_temp_kelvin') | float(2700) }}{% endif %}"
-      bri: '{{ (pct * 254 / 100) | round(0) | int }}'
-      mired_raw: '{{ (1000000 / kelvin) | round(0) | int }}'
-      mired: '{{ [ [ mired_raw, 153 ] | max, 500 ] | min }}'
-      target_state_norm: '{{ target_state | upper }}'
-      state_for_lights: '{{ target_state_norm if target_state_norm == "ON" else None }}'
-  - choose:
-    - conditions:
-      - condition: template
-        value_template: '{{ (inovelli_topic | string | trim) | length > 0 }}'
-      sequence:
-      - action: mqtt.publish
-        data:
-          topic: '{{ inovelli_topic }}'
-          qos: 0
-          retain: false
-          payload: "{% if target_state_norm == 'OFF' %}{\"defaultLevelLocal\": {{ bri\
-            }}, \"defaultLevelRemote\": {{ bri }}, \"level_config\": {\"execute_if_off\
-            \": true}}{%- else %}{\"brightness\": {{ bri }}, \"defaultLevelLocal\":\
-            \ {{ bri }}, \"defaultLevelRemote\": {{ bri }}, \"level_config\": {\"execute_if_off\"\
-            : true}, \"state\": \"ON\"}{% endif %}"
-  - choose:
-    - conditions:
-      - condition: template
-        value_template: '{{ (inovelli_topic | string | trim) | length > 0 and (group_topic | string | trim) | length > 0 }}'
-      sequence:
-      - delay:
-          seconds: !input inovelli_group_delay
-  - choose:
-    - conditions:
-      - condition: template
-        value_template: '{{ (group_topic | string | trim) | length > 0 }}'
-      sequence:
-      - action: mqtt.publish
-        data:
-          topic: '{{ group_topic }}'
-          qos: 0
-          retain: false
-          payload: "{% if state_for_lights is none %}{\"brightness\": {{ bri }}, \"\
-            level_config\": {\"execute_if_off\": true}}{%- else %}{\"state\": \"{{ state_for_lights\
-            }}\", \"brightness\": {{ bri }}, \"color_temp\": {{ mired }}}{% endif %}"
+blueprint:
+  name: Ataraxia Lighting - Adaptive Push Script (v1.0rc13)
+  domain: script
+  source_url: https://raw.githubusercontent.com/mnestrud/ha_random/refs/heads/main/Ataraxia%20Lighting%20-%20Adaptive%20Push%20Script.yaml
+  author: mnestrud
+  description: >
+    Syncs Adaptive Lighting values to Inovelli switches and/or Zigbee2MQTT
+    light groups. Always publishes on every tick. Inovelli OFF payload omits
+    state to avoid triggering a ZCL group recall.
+  input:
+    al_switch:
+      name: Adaptive Lighting switch
+      description: >
+        Adaptive Lighting dummy switch entity. Provides brightness_pct
+        and color_temp_kelvin attributes.
+      selector:
+        entity:
+          domain:
+          - switch
+          reorder: false
+          multiple: false
+    inovelli_set_topic:
+      name: Inovelli switch MQTT topic
+      description: >
+        Zigbee2MQTT /set topic for the Inovelli Blue switch. Example:
+        "zigbee2mqtt/Primary Bedroom Overhead Light Switch/set".
+        Leave blank to disable Inovelli publishing.
+      default: ''
+      selector:
+        text:
+          multiple: false
+          multiline: false
+    group_set_topic:
+      name: Light group / light MQTT topic
+      description: >
+        Zigbee2MQTT /set topic for a light group or individual light. Example:
+        "zigbee2mqtt/zgb_primary_bedroom/set".
+        Leave blank to disable group publishing.
+      default: ''
+      selector:
+        text:
+          multiple: false
+          multiline: false
+    inovelli_group_delay:
+      name: Inovelli -> Group publish delay (s)
+      description: Delay between Inovelli publish and group publish when both topics are set.
+      default: 0.5
+      selector:
+        number:
+          min: 0.0
+          max: 5.0
+          step: 0.1
+          mode: slider
+alias: AL Bedroom Overhead
+mode: single
+fields:
+  target_state:
+    description: 'Target power state ("ON" or "OFF").'
+    example: 'ON'
+  brightness_pct:
+    description: 'Optional brightness percent (0-100). Falls back to the AL switch value.'
+    example: 72
+  color_temp_kelvin:
+    description: 'Optional color temperature in Kelvin. Falls back to the AL switch value.'
+    example: 2700
+sequence:
+- variables:
+    al_sw: !input al_switch
+    inovelli_topic: !input inovelli_set_topic
+    group_topic: !input group_set_topic
+    pct: "{% set p = brightness_pct | default(None) %}{% if p is number %}{{ p | int }}{% else %}{{ state_attr(al_sw, 'brightness_pct') | int(50) }}{% endif %}"
+    kelvin: "{% set k = color_temp_kelvin | default(None) %}{% if k is number %}{{ k | float }}{% else %}{{ state_attr(al_sw, 'color_temp_kelvin') | float(2700) }}{% endif %}"
+    bri: '{{ (pct * 254 / 100) | round(0) | int }}'
+    mired_raw: '{{ (1000000 / kelvin) | round(0) | int }}'
+    mired: '{{ [ [ mired_raw, 153 ] | max, 500 ] | min }}'
+    target_state_norm: '{{ target_state | upper }}'
+    state_for_lights: '{{ target_state_norm if target_state_norm == "ON" else None }}'
+- choose:
+  - conditions:
+    - condition: template
+      value_template: '{{ (inovelli_topic | string | trim) | length > 0 }}'
+    sequence:
+    - action: mqtt.publish
+      data:
+        topic: '{{ inovelli_topic }}'
+        qos: 0
+        retain: false
+        payload: "{% if target_state_norm == 'OFF' %}{\"defaultLevelLocal\": {{ bri }}, \"defaultLevelRemote\": {{ bri }}, \"level_config\": {\"execute_if_off\": true}}{%- else %}{\"brightness\": {{ bri }}, \"defaultLevelLocal\": {{ bri }}, \"defaultLevelRemote\": {{ bri }}, \"level_config\": {\"execute_if_off\": true}, \"state\": \"ON\"}{% endif %}"
+- choose:
+  - conditions:
+    - condition: template
+      value_template: '{{ (inovelli_topic | string | trim) | length > 0 and (group_topic | string | trim) | length > 0 }}'
+    sequence:
+    - delay:
+        seconds: !input inovelli_group_delay
+- choose:
+  - conditions:
+    - condition: template
+      value_template: '{{ (group_topic | string | trim) | length > 0 }}'
+    sequence:
+    - action: mqtt.publish
+      data:
+        topic: '{{ group_topic }}'
+        qos: 0
+        retain: false
+        payload: "{% if state_for_lights is none %}{\"brightness\": {{ bri }}, \"level_config\": {\"execute_if_off\": true}}{%- else %}{\"state\": \"{{ state_for_lights }}\", \"brightness\": {{ bri }}, \"color_temp\": {{ mired }}}{% endif %}"
