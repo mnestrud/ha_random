@@ -1,5 +1,5 @@
 blueprint:
-  name: Ataraxia Lighting – Hue Defaults (v1.15)
+  name: Ataraxia Lighting – Hue Defaults (v1.16)
   description: >
     Apply Philips Hue defaults via Zigbee2MQTT without a reference device.
 
@@ -17,6 +17,8 @@ blueprint:
 
     Parameters
       • MQTT Base Topic (text, default: zigbee2mqtt)
+      • Hue Native Control (bool, default: false)
+      • Effect Color Mode (list, default: stop)
       • state_action (bool, default: false)
       • color_sync (bool, default: true)
       • transition (number, default: 0.4)
@@ -27,6 +29,7 @@ blueprint:
       • Target devices (list)
 
     Changelog
+      • v1.16: Added hue native control , and effect color mode options. (details on hue native control: https://community.home-assistant.io/t/z2m-and-hue-native-control/1008938)
       • v1.15: Remove unsupported blueprint keys (icon/tags/input_order). Keep always-push of execute_if_off flags.
       • v1.14: Added configurable MQTT base topic; docs tables (no logic change)
       • v1.13: Docs polish
@@ -51,6 +54,24 @@ blueprint:
         text: {}
 
     # DEVICE OPTIONS (Z2M per-device)
+    hue_native_control:
+      name: Hue Native Control (device option)
+      description: When true, z2m uses phillips hue atomic commands instead of ZCL. Default = false.
+      default: false
+      selector:
+        boolean: {}
+
+    effect_color_mode:
+      name: Effect Color Mode (device option)
+      description: What happens when color is changed while an effect is active (requires Hue native control). Default = stop.
+      default: "stop"
+      selector:
+        select:
+          mode: dropdown
+          options:
+            - "stop"
+            - "update"
+        
     state_action:
       name: state_action (device option)
       description: When true, Z2M also publishes action events. Default = false.
@@ -147,6 +168,8 @@ variables:
   in_power_on_behavior: !input power_on_behavior
   in_publish_delay: !input publish_delay
   in_configure_reporting: !input configure_reporting
+  in_hue_native_control: !input hue_native_control
+  in_effect_color_mode: !input effect_color_mode
 
   # Constant defaults for Hue
   color_temp_startup_default: 370
@@ -164,6 +187,8 @@ variables:
         'color_sync': in_color_sync,
         'state_action': in_state_action,
         'optimistic': in_optimistic,
+        'hue_native_control': in_hue_native_control,
+        'effect_color_mode': in_effect_color_mode,
         'qos': 0
       } }}
 
@@ -224,6 +249,7 @@ sequence:
         - delay: "{{ in_publish_delay }}"
 
         # 2) Light defaults (/set) – ONE KEY PER PUBLISH (and ALWAYS push execute_if_off flags)
+        
         # power_on_behavior
         - action: mqtt.publish
           data:

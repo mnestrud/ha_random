@@ -1,4 +1,4 @@
-# Ataraxia Lighting – Hue Defaults (v1.15)
+# Ataraxia Lighting – Hue Defaults (v1.16)
 
 **Purpose:** Apply Hue light defaults and reporting via Zigbee2MQTT.  
 **Reference device:** Not used in this version.  
@@ -11,6 +11,8 @@
 | Name | Default | What it does |
 |---|---|---|
 | **MQTT Base Topic** | `zigbee2mqtt` | Root MQTT topic for Z2M (e.g. `zigbee2mqtt`). |
+| **hue_native_control** | `false` | Use Phillips specific protocol to send atomic commands instead of traditional ZCL commands. (Allows updating while off on older bulbs that don't support the `***.update_while_off` options) |
+| **effect_color_mode** | `stop` | What happens when color is changed while an effect is active (requires Hue native control): `"stop"`, or `"update"`  |
 | **state_action** | `false` | Also publish action events from Z2M. |
 | **color_sync** | `true` | Keep `xy` and `color_temp` modes in sync. |
 | **transition** | `0.4` | Default transition for level/color/on/off commands. |
@@ -35,6 +37,8 @@
 ### Zigbee2MQTT device options (published to `…/bridge/request/device/options`)
 | Option | Value (from inputs) |
 |---|---|
+| `hue_native_controls` | user input (default `false`) |
+| `effect_color_mode` | user input (default `stop`) |
 | `transition` | user input (default `0.4`) |
 | `color_sync` | user input (default `true`) |
 | `state_action` | user input (default `false`) |
@@ -80,6 +84,10 @@ Hue doesn’t expose many vendor-specific options. Hard-coded here are:
 - ### `level_config.execute_if_off`
   Default: **true**. Allows brightness updates while off.  
   **Why it matters:** Ensures adaptive brightness changes are retained while the light is off.
+
+- ### `hue_native_control`
+  Default: **false**. True allows Z2M to use Phillips Specific protocol to send single atomic commands.  
+  **Why it matters:** Ensures adaptive brightness & color updates are stored while off, so they’re correct on next power-on for older bulbs that do not support these options via the `execute_if_off` options.
 
 - ### Device options that affect adaptive lighting
   - **`transition`** (default **0.4s**): Smooth fade time for adaptive updates.  
